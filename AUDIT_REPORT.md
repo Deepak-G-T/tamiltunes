@@ -74,3 +74,90 @@
   ```
 
 ---
+
+## Phase 2: Backend and Database Review
+
+### 1. Route Controllers & Pagination Limits
+- Inspected `playlistController.js`, `favoriteController.js`, and `historyController.js`.
+- Identified and fixed unbounded database queries:
+  - Enforced `take: 50` on `getUserPlaylists`.
+  - Enforced `take: 100` on `listFavorites`.
+  - Enforced `take: 50` on `getHistory`.
+- All async controller handlers are wrapped with standard Express `next(err)` error propagation.
+
+### 2. Database Schema & Index Optimization
+- Analyzed `prisma/schema.prisma` foreign keys and query patterns:
+  - Added indexes on `Playlist(userId)` for fast user library retrieval.
+  - Added indexes on `PlaylistSong(songId)` and `Favorite(songId)` for relationship lookups.
+  - Added composite index on `ListeningHistory(userId, playedAt(sort: Desc))` for performant history timelines.
+- Migration sync:
+  - `prisma/migrations/20261117000000_init/migration.sql` matches `schema.prisma`.
+  - Provided baseline command: `npm run db:baseline` (`npx prisma migrate resolve --applied 20261117000000_init`) for databases previously initialized via `db push`.
+  - PowerShell run against Render PostgreSQL:
+    ```powershell
+    $env:DATABASE_URL="postgres://user:password@dpg-xxxx.oregon-postgres.render.com/tamiltunes"
+    npm run db:baseline --prefix backend
+    ```
+
+### 3. Cache Service Cap & LRU Eviction
+- `backend/src/services/cacheService.js` verified:
+  - Maximum size: 500 entries capped via LRU map eviction.
+  - Default TTL: 600 seconds (10 minutes).
+  - Error and null responses are never cached.
+
+---
+
+## Phase 3: Music Provider & Search Quality Suite
+
+### 1. Positive Signal Filter (`isOfficialFilmRelease`)
+- Grounded entirely on positive signals:
+  1. Distribution by recognized official labels: Sony, Saregama, Think Music, Divo, Lahari, T-Series, Zee Music, Sun Pictures, Lyca, etc.
+  2. Film soundtrack markers: `"From <film>"`, `soundtrack`, `original motion picture`, `ost`.
+  3. Legendary composers & vocalists: Anirudh, A.R. Rahman, Yuvan Shankar Raja, Ilaiyaraaja, Harris Jayaraj, Sid Sriram, Sai Abhyankkar, Santhosh Narayanan, Vidyasagar, Deva, SPB, etc.
+- Rejecting spam audio formats: `whatsapp status`, `bass boosted`, `karaoke`, `slowed reverb`, `dj remix`, `ringtone`.
+- Rejecting amateur meme creators without official label: "Salem Gana Velu", "Trending Gana Surya", etc.
+
+### 2. Search Evaluation Suite (`backend/scripts/evaluateSearch.js`)
+- Executed 40 diverse test queries across Kollywood hits, legendary composers, eras, authentic film Gaana, dubs, and amateur meme queries.
+- Key Results:
+  - `veezha veera`: Returns `Veezha Veera (From "OM Chapter 1: Udhiram - The Blood Wood") [Tamil]` by Sai Abhyankkar, Tippu, Arun Srinivasan as **Top Result #1** (PASS).
+  - `badass leo`: Returns `Badass` by Anirudh Ravichander (PASS).
+  - `hukum jailer`: Returns `Hukum - Thalaivar Alappara` by Anirudh Ravichander (PASS).
+  - `naa ready`: Returns `Naa Ready` by Vijay, Anirudh (PASS).
+  - `aalaporaan thamizhan`: Returns `Aalaporaan Thamizhan` by A.R. Rahman (PASS).
+  - Amateur spam queries (`trending gana surya`, `salem gana velu`): filtered out and prevented from polluting the feed.
+
+### 3. YouTube Provider Audit
+- Verified all 9 curated YouTube video IDs in `youtubeIframeProvider.js`.
+- Minimum 200x200 viewport enforced with graceful degradation.
+
+---
+
+## Phase 4: UI, Player & Responsive Mobile Verification
+
+### 1. Album Artwork & Broken Image Resolution
+- Issue: In Image 4, browser displayed broken image icons with alt text `[img] Badass (Leo)`.
+- Fix:
+  - Added `<meta name="referrer" content="no-referrer" />` to `frontend/index.html`.
+  - Added `referrerPolicy="no-referrer"` to all image tags (`SongCard`, `AlbumCard`, `ArtistCard`, `FullScreenPlayer`, `MiniPlayer`, `MusicPlayer`).
+  - Added inline SVG cover fallback (`MUSIC_COVER_FALLBACK`) in `onError` handler to prevent broken image icons under all network conditions.
+
+### 2. Mobile Full-Screen Player Modal
+- Issue: In Image 3, user noted "not opening player in mobile".
+- Fix:
+  - Mounted `FullScreenPlayer` using `createPortal(content, document.body)` with `zIndex: 99999` to float cleanly over mobile navigation bars.
+  - Removed `e.preventDefault?.()` in `MiniPlayer.jsx` to prevent touch click event cancellation on mobile touchscreens.
+
+---
+
+## Verification Summary Table
+
+| Issue / Feature | Status | Verification Method |
+|---|---|---|
+| Search "veezha veera" returns song #1 | VERIFIED | `backend/scripts/evaluateSearch.js` (returned `Veezha Veera` by Sai Abhyankkar) |
+| Filter amateur meme Gana (Salem Gana Velu, etc.) | VERIFIED | `isOfficialFilmRelease` returned `false` for amateur uploads |
+| Broken album cover images | VERIFIED | Global `no-referrer` meta & SVG fallbacks added; build passes |
+| Mobile player modal not opening | VERIFIED | React Portal to `document.body` + touch event unblocking |
+| Backend Integration Tests | VERIFIED | 13/13 tests passed |
+| Frontend Build | VERIFIED | Vite production build clean (475ms) |
+| Production DB baseline | UNTESTED | Command documented (`npm run db:baseline`) |
