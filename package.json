@@ -1,0 +1,39 @@
+{
+  "name": "tamiltunes",
+  "version": "1.0.0",
+  "description": "TamilTunes - Production-Quality Tamil Music Streaming Web App",
+  "type": "module",
+  "private": true,
+  "scripts": {
+    "build": "cd frontend && npm install && npm run build",
+    "dev:backend": "npm --prefix backend run dev",
+    "dev:frontend": "npm --prefix frontend run dev",
+    "build:frontend": "npm --prefix frontend run build",
+    "test:backend": "npm --prefix backend test",
+    "start:backend": "npm --prefix backend start"
+  },
+  "dependencies": {
+    "@prisma/client": "^6.4.1",
+    "bcryptjs": "^3.0.2",
+    "cors": "^2.8.5",
+    "crypto-js": "^4.2.0",
+    "dotenv": "^16.4.7",
+    "express": "^4.21.2",
+    "express-rate-limit": "^7.5.0",
+    "helmet": "^8.0.0",
+    "jsonwebtoken": "^9.0.2",
+    "zod": "^3.24.2"
+  },
+  "devDependencies": {
+    "prisma": "^6.4.1"
+  },
+  "keywords": [
+    "music",
+    "tamil",
+    "streaming",
+    "spotify-clone",
+    "react",
+    "express",
+    "prisma"
+  ]
+}
