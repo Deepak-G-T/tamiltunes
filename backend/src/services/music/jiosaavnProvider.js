@@ -103,6 +103,7 @@ export class JioSaavnProvider extends MusicProvider {
       image,
       year: raw.year || raw.more_info?.year || '2024',
       streamUrl: streamUrl || null,
+      language: raw.language || raw.more_info?.language || 'tamil',
       provider: 'jiosaavn',
       isPlayable: !!streamUrl,
       licenseNotice: 'High-Quality Tamil Audio Stream (cyberboysumanjay/JioSaavnAPI)'
@@ -135,7 +136,9 @@ export class JioSaavnProvider extends MusicProvider {
       const res = await fetch(url, {
         headers: {
           'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
-          Accept: 'application/json'
+          Accept: 'application/json',
+          'X-Forwarded-For': '103.208.71.1',
+          'Client-IP': '103.208.71.1'
         },
         signal: controller.signal
       });
@@ -171,51 +174,69 @@ export class JioSaavnProvider extends MusicProvider {
 
   async searchSongs(query, limit = 20) {
     const qLower = query.toLowerCase().trim();
+    const tamilQuery = qLower.includes('tamil') ? query : `${query} tamil`;
 
-    // 1. Primary: Fast autocomplete search with country code (cc=in) from cyberboysumanjay/JioSaavnAPI
-    try {
-      const autoData = await this._fetchDirect('autocomplete.get', {
-        query: query,
-        includeMetaTags: '1'
-      });
-      console.log(`[JioSaavn] autocomplete.get for "${query}": songs count = ${autoData?.songs?.data?.length || 0}`);
+    // 1. Concurrently run direct search and autocomplete for comprehensive catalog coverage
+    const [directRes, tamilRes, autoData] = await Promise.all([
+      this._fetchDirect('search.getResults', { q: query, p: '1', n: '20' }),
+      this._fetchDirect('search.getResults', { q: tamilQuery, p: '1', n: '20' }),
+      this._fetchDirect('autocomplete.get', { query: query, includeMetaTags: '1' }).catch(() => null)
+    ]);
 
-      if (autoData?.songs?.data && autoData.songs.data.length > 0) {
-        const songItems = autoData.songs.data;
-        const pids = songItems.map((s) => s.id).join(',');
-        const detailsData = await this._fetchDirect('song.getDetails', { pids });
+    const candidates = [];
+    const seenIds = new Set();
 
-        if (detailsData) {
-          const rawSongs = Array.isArray(detailsData.songs)
-            ? detailsData.songs
-            : Object.values(detailsData).filter((v) => v && typeof v === 'object' && v.id);
+    const addCandidate = (raw) => {
+      if (!raw || !raw.id || seenIds.has(raw.id)) return;
+      seenIds.add(raw.id);
+      candidates.push(raw);
+    };
 
-          const songs = [];
-          for (const raw of rawSongs) {
-            const formatted = this._formatSong(raw);
-            if (formatted && formatted.streamUrl) {
-              songs.push(formatted);
-            }
-          }
+    // Collect direct search results
+    for (const r of (directRes?.results || [])) addCandidate(r);
+    for (const r of (tamilRes?.results || [])) addCandidate(r);
 
-          if (songs.length > 0) {
-            // Sort authentic Tamil tracks to top
-            songs.sort((a, b) => {
-              const aTamil = (a.title.toLowerCase().includes('tamil') || a.album.toLowerCase().includes('tamil') || (a.language && a.language.toLowerCase() === 'tamil')) ? 1 : 0;
-              const bTamil = (b.title.toLowerCase().includes('tamil') || b.album.toLowerCase().includes('tamil') || (b.language && b.language.toLowerCase() === 'tamil')) ? 1 : 0;
-              return bTamil - aTamil;
-            });
-            return songs.slice(0, limit);
-          }
-        }
+    // If autocomplete returned song items, fetch their full details for any missing pids
+    if (autoData?.songs?.data && autoData.songs.data.length > 0) {
+      const missingPids = autoData.songs.data
+        .map((s) => s.id)
+        .filter((id) => !seenIds.has(id))
+        .join(',');
+      if (missingPids) {
+        const detailsData = await this._fetchDirect('song.getDetails', { pids: missingPids });
+        const rawSongs = Array.isArray(detailsData?.songs)
+          ? detailsData.songs
+          : Object.values(detailsData || {}).filter((v) => v && typeof v === 'object' && v.id);
+        for (const r of rawSongs) addCandidate(r);
       }
-    } catch (err) {
-      console.warn('JioSaavn autocomplete search fallback:', err.message);
     }
 
-    // 2. Secondary: Query the cyberboysumanjay/JioSaavnAPI microservice if available
+    // Format all candidate tracks and filter valid playable streams
+    const formatted = candidates
+      .map((c) => this._formatSong(c))
+      .filter((s) => s && s.streamUrl);
+
+    // Prioritize authentic Tamil tracks
+    formatted.sort((a, b) => {
+      const aTamil = (
+        (a.language && a.language.toLowerCase() === 'tamil') ||
+        a.title.toLowerCase().includes('tamil') ||
+        a.album.toLowerCase().includes('tamil')
+      ) ? 1 : 0;
+      const bTamil = (
+        (b.language && b.language.toLowerCase() === 'tamil') ||
+        b.title.toLowerCase().includes('tamil') ||
+        b.album.toLowerCase().includes('tamil')
+      ) ? 1 : 0;
+      return bTamil - aTamil;
+    });
+
+    if (formatted.length > 0) {
+      return formatted.slice(0, limit);
+    }
+
+    // 2. Microservice fallback if needed
     try {
-      const tamilQuery = qLower.includes('tamil') ? query : `${query} tamil`;
       const pyUrl = `${this.pythonServiceUrl}/song/?query=${encodeURIComponent(tamilQuery)}`;
       const pyController = new AbortController();
       const pyTimeout = setTimeout(() => pyController.abort(), 6000);
@@ -225,34 +246,15 @@ export class JioSaavnProvider extends MusicProvider {
       if (res.ok) {
         const songsJson = await res.json();
         if (Array.isArray(songsJson) && songsJson.length > 0) {
-          const formatted = songsJson.map((s) => this._formatSong(s)).filter((s) => s && s.streamUrl);
-          if (formatted.length > 0) {
-            return formatted.slice(0, limit);
+          const pyFormatted = songsJson.map((s) => this._formatSong(s)).filter((s) => s && s.streamUrl);
+          if (pyFormatted.length > 0) {
+            return pyFormatted.slice(0, limit);
           }
         }
       }
-    } catch (err) {
-      // Python microservice silent fallback
-    }
+    } catch (err) {}
 
-    // 3. Fallback: Direct Node.js search.getResults with DES decryption
-    const tamilQuery = qLower.includes('tamil') ? query : `${query} tamil`;
-    const data = await this._fetchDirect('search.getResults', {
-      q: tamilQuery,
-      p: '1',
-      n: '30'
-    });
-
-    if (!data || !data.results) return [];
-
-    // Prioritize authentic Tamil tracks
-    const sorted = [...data.results].sort((a, b) => {
-      const aIsTamil = (a.language?.toLowerCase() === 'tamil' || (a.album && a.album.toLowerCase().includes('tamil'))) ? 1 : 0;
-      const bIsTamil = (b.language?.toLowerCase() === 'tamil' || (b.album && b.album.toLowerCase().includes('tamil'))) ? 1 : 0;
-      return bIsTamil - aIsTamil;
-    });
-
-    return sorted.map((item) => this._formatSong(item)).filter((s) => s && s.streamUrl).slice(0, limit);
+    return [];
   }
 
   async searchAlbums(query, limit = 20) {
