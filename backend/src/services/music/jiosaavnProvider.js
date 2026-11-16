@@ -304,6 +304,10 @@ export class JioSaavnProvider extends MusicProvider {
     }));
   }
 
+  async searchTracks(query, options = {}) {
+    return this.search(query, options.type || 'all');
+  }
+
   async search(query, type = 'all') {
     const [songs, albums, artists] = await Promise.all([
       type === 'all' || type === 'songs' ? this.searchSongs(query, 15) : Promise.resolve([]),
@@ -312,6 +316,10 @@ export class JioSaavnProvider extends MusicProvider {
     ]);
 
     return { songs, albums, artists };
+  }
+
+  async getSong(id) {
+    return this.getSongById(id);
   }
 
   async getSongById(id) {

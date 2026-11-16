@@ -12,6 +12,7 @@ const CATEGORIES = [
   { id: 'all', label: 'All Tamil Music' },
   { id: 'trending', label: '🔥 Trending' },
   { id: 'melodies', label: '💖 Melodies' },
+  { id: 'gana', label: '🪘 Film Gaana' },
   { id: '90s', label: '📻 90s Hits' },
   { id: '2000s', label: '✨ 2000s Hits' },
   { id: 'love', label: '💌 Love Songs' },
@@ -34,6 +35,7 @@ const Home = () => {
     nineties: [],
     twoThousands: [],
     melodies: [],
+    gana: [],
     folk: []
   });
   const [favoritesMap, setFavoritesMap] = useState({});
@@ -291,6 +293,31 @@ const Home = () => {
                 key={song.id}
                 song={song}
                 playlist={homeData.melodies}
+                onAddToPlaylist={onOpenAddToPlaylist}
+                onToggleFavorite={toggleFavorite}
+                isFavorite={!!favoritesMap[song.id]}
+              />
+            ))}
+          </div>
+        </section>
+      )}
+
+      {/* Section: Authentic Film Gaana Hits */}
+      {(activeTab === 'all' || activeTab === 'gana') && (
+        <section>
+          <div className="flex items-center justify-between mb-4">
+            <div className="flex items-center gap-2">
+              <span className="text-lg">🪘</span>
+              <h2 className="text-xl font-bold text-white tracking-tight">Authentic Film Gaana Hits</h2>
+            </div>
+          </div>
+
+          <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-4">
+            {(homeData.gana?.length > 0 ? homeData.gana : homeData.folk)?.slice(0, 5).map((song) => (
+              <SongCard
+                key={song.id}
+                song={song}
+                playlist={homeData.gana || homeData.folk}
                 onAddToPlaylist={onOpenAddToPlaylist}
                 onToggleFavorite={toggleFavorite}
                 isFavorite={!!favoritesMap[song.id]}

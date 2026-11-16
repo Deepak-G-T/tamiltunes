@@ -8,6 +8,7 @@ export const config = {
   jwtExpiresIn: process.env.JWT_EXPIRES_IN || '7d',
   databaseUrl: process.env.DATABASE_URL || 'postgresql://postgres:postgres@localhost:5432/tamiltunes',
   jiosaavnApiUrl: process.env.JIOSAAVN_API_URL || 'https://www.jiosaavn.com/api.php',
+  musicProvider: (process.env.MUSIC_PROVIDER || 'jiosaavn').toLowerCase(),
   corsOrigin: process.env.CORS_ORIGIN || '*',
   enableExternalStreams: process.env.ENABLE_EXTERNAL_STREAMS === 'true'
 };

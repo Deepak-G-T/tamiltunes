@@ -200,37 +200,27 @@ class InMemoryDb {
 
 const fallbackDb = new InMemoryDb();
 
-// Test connection and ensure tables and seed exist
+// Test connection and ensure tables exist via non-destructive migration deploy
 export const initDb = async () => {
   if (prismaInstance) {
     try {
       await prismaInstance.$connect();
       console.log('Connected to PostgreSQL via Prisma');
 
-      // Verify if tables are created; if not, synchronize automatically
+      // Verify if tables are created; if not, apply migrations safely
       try {
         await prismaInstance.user.count();
         isPostgresAvailable = true;
         console.log('PostgreSQL tables verified');
       } catch (tableErr) {
-        console.warn('PostgreSQL tables not found, syncing schema now...');
+        console.warn('PostgreSQL tables not found, deploying migrations safely with prisma migrate deploy...');
         try {
           const { execSync } = await import('child_process');
-          execSync('npx prisma db push --accept-data-loss --skip-generate', { stdio: 'inherit' });
+          execSync('npx prisma migrate deploy', { stdio: 'inherit' });
           isPostgresAvailable = true;
-          console.log('PostgreSQL schema synchronized successfully');
-        } catch (pushErr) {
-          console.error('Prisma schema sync error:', pushErr.message);
-        }
-      }
-
-      // Seed authentic Tamil catalog into PostgreSQL if available
-      if (isPostgresAvailable) {
-        try {
-          const { seedDatabase } = await import('./seed.js');
-          await seedDatabase();
-        } catch (seedErr) {
-          console.warn('Database seed note:', seedErr.message);
+          console.log('PostgreSQL migrations deployed successfully');
+        } catch (migErr) {
+          console.error('Prisma migrate deploy error:', migErr.message);
         }
       }
 

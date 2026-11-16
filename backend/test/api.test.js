@@ -9,20 +9,30 @@ const runTests = async () => {
   const BASE = 'http://localhost:5002/api';
 
   try {
-    // 1. Health check
-    const healthRes = await fetch(`${BASE}/health`).then((r) => r.json());
-    if (healthRes.status !== 'ok') throw new Error('Health check failed');
-    console.log('✓ Health Check: PASSED');
+    // 1. Health check (both /health and /api/health)
+    const rootHealth = await fetch('http://localhost:5002/health').then((r) => r.json());
+    if (rootHealth.status !== 'ok' || !rootHealth.musicProvider || !rootHealth.cache) {
+      throw new Error('Root /health check failed');
+    }
+    const apiHealth = await fetch(`${BASE}/health`).then((r) => r.json());
+    if (apiHealth.status !== 'ok' || apiHealth.cache.ttlMinutes !== 10) {
+      throw new Error('API /api/health check failed');
+    }
+    console.log(`✓ Health Check (Root + API, 10m TTL Cache, Provider: ${rootHealth.musicProvider}): PASSED`);
 
-    // 2. Music Home feed
+    // 2. Music Home feed (including Gana category)
     const homeRes = await fetch(`${BASE}/music/home`).then((r) => r.json());
     if (!homeRes.success || !homeRes.data?.trending?.length) throw new Error('Home feed failed');
-    console.log(`✓ Music Home Feed: PASSED (${homeRes.data.trending.length} trending songs)`);
+    if (!homeRes.data.gana || !homeRes.data.gana.length) throw new Error('Film Gana category missing in home feed');
+    console.log(`✓ Music Home Feed: PASSED (${homeRes.data.trending.length} trending, ${homeRes.data.gana.length} film gaana)`);
 
-    // 3. Music Search (Anirudh)
-    const searchRes = await fetch(`${BASE}/music/search?query=Anirudh`).then((r) => r.json());
-    if (!searchRes.success || !searchRes.data?.songs?.length) throw new Error('Search failed');
-    console.log(`✓ Tamil Search (Anirudh): PASSED (${searchRes.data.songs.length} songs found)`);
+    // 3. Music Search (Anirudh) & Cache verification
+    const searchRes1 = await fetch(`${BASE}/music/search?query=Anirudh`).then((r) => r.json());
+    if (!searchRes1.success || !searchRes1.data?.songs?.length) throw new Error('Search failed');
+    const searchRes2 = await fetch(`${BASE}/music/search?query=Anirudh`).then((r) => r.json());
+    const healthAfterCache = await fetch(`${BASE}/health`).then((r) => r.json());
+    if (healthAfterCache.cache.hits < 1) throw new Error('Search caching verification failed');
+    console.log(`✓ Tamil Search & 10-Minute Cache: PASSED (${searchRes1.data.songs.length} songs found, Cache Hits: ${healthAfterCache.cache.hits})`);
 
     // 4. User Registration
     const testEmail = `test_${Date.now()}@tamiltunes.com`;
