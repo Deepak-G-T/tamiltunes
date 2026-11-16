@@ -33,11 +33,13 @@ export class MusicProviderManager {
         (s.album && s.album.toLowerCase().includes(q))
     );
 
-    const existingTitles = new Set(result.songs.map((s) => s.title.toLowerCase()));
+    const normTitle = (str) => (str || '').toLowerCase().replace(/[^a-z0-9]/g, '');
+    const existingTitles = new Set(result.songs.map((s) => normTitle(s.title)));
     for (const s of curatedMatches) {
-      if (!existingTitles.has(s.title.toLowerCase())) {
+      const norm = normTitle(s.title);
+      if (!existingTitles.has(norm)) {
         result.songs.unshift(s);
-        existingTitles.add(s.title.toLowerCase());
+        existingTitles.add(norm);
       }
     }
 
@@ -111,7 +113,7 @@ export class MusicProviderManager {
     const melodiesCurated = CURATED_TAMIL_SONGS.filter((s) => s.category === 'melodies');
     const folkCurated = CURATED_TAMIL_SONGS.filter((s) => s.category === 'folk');
 
-    // Fetch live categories from JioSaavn in parallel using top Kollywood terms
+    // Fetch live categories from JioSaavn in parallel using top Kollywood movie soundtracks
     const [
       liveTrending,
       liveLatest,
@@ -123,25 +125,35 @@ export class MusicProviderManager {
       liveFolk,
       liveInstrumental
     ] = await Promise.all([
-      this.jiosaavn.searchSongs('tamil trending blockbusters anirudh', 8).catch(() => []),
-      this.jiosaavn.searchSongs('latest tamil songs 2024 anirudh', 8).catch(() => []),
-      this.jiosaavn.searchSongs('ar rahman 90s hits tamil', 8).catch(() => []),
-      this.jiosaavn.searchSongs('harris jayaraj hits tamil', 8).catch(() => []),
-      this.jiosaavn.searchSongs('tamil evergreen melodies', 8).catch(() => []),
-      this.jiosaavn.searchSongs('tamil romantic love songs', 8).catch(() => []),
-      this.jiosaavn.searchSongs('tamil sad breakup melodies', 8).catch(() => []),
-      this.jiosaavn.searchSongs('kollywood kuthu celebration', 8).catch(() => []),
-      this.jiosaavn.searchSongs('tamil instrumental violin flute', 8).catch(() => [])
+      this.jiosaavn.searchSongs('leo jailer master anirudh tamil', 10).catch(() => []),
+      this.jiosaavn.searchSongs('vettaiyan goat sai abhyankkar tamil', 10).catch(() => []),
+      this.jiosaavn.searchSongs('ar rahman 90s hits tamil', 10).catch(() => []),
+      this.jiosaavn.searchSongs('harris jayaraj hits tamil', 10).catch(() => []),
+      this.jiosaavn.searchSongs('yuvan shankar raja melodies tamil', 10).catch(() => []),
+      this.jiosaavn.searchSongs('sid sriram romantic tamil', 10).catch(() => []),
+      this.jiosaavn.searchSongs('ilaiyaraaja sad evergreen tamil', 10).catch(() => []),
+      this.jiosaavn.searchSongs('anirudh dhee kuthu beats tamil', 10).catch(() => []),
+      this.jiosaavn.searchSongs('tamil instrumental violin flute', 10).catch(() => [])
     ]);
 
-    // Filter out low-effort / amateur / local gaana tracks
+    // Filter out low-effort / amateur / local gaana tracks and uninteresting artists
     const JUNK_PATTERNS = [
-      /gana\s+(velu|surya|suriya|muthu|mani|stephen|vinoth|bala|lokesh|suresh)/i,
+      /gana\s+/i,
+      /\bgana\b/i,
       /trending\s+gana/i,
+      /trending\s+version/i,
+      /salem\s+gana/i,
+      /the\s+independeners/i,
       /dj\s+remix/i,
+      /\bremix\b/i,
       /bass\s+boosted/i,
       /whatsapp\s+status/i,
-      /cover\s+song/i
+      /status\s+video/i,
+      /cover\s+song/i,
+      /cover\s+version/i,
+      /karaoke/i,
+      /lofi\s+flip/i,
+      /slowed\s+reverb/i
     ];
 
     const isHighQuality = (song) => {

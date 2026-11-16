@@ -176,45 +176,56 @@ export class JioSaavnProvider extends MusicProvider {
     const qLower = query.toLowerCase().trim();
     const tamilQuery = qLower.includes('tamil') ? query : `${query} tamil`;
 
-    // 1. Concurrently run direct search and autocomplete for comprehensive catalog coverage
+    // 1. Concurrently run direct search and autocomplete
     const [directRes, tamilRes, autoData] = await Promise.all([
       this._fetchDirect('search.getResults', { q: query, p: '1', n: '20' }),
       this._fetchDirect('search.getResults', { q: tamilQuery, p: '1', n: '20' }),
       this._fetchDirect('autocomplete.get', { query: query, includeMetaTags: '1' }).catch(() => null)
     ]);
 
-    const candidates = [];
+    const candidateIdList = [];
     const seenIds = new Set();
 
-    const addCandidate = (raw) => {
-      if (!raw || !raw.id || seenIds.has(raw.id)) return;
-      seenIds.add(raw.id);
-      candidates.push(raw);
+    const trackId = (id) => {
+      if (!id || seenIds.has(id)) return;
+      seenIds.add(id);
+      candidateIdList.push(id);
     };
 
-    // Collect direct search results
-    for (const r of (directRes?.results || [])) addCandidate(r);
-    for (const r of (tamilRes?.results || [])) addCandidate(r);
+    // Collect IDs from direct search & tamil query
+    for (const r of (directRes?.results || [])) trackId(r.id);
+    for (const r of (tamilRes?.results || [])) trackId(r.id);
+    for (const s of (autoData?.songs?.data || [])) trackId(s.id);
 
-    // If autocomplete returned song items, fetch their full details for any missing pids
-    if (autoData?.songs?.data && autoData.songs.data.length > 0) {
-      const missingPids = autoData.songs.data
-        .map((s) => s.id)
-        .filter((id) => !seenIds.has(id))
-        .join(',');
-      if (missingPids) {
-        const detailsData = await this._fetchDirect('song.getDetails', { pids: missingPids });
-        const rawSongs = Array.isArray(detailsData?.songs)
-          ? detailsData.songs
-          : Object.values(detailsData || {}).filter((v) => v && typeof v === 'object' && v.id);
-        for (const r of rawSongs) addCandidate(r);
+    // Fetch full song details with encrypted_media_url for all candidate IDs in batch
+    let rawSongs = [];
+    if (candidateIdList.length > 0) {
+      const pidsChunk = candidateIdList.slice(0, 30).join(',');
+      const detailsData = await this._fetchDirect('song.getDetails', { pids: pidsChunk });
+      if (detailsData) {
+        if (Array.isArray(detailsData.songs)) {
+          rawSongs = detailsData.songs;
+        } else {
+          rawSongs = Object.values(detailsData).filter((v) => v && typeof v === 'object' && v.id);
+        }
       }
     }
 
     // Format all candidate tracks and filter valid playable streams
-    const formatted = candidates
+    let formatted = rawSongs
       .map((c) => this._formatSong(c))
       .filter((s) => s && s.streamUrl);
+
+    // Drop non-Tamil language tracks (Telugu, Hindi, etc.) unless query specifically targets them
+    if (!qLower.includes('telugu') && !qLower.includes('hindi')) {
+      formatted = formatted.filter((s) => {
+        const lang = (s.language || '').toLowerCase();
+        const titleLower = (s.title || '').toLowerCase();
+        if (lang === 'telugu' || lang === 'hindi' || lang === 'kannada' || lang === 'malayalam') return false;
+        if (titleLower.includes('[telugu]') || titleLower.includes('[hindi]') || titleLower.includes('[kannada]')) return false;
+        return true;
+      });
+    }
 
     // Prioritize authentic Tamil tracks
     formatted.sort((a, b) => {

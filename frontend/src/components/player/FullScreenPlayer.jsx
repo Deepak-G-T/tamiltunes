@@ -1,4 +1,5 @@
-import React from 'react';
+import React, { useEffect } from 'react';
+import { createPortal } from 'react-dom';
 import {
   ChevronDown,
   Play,
@@ -16,6 +17,8 @@ import {
 import { useAudio } from '../../context/AudioContext';
 import ProgressBar from './ProgressBar';
 import VolumeSlider from './VolumeSlider';
+
+const MUSIC_COVER_FALLBACK = "data:image/svg+xml;charset=UTF-8,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 300 300'%3E%3Cdefs%3E%3ClinearGradient id='bg' x1='0%25' y1='0%25' x2='100%25' y2='100%25'%3E%3Cstop offset='0%25' stop-color='%233b185f'/%3E%3Cstop offset='50%25' stop-color='%231f1338'/%3E%3Cstop offset='100%25' stop-color='%230f091f'/%3E%3C/linearGradient%3E%3C/defs%3E%3Crect width='300' height='300' rx='16' fill='url(%23bg)'/%3E%3Ccircle cx='150' cy='150' r='60' fill='%23a855f7' opacity='0.2'/%3E%3Cpath d='M135 180V120l50-14v54m-50 0a16 16 0 11-32 0 16 16 0 0132 0zm50-14a16 16 0 11-32 0 16 16 0 0132 0z' stroke='%23c084fc' stroke-width='6' fill='none' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E";
 
 const FullScreenPlayer = ({ isOpen, onClose, onToggleFavorite, isFavorite }) => {
   const {
@@ -40,31 +43,44 @@ const FullScreenPlayer = ({ isOpen, onClose, onToggleFavorite, isFavorite }) => 
     setIsQueueOpen
   } = useAudio();
 
+  // Lock body scroll when full screen player is open on mobile
+  useEffect(() => {
+    if (isOpen) {
+      document.body.style.overflow = 'hidden';
+    } else {
+      document.body.style.overflow = '';
+    }
+    return () => {
+      document.body.style.overflow = '';
+    };
+  }, [isOpen]);
+
   if (!isOpen || !currentSong) return null;
 
-  return (
-    <div className="fixed inset-0 z-50 bg-[#09090B] flex flex-col justify-between p-6 sm:p-10 select-none overflow-hidden animate-in fade-in duration-200">
-      {/* Blurred background effect */}
+  const content = (
+    <div className="fixed inset-0 z-[9999] bg-[#09090B] flex flex-col justify-between p-4 sm:p-8 select-none overflow-y-auto animate-in fade-in duration-200">
+      {/* Blurred ambient background effect */}
       <div
-        className="absolute inset-0 opacity-20 filter blur-3xl pointer-events-none scale-125"
+        className="fixed inset-0 opacity-25 filter blur-3xl pointer-events-none scale-125"
         style={{
-          backgroundImage: `url(${currentSong.image})`,
+          backgroundImage: `url(${currentSong.image || MUSIC_COVER_FALLBACK})`,
           backgroundPosition: 'center',
           backgroundSize: 'cover'
         }}
       />
 
-      {/* Top Bar */}
-      <div className="relative z-10 flex items-center justify-between">
+      {/* Top Bar with Down Chevron to close */}
+      <div className="relative z-10 flex items-center justify-between pb-2">
         <button
           onClick={onClose}
-          className="p-2 rounded-full bg-zinc-900/60 hover:bg-zinc-800 text-zinc-300 hover:text-white transition-colors"
+          aria-label="Close now playing"
+          className="p-2.5 rounded-full bg-zinc-900/80 hover:bg-zinc-800 text-zinc-300 hover:text-white transition-all active:scale-90"
         >
-          <ChevronDown className="w-6 h-6" />
+          <ChevronDown className="w-7 h-7" />
         </button>
 
-        <div className="text-center">
-          <p className="text-xs uppercase tracking-widest text-zinc-400 font-semibold">
+        <div className="text-center px-2 min-w-0">
+          <p className="text-[10px] sm:text-xs uppercase tracking-widest text-zinc-400 font-semibold truncate">
             Playing From {currentSong.album ? `"${currentSong.album}"` : 'TamilTunes'}
           </p>
         </div>
@@ -74,22 +90,24 @@ const FullScreenPlayer = ({ isOpen, onClose, onToggleFavorite, isFavorite }) => 
             setIsQueueOpen(true);
             onClose();
           }}
-          className="p-2 rounded-full bg-zinc-900/60 hover:bg-zinc-800 text-zinc-300 hover:text-white transition-colors"
+          aria-label="Open queue"
+          className="p-2.5 rounded-full bg-zinc-900/80 hover:bg-zinc-800 text-zinc-300 hover:text-white transition-all active:scale-90"
         >
-          <ListMusic className="w-5 h-5" />
+          <ListMusic className="w-6 h-6" />
         </button>
       </div>
 
       {/* Center Artwork & Metadata */}
-      <div className="relative z-10 flex flex-col items-center justify-center my-auto max-w-md mx-auto w-full">
+      <div className="relative z-10 flex flex-col items-center justify-center my-auto max-w-sm sm:max-w-md mx-auto w-full py-4">
         {/* Album Cover */}
-        <div className="relative w-64 h-64 sm:w-80 sm:h-80 rounded-2xl overflow-hidden shadow-2xl border border-zinc-800/80 mb-8 group">
+        <div className="relative w-56 h-56 xs:w-64 xs:h-64 sm:w-80 sm:h-80 rounded-2xl overflow-hidden shadow-2xl border border-zinc-800/80 mb-6 group bg-zinc-900">
           <img
-            src={currentSong.image || 'https://images.unsplash.com/photo-1511671782779-c97d3d27a1d4?w=600&auto=format&fit=crop&q=80'}
+            src={currentSong.image || MUSIC_COVER_FALLBACK}
             alt={currentSong.title}
+            referrerPolicy="no-referrer"
             onError={(e) => {
               e.currentTarget.onerror = null;
-              e.currentTarget.src = 'https://images.unsplash.com/photo-1511671782779-c97d3d27a1d4?w=600&auto=format&fit=crop&q=80';
+              e.currentTarget.src = MUSIC_COVER_FALLBACK;
             }}
             className={`w-full h-full object-cover transition-transform duration-500 ${
               isPlaying ? 'scale-105' : 'scale-100'
@@ -103,9 +121,9 @@ const FullScreenPlayer = ({ isOpen, onClose, onToggleFavorite, isFavorite }) => 
         </div>
 
         {/* Title, Artist, & Favorite */}
-        <div className="w-full flex items-center justify-between mb-4">
-          <div className="min-w-0 flex-1 mr-4">
-            <h2 className="text-2xl font-bold text-white truncate tracking-tight">
+        <div className="w-full flex items-center justify-between mb-3 px-1">
+          <div className="min-w-0 flex-1 mr-3">
+            <h2 className="text-xl sm:text-2xl font-bold text-white truncate tracking-tight">
               {currentSong.title}
             </h2>
             <p className="text-sm font-medium text-zinc-400 truncate mt-1">
@@ -120,7 +138,7 @@ const FullScreenPlayer = ({ isOpen, onClose, onToggleFavorite, isFavorite }) => 
           {onToggleFavorite && (
             <button
               onClick={() => onToggleFavorite(currentSong)}
-              className="p-3 rounded-full hover:bg-zinc-800/60 transition-colors"
+              className="p-3 rounded-full hover:bg-zinc-800/60 active:scale-90 transition-transform"
             >
               <Heart
                 className={`w-6 h-6 transition-colors ${
@@ -132,11 +150,11 @@ const FullScreenPlayer = ({ isOpen, onClose, onToggleFavorite, isFavorite }) => 
         </div>
 
         {/* License Notice / Stream Status Badge */}
-        <div className="w-full mb-4">
+        <div className="w-full mb-3 px-1">
           <div className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-zinc-900/80 border border-zinc-800 text-[11px] text-zinc-400">
             <ShieldCheck className="w-3.5 h-3.5 text-emerald-400 flex-shrink-0" />
             <span className="truncate">
-              {currentSong.licenseNotice || 'Authorized Music Stream • Ad-Free Playback'}
+              {currentSong.licenseNotice || '320kbps CD Quality Audio • Direct Tamil Stream'}
             </span>
           </div>
           {playbackError && (
@@ -146,9 +164,9 @@ const FullScreenPlayer = ({ isOpen, onClose, onToggleFavorite, isFavorite }) => 
       </div>
 
       {/* Bottom Controls */}
-      <div className="relative z-10 max-w-md mx-auto w-full">
+      <div className="relative z-10 max-w-sm sm:max-w-md mx-auto w-full pb-2">
         {/* Scrubber */}
-        <div className="mb-6">
+        <div className="mb-5">
           <ProgressBar
             currentTime={currentTime}
             duration={duration}
@@ -158,10 +176,10 @@ const FullScreenPlayer = ({ isOpen, onClose, onToggleFavorite, isFavorite }) => 
         </div>
 
         {/* Transport controls */}
-        <div className="flex items-center justify-between mb-6">
+        <div className="flex items-center justify-between mb-5">
           <button
             onClick={toggleShuffle}
-            className={`p-2 transition-colors ${
+            className={`p-2.5 transition-colors active:scale-90 ${
               isShuffle ? 'text-purple-400' : 'text-zinc-500 hover:text-white'
             }`}
           >
@@ -170,7 +188,7 @@ const FullScreenPlayer = ({ isOpen, onClose, onToggleFavorite, isFavorite }) => 
 
           <button
             onClick={previousTrack}
-            className="p-2 text-zinc-300 hover:text-white transition-colors"
+            className="p-2.5 text-zinc-300 hover:text-white active:scale-90 transition-all"
           >
             <SkipBack className="w-7 h-7" />
           </button>
@@ -184,14 +202,14 @@ const FullScreenPlayer = ({ isOpen, onClose, onToggleFavorite, isFavorite }) => 
 
           <button
             onClick={nextTrack}
-            className="p-2 text-zinc-300 hover:text-white transition-colors"
+            className="p-2.5 text-zinc-300 hover:text-white active:scale-90 transition-all"
           >
             <SkipForward className="w-7 h-7" />
           </button>
 
           <button
             onClick={toggleRepeat}
-            className={`p-2 transition-colors ${
+            className={`p-2.5 transition-colors active:scale-90 ${
               repeatMode !== 'off' ? 'text-purple-400' : 'text-zinc-500 hover:text-white'
             }`}
           >
@@ -211,6 +229,8 @@ const FullScreenPlayer = ({ isOpen, onClose, onToggleFavorite, isFavorite }) => 
       </div>
     </div>
   );
+
+  return typeof document !== 'undefined' ? createPortal(content, document.body) : content;
 };
 
 export default FullScreenPlayer;

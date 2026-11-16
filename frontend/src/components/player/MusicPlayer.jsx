@@ -21,6 +21,8 @@ import QueueDrawer from './QueueDrawer';
 import FullScreenPlayer from './FullScreenPlayer';
 import api from '../../services/api';
 
+const MUSIC_COVER_FALLBACK = "data:image/svg+xml;charset=UTF-8,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 300 300'%3E%3Cdefs%3E%3ClinearGradient id='bg' x1='0%25' y1='0%25' x2='100%25' y2='100%25'%3E%3Cstop offset='0%25' stop-color='%233b185f'/%3E%3Cstop offset='50%25' stop-color='%231f1338'/%3E%3Cstop offset='100%25' stop-color='%230f091f'/%3E%3C/linearGradient%3E%3C/defs%3E%3Crect width='300' height='300' rx='16' fill='url(%23bg)'/%3E%3Ccircle cx='150' cy='150' r='60' fill='%23a855f7' opacity='0.2'/%3E%3Cpath d='M135 180V120l50-14v54m-50 0a16 16 0 11-32 0 16 16 0 0132 0zm50-14a16 16 0 11-32 0 16 16 0 0132 0z' stroke='%23c084fc' stroke-width='6' fill='none' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E";
+
 const MusicPlayer = () => {
   const {
     currentSong,
@@ -121,11 +123,12 @@ const MusicPlayer = () => {
             onClick={() => setIsFullScreen(true)}
           >
             <img
-              src={currentSong.image || 'https://images.unsplash.com/photo-1511671782779-c97d3d27a1d4?w=120&auto=format&fit=crop&q=80'}
+              src={currentSong.image || MUSIC_COVER_FALLBACK}
               alt={currentSong.title}
+              referrerPolicy="no-referrer"
               onError={(e) => {
                 e.currentTarget.onerror = null;
-                e.currentTarget.src = 'https://images.unsplash.com/photo-1511671782779-c97d3d27a1d4?w=120&auto=format&fit=crop&q=80';
+                e.currentTarget.src = MUSIC_COVER_FALLBACK;
               }}
               className="w-full h-full object-cover group-hover:scale-105 transition-transform"
             />
