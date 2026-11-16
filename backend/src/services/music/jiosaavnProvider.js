@@ -184,25 +184,25 @@ export class JioSaavnProvider extends MusicProvider {
         const songItems = autoData.songs.data;
         const pids = songItems.map((s) => s.id).join(',');
         const detailsData = await this._fetchDirect('song.getDetails', { pids });
-        console.log(`[JioSaavn] song.getDetails returned keys:`, detailsData ? Object.keys(detailsData) : null);
 
         if (detailsData) {
+          const rawSongs = Array.isArray(detailsData.songs)
+            ? detailsData.songs
+            : Object.values(detailsData).filter((v) => v && typeof v === 'object' && v.id);
+
           const songs = [];
-          for (const item of songItems) {
-            const raw = detailsData[item.id];
-            if (raw) {
-              const formatted = this._formatSong(raw);
-              if (formatted && formatted.streamUrl) {
-                songs.push(formatted);
-              }
+          for (const raw of rawSongs) {
+            const formatted = this._formatSong(raw);
+            if (formatted && formatted.streamUrl) {
+              songs.push(formatted);
             }
           }
 
           if (songs.length > 0) {
             // Sort authentic Tamil tracks to top
             songs.sort((a, b) => {
-              const aTamil = (a.title.toLowerCase().includes('tamil') || a.album.toLowerCase().includes('tamil')) ? 1 : 0;
-              const bTamil = (b.title.toLowerCase().includes('tamil') || b.album.toLowerCase().includes('tamil')) ? 1 : 0;
+              const aTamil = (a.title.toLowerCase().includes('tamil') || a.album.toLowerCase().includes('tamil') || (a.language && a.language.toLowerCase() === 'tamil')) ? 1 : 0;
+              const bTamil = (b.title.toLowerCase().includes('tamil') || b.album.toLowerCase().includes('tamil') || (b.language && b.language.toLowerCase() === 'tamil')) ? 1 : 0;
               return bTamil - aTamil;
             });
             return songs.slice(0, limit);
@@ -314,8 +314,13 @@ export class JioSaavnProvider extends MusicProvider {
 
     // Direct fallback
     const rawData = await this._fetchDirect('song.getDetails', { pids: cleanId });
-    if (rawData && rawData[cleanId]) {
-      return this._formatSong(rawData[cleanId]);
+    if (rawData) {
+      if (Array.isArray(rawData.songs) && rawData.songs.length > 0) {
+        return this._formatSong(rawData.songs[0]);
+      }
+      if (rawData[cleanId]) {
+        return this._formatSong(rawData[cleanId]);
+      }
     }
     return null;
   }
