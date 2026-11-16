@@ -116,6 +116,7 @@ export class JioSaavnProvider extends MusicProvider {
       _marker: '0',
       api_version: '4',
       ctx: 'web6dot0',
+      cc: 'in', // Force India geo-availability for complete Tamil catalogue
       ...params
     });
 
@@ -164,14 +165,53 @@ export class JioSaavnProvider extends MusicProvider {
   }
 
   async searchSongs(query, limit = 20) {
-    const qLower = query.toLowerCase();
-    const tamilQuery = qLower.includes('tamil') ? query : `${query} tamil`;
+    const qLower = query.toLowerCase().trim();
 
-    // 1. Try querying the cyberboysumanjay/JioSaavnAPI microservice first
+    // 1. Primary: Fast autocomplete search with country code (cc=in) from cyberboysumanjay/JioSaavnAPI
     try {
+      const autoData = await this._fetchDirect('autocomplete.get', {
+        query: query,
+        includeMetaTags: '1'
+      });
+
+      if (autoData?.songs?.data && autoData.songs.data.length > 0) {
+        const songItems = autoData.songs.data;
+        const pids = songItems.map((s) => s.id).join(',');
+        const detailsData = await this._fetchDirect('song.getDetails', { pids });
+
+        if (detailsData) {
+          const songs = [];
+          for (const item of songItems) {
+            const raw = detailsData[item.id];
+            if (raw) {
+              const formatted = this._formatSong(raw);
+              if (formatted && formatted.streamUrl) {
+                songs.push(formatted);
+              }
+            }
+          }
+
+          if (songs.length > 0) {
+            // Sort authentic Tamil tracks to top
+            songs.sort((a, b) => {
+              const aTamil = (a.title.toLowerCase().includes('tamil') || a.album.toLowerCase().includes('tamil')) ? 1 : 0;
+              const bTamil = (b.title.toLowerCase().includes('tamil') || b.album.toLowerCase().includes('tamil')) ? 1 : 0;
+              return bTamil - aTamil;
+            });
+            return songs.slice(0, limit);
+          }
+        }
+      }
+    } catch (err) {
+      console.warn('JioSaavn autocomplete search fallback:', err.message);
+    }
+
+    // 2. Secondary: Query the cyberboysumanjay/JioSaavnAPI microservice if available
+    try {
+      const tamilQuery = qLower.includes('tamil') ? query : `${query} tamil`;
       const pyUrl = `${this.pythonServiceUrl}/song/?query=${encodeURIComponent(tamilQuery)}`;
       const pyController = new AbortController();
-      const pyTimeout = setTimeout(() => pyController.abort(), 8000);
+      const pyTimeout = setTimeout(() => pyController.abort(), 6000);
       const res = await fetch(pyUrl, { signal: pyController.signal });
       clearTimeout(pyTimeout);
 
@@ -188,7 +228,8 @@ export class JioSaavnProvider extends MusicProvider {
       // Python microservice silent fallback
     }
 
-    // 2. Direct Node.js fallback with DES decryption
+    // 3. Fallback: Direct Node.js search.getResults with DES decryption
+    const tamilQuery = qLower.includes('tamil') ? query : `${query} tamil`;
     const data = await this._fetchDirect('search.getResults', {
       q: tamilQuery,
       p: '1',
