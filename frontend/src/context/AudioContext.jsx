@@ -510,9 +510,10 @@ export const AudioProvider = ({ children }) => {
         setPlaybackError
       }}
     >
-      {/* Hidden YouTube IFrame Engine */}
+      {/* YouTube IFrame Engine (visible when playing YouTube source, min 200x200) */}
       <YouTubePlayer
         ref={ytPlayerRef}
+        visible={isYouTubeSong(currentSong)}
         onPlaying={() => {
           if (isYouTubeSong(currentSongRef.current)) {
             setIsPlaying(true);

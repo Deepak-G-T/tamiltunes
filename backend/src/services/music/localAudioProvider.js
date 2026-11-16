@@ -92,21 +92,6 @@ export const CURATED_TAMIL_SONGS = [
     licenseNotice: 'Original Tamil Master Audio (Mersal)'
   },
   {
-    id: 'tt_trending_6',
-    title: 'Veezha Veera (From "OM Chapter 1: Udhiram - The Blood Wood") [Tamil]',
-    artist: 'Sai Abhyankkar, Tippu, Arun Srinivasan',
-    singers: 'Sai Abhyankkar, Tippu, Arun Srinivasan',
-    album: 'OM Chapter 1',
-    duration: 236,
-    year: '2026',
-    image: 'https://c.saavncdn.com/696/Veezha-Veera-From-OM-Chapter-1-Udhiram-The-Blood-Wood-Tamil-Tamil-2026-20261019161818-500x500.jpg',
-    streamUrl: 'https://aac.saavncdn.com/696/33b63dd76847575d76550d30dcc97bf5_320.mp4',
-    cdnStreamUrl: 'https://aac.saavncdn.com/696/33b63dd76847575d76550d30dcc97bf5_320.mp4',
-    isPlayable: true,
-    category: 'trending',
-    licenseNotice: 'Original Tamil Master Audio (OM Chapter 1)'
-  },
-  {
     id: 'tt_folk_1',
     title: 'Arabic Kuthu - Halamithi Habibo',
     artist: 'Anirudh Ravichander, Jonita Gandhi',

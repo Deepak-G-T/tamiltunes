@@ -7,6 +7,7 @@ import React, { useEffect, useRef, useImperativeHandle, forwardRef } from 'react
  * play, pause, seek, setVolume, mute, unMute, onTimeUpdate, onEnded, onPlaying, onPause, onBuffering.
  */
 const YouTubePlayer = forwardRef(({
+  visible = false,
   onPlaying,
   onPause,
   onBuffering,
@@ -56,13 +57,13 @@ const YouTubePlayer = forwardRef(({
 
     try {
       playerRef.current = new window.YT.Player('yt-player-iframe', {
-        height: '1',
-        width: '1',
+        height: '200',
+        width: '200',
         playerVars: {
           autoplay: 0,
-          controls: 0,
-          disablekb: 1,
-          fs: 0,
+          controls: 1,
+          disablekb: 0,
+          fs: 1,
           modestbranding: 1,
           playsinline: 1,
           rel: 0,
@@ -188,17 +189,25 @@ const YouTubePlayer = forwardRef(({
       id="yt-player-container"
       style={{
         position: 'fixed',
-        bottom: -200,
-        right: -200,
-        width: 1,
-        height: 1,
-        opacity: 0,
-        pointerEvents: 'none',
-        zIndex: -1
+        bottom: visible ? '88px' : '-300px',
+        right: '16px',
+        width: '240px',
+        height: '200px',
+        minWidth: '200px',
+        minHeight: '200px',
+        opacity: visible ? 1 : 0,
+        pointerEvents: visible ? 'auto' : 'none',
+        zIndex: visible ? 45 : -1,
+        borderRadius: '12px',
+        overflow: 'hidden',
+        backgroundColor: '#09090b',
+        border: '1px solid #27272a',
+        boxShadow: '0 20px 25px -5px rgba(0, 0, 0, 0.8), 0 8px 10px -6px rgba(0, 0, 0, 0.6)',
+        transition: 'opacity 0.25s ease, bottom 0.25s ease'
       }}
-      aria-hidden="true"
+      aria-label="YouTube Video Player"
     >
-      <div id="yt-player-iframe" />
+      <div id="yt-player-iframe" style={{ width: '100%', height: '100%', minWidth: '200px', minHeight: '200px' }} />
     </div>
   );
 });

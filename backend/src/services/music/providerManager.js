@@ -13,40 +13,16 @@ const OFFICIAL_LABELS = [
   'dvo', 'aditya music', 'v creations', 'gemini', 'junglee music', 'trendmusic'
 ];
 
-// Unofficial social media and amateur meme audio to strictly filter out
-const JUNK_AUDIO_PATTERNS = [
+// Short junk filter for obvious spam audio formats
+const SPAM_PATTERNS = [
   /whatsapp\s+status/i,
   /status\s+video/i,
   /bass\s+boosted/i,
-  /dj\s+remix/i,
-  /\bremix\b/i,
-  /lofi\s+flip/i,
-  /slowed\s+reverb/i,
-  /cover\s+song/i,
-  /cover\s+version/i,
   /karaoke/i,
+  /slowed\s+reverb/i,
+  /dj\s+remix/i,
   /ringtone/i,
-  /bgm\s+cut/i,
-  /\bmashup\b/i,
-  /\btribute\b/i,
-  /trending\s+version/i,
-  /the\s+independeners/i,
-  /salem\s+gana/i,
-  /trending\s+gana/i,
-  /gana\s+surya/i,
-  /gana\s+suriya/i,
-  /gana\s+velu/i,
-  /gana\s+mani/i,
-  /gana\s+stephen/i,
-  /gana\s+vinoth/i,
-  /gana\s+killer/i,
-  /gana\s+harish/i,
-  /gana\s+prabha/i,
-  /gana\s+micheal/i,
-  /trending\s+la\s+alla/i,
-  /unakosam\s+en\s+usura/i,
-  /veruthutu\s+pora/i,
-  /independent\s+gana/i
+  /bgm\s+cut/i
 ];
 
 // Top authentic Tamil music directors, singers, and lyricists
@@ -61,18 +37,19 @@ const RECOGNIZED_TAMIL_ARTISTS = [
   'tippu', 'harish raghavendra', 'naresh iyer', 'alisha thomas', 'shashaa tirupati',
   'sathyaprakash', 'deepthi suresh', 'arunraja kamaraj', 'super subu', 'vignesh shivan',
   'kaala bhairava', 'silambarasan', 'dhanush', 'kamal haasan', 'rajinikanth', 'vijay',
-  'marana gana viji', 'rokesh', 'gana ulaganathan', 'shankar ganesh'
+  'marana gana viji', 'rokesh', 'gana ulaganathan', 'shankar ganesh', 'arun srinivasan'
 ];
 
 /**
  * Validates whether a song originates from an official film release or reputable label
- * Strictly excludes amateur meme/independent uploads while preserving authentic film Gaana
+ * Uses positive signals (official label, "From <film>", recognized composer/singer)
+ * with a short junk filter for obvious spam.
  */
 export const isOfficialFilmRelease = (song) => {
   if (!song) return false;
   const combined = `${song.title || ''} ${song.artist || ''} ${song.album || ''} ${song.singers || ''}`.toLowerCase();
 
-  // Reject non-Tamil language versions (Telugu, Hindi, Kannada, Malayalam, etc.)
+  // Reject non-Tamil language dubs (Telugu, Hindi, Kannada, Malayalam, etc.)
   const lang = (song.language || song.more_info?.language || '').toLowerCase();
   if (['telugu', 'hindi', 'kannada', 'malayalam', 'punjabi', 'bhojpuri'].includes(lang)) {
     return false;
@@ -86,8 +63,8 @@ export const isOfficialFilmRelease = (song) => {
     return false;
   }
 
-  // Reject social media junk audio and amateur meme creators
-  if (JUNK_AUDIO_PATTERNS.some((pattern) => pattern.test(combined))) {
+  // Reject obvious spam audio formats
+  if (SPAM_PATTERNS.some((pattern) => pattern.test(combined))) {
     return false;
   }
 
@@ -96,14 +73,15 @@ export const isOfficialFilmRelease = (song) => {
     return true;
   }
 
-  // Check if labeled by recognized official distributor
+  // Positive Signal 1: Check if distributed by recognized official label
   const songLabel = (song.label || song.more_info?.label || '').toLowerCase();
   if (OFFICIAL_LABELS.some((lbl) => songLabel.includes(lbl))) {
     return true;
   }
 
-  // Check film release indicators in title or album
+  // Positive Signal 2: Check film release indicator ("From <film>", soundtrack, OST) in title or album
   const hasFilmIndicator =
+    /from\s+["'].+?["']/i.test(combined) ||
     combined.includes('from "') ||
     combined.includes("from '") ||
     combined.includes('soundtrack') ||
@@ -114,15 +92,9 @@ export const isOfficialFilmRelease = (song) => {
     return true;
   }
 
-  // Check if track features a recognized Tamil music director/singer
+  // Positive Signal 3: Check if track features a recognized Tamil music director/singer
   const hasRecognizedArtist = RECOGNIZED_TAMIL_ARTISTS.some((a) => combined.includes(a));
   if (hasRecognizedArtist) {
-    const normTitle = (song.title || '').toLowerCase().trim();
-    const normAlbum = (song.album || '').toLowerCase().trim();
-    // Reject self-titled amateur singles
-    if (normTitle && normAlbum && normTitle === normAlbum && !hasFilmIndicator) {
-      return false;
-    }
     return true;
   }
 
