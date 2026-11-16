@@ -22,7 +22,6 @@ const MiniPlayer = () => {
 
   const handleOpenFull = (e) => {
     if (e) {
-      e.preventDefault?.();
       e.stopPropagation?.();
     }
     setIsFullScreen(true);
