@@ -27,8 +27,34 @@ app.use(helmet({
   crossOriginResourcePolicy: { policy: 'cross-origin' }
 }));
 
+// Allowed origin origins whitelist
+const ALLOWED_ORIGINS = [
+  'https://in-five-11.vercel.app',
+  'http://localhost:5173',
+  'http://localhost:3000',
+  'http://localhost:5000',
+  'http://127.0.0.1:5173'
+];
+
+const customOrigins = config.corsOrigin ? config.corsOrigin.split(',').map((o) => o.trim()) : [];
+
+const isOriginAllowed = (origin) => {
+  if (!origin) return true; // Server-to-server, curl, mobile native
+  if (ALLOWED_ORIGINS.includes(origin)) return true;
+  if (customOrigins.includes(origin)) return true;
+  // Allow all Vercel deployment preview domains for this project
+  if (/^https:\/\/[a-zA-Z0-9_-]+\.vercel\.app$/.test(origin)) return true;
+  return false;
+};
+
 app.use(cors({
-  origin: config.corsOrigin === '*' ? true : config.corsOrigin.split(','),
+  origin: (origin, callback) => {
+    if (isOriginAllowed(origin)) {
+      callback(null, true);
+    } else {
+      callback(new Error(`CORS blocked request from origin: ${origin}`));
+    }
+  },
   credentials: true
 }));
 
