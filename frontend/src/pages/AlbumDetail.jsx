@@ -104,6 +104,10 @@ const AlbumDetail = () => {
           <img
             src={album.image || 'https://images.unsplash.com/photo-1514525253161-7a46d19cd819?w=500&auto=format&fit=crop&q=80'}
             alt={album.name || album.title}
+            onError={(e) => {
+              e.currentTarget.onerror = null;
+              e.currentTarget.src = 'https://images.unsplash.com/photo-1514525253161-7a46d19cd819?w=500&auto=format&fit=crop&q=80';
+            }}
             className="w-full h-full object-cover"
           />
         </div>

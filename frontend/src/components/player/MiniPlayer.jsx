@@ -20,9 +20,9 @@ const MiniPlayer = () => {
   const progressPercent = duration > 0 ? (currentTime / duration) * 100 : 0;
 
   return (
-    <div className="md:hidden fixed bottom-16 left-0 right-0 z-40 px-2 pb-1">
+    <div className="md:hidden fixed bottom-16 left-0 right-0 z-45 px-2 pb-1 pointer-events-auto">
       <div
-        className="bg-[#18181B]/95 backdrop-blur-md rounded-xl p-2.5 border border-zinc-800/80 shadow-2xl flex items-center justify-between cursor-pointer active:scale-[0.98] transition-transform select-none"
+        className="bg-[#18181B]/95 backdrop-blur-md rounded-xl p-2.5 border border-zinc-800/80 shadow-2xl flex items-center justify-between cursor-pointer active:scale-[0.98] transition-transform select-none touch-manipulation"
         onClick={() => setIsFullScreen(true)}
         role="button"
         tabIndex={0}
@@ -33,6 +33,10 @@ const MiniPlayer = () => {
           <img
             src={currentSong.image || 'https://images.unsplash.com/photo-1511671782779-c97d3d27a1d4?w=100&auto=format&fit=crop&q=80'}
             alt={currentSong.title}
+            onError={(e) => {
+              e.currentTarget.onerror = null;
+              e.currentTarget.src = 'https://images.unsplash.com/photo-1511671782779-c97d3d27a1d4?w=100&auto=format&fit=crop&q=80';
+            }}
             className="w-10 h-10 rounded-lg object-cover flex-shrink-0"
           />
           <div className="min-w-0 flex-1">
@@ -46,23 +50,25 @@ const MiniPlayer = () => {
         </div>
 
         {/* Right: Controls */}
-        <div className="flex items-center gap-1" onClick={(e) => e.stopPropagation()}>
+        <div className="flex items-center gap-1.5" onClick={(e) => e.stopPropagation()}>
           <button
             onClick={togglePlay}
-            className="w-8 h-8 rounded-full bg-purple-600 text-white flex items-center justify-center"
+            className="w-9 h-9 rounded-full bg-purple-600 hover:bg-purple-500 text-white flex items-center justify-center shadow-md active:scale-90 transition-transform"
+            aria-label={isPlaying ? 'Pause' : 'Play'}
           >
             {isBuffering ? (
-              <div className="w-3.5 h-3.5 border-2 border-white border-t-transparent rounded-full animate-spin" />
+              <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
             ) : isPlaying ? (
-              <Pause className="w-4 h-4" />
+              <Pause className="w-4 h-4 fill-white" />
             ) : (
-              <Play className="w-4 h-4 ml-0.5" />
+              <Play className="w-4 h-4 fill-white ml-0.5" />
             )}
           </button>
 
           <button
             onClick={nextTrack}
-            className="p-1.5 text-zinc-300 hover:text-white"
+            className="p-2 text-zinc-300 hover:text-white active:scale-90 transition-transform"
+            aria-label="Next song"
           >
             <SkipForward className="w-4 h-4" />
           </button>

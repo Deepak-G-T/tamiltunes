@@ -15,6 +15,10 @@ const ArtistCard = ({ artist }) => {
           src={artist.image || 'https://images.unsplash.com/photo-1511671782779-c97d3d27a1d4?w=300&auto=format&fit=crop&q=80'}
           alt={artist.name}
           loading="lazy"
+          onError={(e) => {
+            e.currentTarget.onerror = null;
+            e.currentTarget.src = 'https://images.unsplash.com/photo-1511671782779-c97d3d27a1d4?w=300&auto=format&fit=crop&q=80';
+          }}
           className="w-full h-full object-cover transition-transform duration-300 group-hover:scale-105"
         />
       </div>

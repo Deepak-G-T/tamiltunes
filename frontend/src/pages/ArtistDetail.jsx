@@ -92,6 +92,10 @@ const ArtistDetail = () => {
           <img
             src={artist.image || 'https://images.unsplash.com/photo-1511671782779-c97d3d27a1d4?w=500&auto=format&fit=crop&q=80'}
             alt={artist.name}
+            onError={(e) => {
+              e.currentTarget.onerror = null;
+              e.currentTarget.src = 'https://images.unsplash.com/photo-1511671782779-c97d3d27a1d4?w=500&auto=format&fit=crop&q=80';
+            }}
             className="w-full h-full object-cover"
           />
         </div>
