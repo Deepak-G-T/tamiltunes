@@ -57,10 +57,8 @@ const MainLayout = () => {
         {/* Mobile Bottom Navigation */}
         <MobileNav />
 
-        {/* Desktop Fixed Bottom Player */}
-        <div className="hidden md:block">
-          <MusicPlayer />
-        </div>
+        {/* Shared Audio Player Engine (Desktop bar + Mobile FullScreen Modal + Queue Drawer) */}
+        <MusicPlayer />
       </div>
 
       {/* Modals */}

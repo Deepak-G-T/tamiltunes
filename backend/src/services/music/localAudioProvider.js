@@ -91,6 +91,96 @@ export const CURATED_TAMIL_SONGS = [
     category: 'trending',
     licenseNotice: 'Original Tamil Master Audio (Mersal)'
   },
+  {
+    id: 'tt_trending_6',
+    title: 'Veezha Veera (From "OM Chapter 1: Udhiram - The Blood Wood") [Tamil]',
+    artist: 'Sai Abhyankkar, Tippu, Arun Srinivasan',
+    singers: 'Sai Abhyankkar, Tippu, Arun Srinivasan',
+    album: 'OM Chapter 1',
+    duration: 236,
+    year: '2026',
+    image: 'https://c.saavncdn.com/696/Veezha-Veera-From-OM-Chapter-1-Udhiram-The-Blood-Wood-Tamil-Tamil-2026-20261019161818-500x500.jpg',
+    streamUrl: 'https://aac.saavncdn.com/696/33b63dd76847575d76550d30dcc97bf5_320.mp4',
+    cdnStreamUrl: 'https://aac.saavncdn.com/696/33b63dd76847575d76550d30dcc97bf5_320.mp4',
+    isPlayable: true,
+    category: 'trending',
+    licenseNotice: 'Original Tamil Master Audio (OM Chapter 1)'
+  },
+  {
+    id: 'tt_folk_1',
+    title: 'Arabic Kuthu - Halamithi Habibo',
+    artist: 'Anirudh Ravichander, Jonita Gandhi',
+    singers: 'Anirudh Ravichander, Jonita Gandhi',
+    album: 'Beast',
+    duration: 280,
+    year: '2022',
+    image: 'https://c.saavncdn.com/510/Beast-Tamil-2022-20220504184736-500x500.jpg',
+    streamUrl: 'https://aac.saavncdn.com/510/9d96fc7ddd4ffadb745f25aed86f7a4e_320.mp4',
+    cdnStreamUrl: 'https://aac.saavncdn.com/510/9d96fc7ddd4ffadb745f25aed86f7a4e_320.mp4',
+    isPlayable: true,
+    category: 'folk',
+    licenseNotice: 'Original Tamil Master Audio (Beast)'
+  },
+  {
+    id: 'tt_folk_2',
+    title: 'Kaavaalaa',
+    artist: 'Anirudh Ravichander, Shilpa Rao',
+    singers: 'Shilpa Rao, Anirudh Ravichander',
+    album: 'Jailer',
+    duration: 191,
+    year: '2023',
+    image: 'https://c.saavncdn.com/187/Jailer-Tamil-2023-20230728081443-500x500.jpg',
+    streamUrl: 'https://aac.saavncdn.com/187/49797372d021638077d8a6b749068bc8_320.mp4',
+    cdnStreamUrl: 'https://aac.saavncdn.com/187/49797372d021638077d8a6b749068bc8_320.mp4',
+    isPlayable: true,
+    category: 'folk',
+    licenseNotice: 'Original Tamil Master Audio (Jailer)'
+  },
+  {
+    id: 'tt_folk_3',
+    title: 'Rowdy Baby',
+    artist: 'Dhanush, Yuvan Shankar Raja, Dhee',
+    singers: 'Dhanush, Dhee',
+    album: 'Maari 2',
+    duration: 284,
+    year: '2018',
+    image: 'https://c.saavncdn.com/276/Maari-2-Tamil-2018-20260203193952-500x500.jpg',
+    streamUrl: 'https://aac.saavncdn.com/276/64b835b4e1829992f8d35f54d6dad5f3_320.mp4',
+    cdnStreamUrl: 'https://aac.saavncdn.com/276/64b835b4e1829992f8d35f54d6dad5f3_320.mp4',
+    isPlayable: true,
+    category: 'folk',
+    licenseNotice: 'Original Tamil Master Audio (Maari 2)'
+  },
+  {
+    id: 'tt_folk_4',
+    title: 'Aaluma Doluma',
+    artist: 'Anirudh Ravichander, Badshah, G. Rokesh',
+    singers: 'Anirudh Ravichander, Badshah',
+    album: 'Vedalam',
+    duration: 258,
+    year: '2015',
+    image: 'https://c.saavncdn.com/323/Vedalam-Tamil-2015-20260120201356-500x500.jpg',
+    streamUrl: 'https://aac.saavncdn.com/323/7b0f4cf0f773cff9514e9913312610b7_320.mp4',
+    cdnStreamUrl: 'https://aac.saavncdn.com/323/7b0f4cf0f773cff9514e9913312610b7_320.mp4',
+    isPlayable: true,
+    category: 'folk',
+    licenseNotice: 'Original Tamil Master Audio (Vedalam)'
+  },
+  {
+    id: 'tt_melodies_1',
+    title: 'Katchi Sera',
+    artist: 'Sai Abhyankkar',
+    singers: 'Sai Abhyankkar',
+    album: 'Think Indie',
+    duration: 187,
+    year: '2024',
+    image: 'https://c.saavncdn.com/118/Katchi-Sera-From-Think-Indie-Tamil-2024-20251026074526-500x500.jpg',
+    streamUrl: 'https://aac.saavncdn.com/118/3456f4e5990e8fb33d7af6678aca034a_320.mp4',
+    cdnStreamUrl: 'https://aac.saavncdn.com/118/3456f4e5990e8fb33d7af6678aca034a_320.mp4',
+    isPlayable: true,
+    category: 'melodies',
+    licenseNotice: 'Original Tamil Master Audio (Think Indie)'
+  },
 
   // 90s Golden Era Classics
   {
@@ -271,6 +361,38 @@ export const CURATED_ARTISTS = [
     role: 'Playback Singer',
     image: 'https://c.saavncdn.com/artists/Sid_Sriram_002_20220504100518_500x500.jpg',
     topSongs: CURATED_TAMIL_SONGS.filter((s) => s.artist.includes('Sid Sriram')),
+    albums: []
+  },
+  {
+    id: 'artist_yuvan',
+    name: 'Yuvan Shankar Raja',
+    role: 'Music Director & Singer',
+    image: 'https://c.saavncdn.com/artists/Yuvan_Shankar_Raja_003_20230804104250_500x500.jpg',
+    topSongs: CURATED_TAMIL_SONGS.filter((s) => s.artist.includes('Yuvan')),
+    albums: []
+  },
+  {
+    id: 'artist_ilaiyaraaja',
+    name: 'Ilaiyaraaja',
+    role: 'Legendary Maestro',
+    image: 'https://c.saavncdn.com/artists/Ilaiyaraaja_002_20191118123233_500x500.jpg',
+    topSongs: CURATED_TAMIL_SONGS.filter((s) => s.artist.includes('Ilaiyaraaja')),
+    albums: []
+  },
+  {
+    id: 'artist_santhosh',
+    name: 'Santhosh Narayanan',
+    role: 'Music Director',
+    image: 'https://c.saavncdn.com/artists/Santhosh_Narayanan_002_20220623120119_500x500.jpg',
+    topSongs: CURATED_TAMIL_SONGS.filter((s) => s.artist.includes('Santhosh')),
+    albums: []
+  },
+  {
+    id: 'artist_sai_abhyankkar',
+    name: 'Sai Abhyankkar',
+    role: 'Music Director & Singer',
+    image: 'https://c.saavncdn.com/artists/Sai_Abhyankkar_003_20250707122433_500x500.jpg',
+    topSongs: CURATED_TAMIL_SONGS.filter((s) => s.artist.includes('Sai Abhyankkar')),
     albums: []
   }
 ];

@@ -97,7 +97,7 @@ const MusicPlayer = () => {
 
   if (!currentSong) {
     return (
-      <footer className="h-20 bg-[#111114] border-t border-zinc-800/80 px-4 md:px-6 flex items-center justify-between text-zinc-500 text-xs">
+      <footer className="hidden md:flex h-20 bg-[#111114] border-t border-zinc-800/80 px-4 md:px-6 items-center justify-between text-zinc-500 text-xs">
         <div className="flex items-center gap-3">
           <div className="w-12 h-12 rounded-lg bg-zinc-800/50 flex items-center justify-center">
             <ShieldCheck className="w-5 h-5 text-zinc-600" />
@@ -113,7 +113,7 @@ const MusicPlayer = () => {
 
   return (
     <>
-      <footer className="h-22 bg-[#111114] border-t border-zinc-800/80 px-4 md:px-6 flex items-center justify-between select-none relative z-30">
+      <footer className="hidden md:flex h-22 bg-[#111114] border-t border-zinc-800/80 px-4 md:px-6 items-center justify-between select-none relative z-30">
         {/* Left: Track Information */}
         <div className="flex items-center gap-3 w-1/4 min-w-[200px]">
           <div
