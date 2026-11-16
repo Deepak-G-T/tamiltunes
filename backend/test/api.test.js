@@ -1,38 +1,44 @@
 import app from '../src/app.js';
 import { initDb } from '../src/prisma/client.js';
+import { musicService } from '../src/services/music/providerManager.js';
+import { musicCache } from '../src/services/cacheService.js';
 
 const runTests = async () => {
   console.log('--- Starting TamilTunes Backend Integration Tests ---');
   await initDb();
 
+  // Use isolated Mock Provider by default so tests run fast and offline
+  musicService.setProvider('mock');
+  musicCache.clear();
+
   const server = app.listen(5002);
   const BASE = 'http://localhost:5002/api';
 
   try {
-    // 1. Health check (both /health and /api/health)
+    // 1. Trimmed health check (status & uptime only)
     const rootHealth = await fetch('http://localhost:5002/health').then((r) => r.json());
-    if (rootHealth.status !== 'ok' || !rootHealth.musicProvider || !rootHealth.cache) {
+    if (rootHealth.status !== 'ok' || typeof rootHealth.uptime !== 'number') {
       throw new Error('Root /health check failed');
     }
     const apiHealth = await fetch(`${BASE}/health`).then((r) => r.json());
-    if (apiHealth.status !== 'ok' || apiHealth.cache.ttlMinutes !== 10) {
+    if (apiHealth.status !== 'ok' || typeof apiHealth.uptime !== 'number') {
       throw new Error('API /api/health check failed');
     }
-    console.log(`✓ Health Check (Root + API, 10m TTL Cache, Provider: ${rootHealth.musicProvider}): PASSED`);
+    console.log(`✓ Health Check (Trimmed to status & uptime): PASSED (uptime: ${rootHealth.uptime}s)`);
 
-    // 2. Music Home feed (including Gana category)
+    // 2. Music Home feed (including Film Gaana category via mock provider)
     const homeRes = await fetch(`${BASE}/music/home`).then((r) => r.json());
     if (!homeRes.success || !homeRes.data?.trending?.length) throw new Error('Home feed failed');
     if (!homeRes.data.gana || !homeRes.data.gana.length) throw new Error('Film Gana category missing in home feed');
     console.log(`✓ Music Home Feed: PASSED (${homeRes.data.trending.length} trending, ${homeRes.data.gana.length} film gaana)`);
 
-    // 3. Music Search (Anirudh) & Cache verification
+    // 3. Music Search (Anirudh) & LRU 10-Minute Cache verification
     const searchRes1 = await fetch(`${BASE}/music/search?query=Anirudh`).then((r) => r.json());
     if (!searchRes1.success || !searchRes1.data?.songs?.length) throw new Error('Search failed');
     const searchRes2 = await fetch(`${BASE}/music/search?query=Anirudh`).then((r) => r.json());
-    const healthAfterCache = await fetch(`${BASE}/health`).then((r) => r.json());
-    if (healthAfterCache.cache.hits < 1) throw new Error('Search caching verification failed');
-    console.log(`✓ Tamil Search & 10-Minute Cache: PASSED (${searchRes1.data.songs.length} songs found, Cache Hits: ${healthAfterCache.cache.hits})`);
+    const stats = musicCache.stats();
+    if (stats.hits < 1) throw new Error('Search LRU caching verification failed');
+    console.log(`✓ Tamil Search & LRU Cache: PASSED (${searchRes1.data.songs.length} songs found, Cache Hits: ${stats.hits}, Keys: ${stats.keys}/${stats.maxEntries})`);
 
     // 4. User Registration
     const testEmail = `test_${Date.now()}@tamiltunes.com`;
@@ -157,6 +163,15 @@ const runTests = async () => {
     }).then((r) => r.json());
     if (!listHistRes.success || listHistRes.history?.length !== 1) throw new Error('List history failed');
     console.log('✓ List Listening History: PASSED');
+
+    // Optional Live Upstream Smoke Test (gated by TEST_LIVE_API=true)
+    if (process.env.TEST_LIVE_API === 'true') {
+      console.log('--- Running Optional Live Upstream Smoke Test (JioSaavn) ---');
+      musicService.setProvider('jiosaavn');
+      const liveRes = await fetch(`${BASE}/music/search?query=Anirudh`).then((r) => r.json());
+      if (!liveRes.success || !liveRes.data?.songs?.length) throw new Error('Live search smoke test failed');
+      console.log(`✓ Optional Live Upstream Smoke Test: PASSED (${liveRes.data.songs.length} live tracks retrieved)`);
+    }
 
     console.log('--- ALL INTEGRATION TESTS PASSED 100% SUCCESSFULLY! ---');
   } catch (err) {

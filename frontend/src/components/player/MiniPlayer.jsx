@@ -21,21 +21,24 @@ const MiniPlayer = () => {
   const progressPercent = duration > 0 ? (currentTime / duration) * 100 : 0;
 
   const handleOpenFull = (e) => {
-    e.stopPropagation();
+    if (e) {
+      e.preventDefault?.();
+      e.stopPropagation?.();
+    }
     setIsFullScreen(true);
   };
 
   return (
     <div className="md:hidden fixed bottom-16 left-0 right-0 z-40 px-2 pb-1 pointer-events-auto">
       <div
-        className="bg-[#18181B]/95 backdrop-blur-md rounded-xl p-2.5 border border-zinc-800/80 shadow-2xl flex items-center justify-between cursor-pointer active:scale-[0.98] transition-transform select-none"
+        className="bg-[#18181B]/95 backdrop-blur-md rounded-xl p-2.5 border border-zinc-800/80 shadow-2xl flex items-center justify-between cursor-pointer active:scale-[0.98] transition-transform select-none touch-manipulation"
         onClick={handleOpenFull}
         role="button"
         tabIndex={0}
         aria-label="Open now playing full screen"
       >
         {/* Left: Thumbnail & Song Info (tap opens player) */}
-        <div className="flex items-center gap-2.5 min-w-0 flex-1 mr-2" onClick={handleOpenFull}>
+        <div className="flex items-center gap-2.5 min-w-0 flex-1 mr-2 cursor-pointer" onClick={handleOpenFull}>
           <img
             src={currentSong.image || MUSIC_COVER_FALLBACK}
             alt={currentSong.title}

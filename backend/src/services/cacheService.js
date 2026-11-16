@@ -1,10 +1,10 @@
 /**
- * In-memory TTL Cache Service for TamilTunes API
- * Caches home feed, search results, and song details with a 10-minute default TTL
- * to avoid hammering upstream APIs and maximize response speed.
+ * LRU In-memory TTL Cache Service for TamilTunes API
+ * Capped at 500 entries with Least Recently Used (LRU) eviction and a 10-minute default TTL.
  */
-class CacheService {
-  constructor(defaultTtlSeconds = 600) {
+class LruCacheService {
+  constructor(maxEntries = 500, defaultTtlSeconds = 600) {
+    this.maxEntries = maxEntries;
     this.defaultTtlMs = defaultTtlSeconds * 1000; // 10 minutes
     this.cache = new Map();
     this.hits = 0;
@@ -24,12 +24,28 @@ class CacheService {
       return null;
     }
 
+    // LRU refresh: delete and re-insert to move key to most recently used position
+    this.cache.delete(key);
+    this.cache.set(key, item);
+
     this.hits++;
     return item.data;
   }
 
   set(key, data, ttlSeconds = null) {
     const ttlMs = ttlSeconds ? ttlSeconds * 1000 : this.defaultTtlMs;
+
+    // If key already exists, delete it so re-insertion refreshes order
+    if (this.cache.has(key)) {
+      this.cache.delete(key);
+    } else if (this.cache.size >= this.maxEntries) {
+      // Evict least recently used (first key in map)
+      const oldestKey = this.cache.keys().next().value;
+      if (oldestKey !== undefined) {
+        this.cache.delete(oldestKey);
+      }
+    }
+
     this.cache.set(key, {
       data,
       expiresAt: Date.now() + ttlMs,
@@ -52,7 +68,7 @@ class CacheService {
   }
 
   stats() {
-    // Purge expired keys before reporting stats
+    // Purge expired keys
     const now = Date.now();
     for (const [key, val] of this.cache.entries()) {
       if (now > val.expiresAt) {
@@ -62,6 +78,7 @@ class CacheService {
 
     return {
       keys: this.cache.size,
+      maxEntries: this.maxEntries,
       hits: this.hits,
       misses: this.misses,
       ttlMinutes: Math.round(this.defaultTtlMs / 60000)
@@ -69,4 +86,4 @@ class CacheService {
   }
 }
 
-export const musicCache = new CacheService(600); // 10-minute TTL
+export const musicCache = new LruCacheService(500, 600);

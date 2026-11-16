@@ -105,6 +105,7 @@ export class JioSaavnProvider extends MusicProvider {
       streamUrl: streamUrl || null,
       language: raw.language || raw.more_info?.language || 'tamil',
       provider: 'jiosaavn',
+      source: 'audio',
       isPlayable: !!streamUrl,
       licenseNotice: 'High-Quality Tamil Audio Stream (cyberboysumanjay/JioSaavnAPI)'
     };

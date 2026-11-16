@@ -38,34 +38,11 @@ app.use(express.urlencoded({ extended: true, limit: '1mb' }));
 // Apply rate limiter to /api
 app.use('/api', apiLimiter);
 
-// Health check endpoint handler with database & music cache inspection
-const healthHandler = async (req, res) => {
-  let dbInfo = { status: 'unknown' };
-  try {
-    const userCount = await db.user.count();
-    const songCount = await db.song.count();
-    const albumCount = (await db.album?.count()) ?? 0;
-    const artistCount = (await db.artist?.count()) ?? 0;
-    dbInfo = {
-      status: 'connected',
-      engine: 'PostgreSQL (Prisma)',
-      counts: { users: userCount, songs: songCount, albums: albumCount, artists: artistCount }
-    };
-  } catch (e) {
-    dbInfo = { status: 'degraded', error: e.message };
-  }
-
-  const musicInfo = await musicService.health();
-
+// Trimmed health check handler returning status and uptime only
+const healthHandler = (req, res) => {
   res.json({
     status: 'ok',
-    app: 'TamilTunes API',
-    version: '1.0.0',
-    uptime: Math.round(process.uptime()),
-    musicProvider: musicInfo.activeProvider,
-    cache: musicInfo.cache,
-    database: dbInfo,
-    timestamp: new Date().toISOString()
+    uptime: Math.round(process.uptime())
   });
 };
 

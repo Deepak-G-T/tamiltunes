@@ -10,6 +10,7 @@
     "dev": "nodemon src/index.js",
     "test": "node test/api.test.js",
     "seed": "node src/prisma/seed.js",
+    "db:baseline": "prisma migrate resolve --applied 20261117000000_init",
     "prisma:generate": "prisma generate",
     "prisma:migrate": "prisma migrate dev",
     "prisma:deploy": "prisma migrate deploy",

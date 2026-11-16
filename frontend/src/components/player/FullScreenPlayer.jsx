@@ -58,7 +58,10 @@ const FullScreenPlayer = ({ isOpen, onClose, onToggleFavorite, isFavorite }) => 
   if (!isOpen || !currentSong) return null;
 
   const content = (
-    <div className="fixed inset-0 z-[9999] bg-[#09090B] flex flex-col justify-between p-4 sm:p-8 select-none overflow-y-auto animate-in fade-in duration-200">
+    <div
+      style={{ zIndex: 99999 }}
+      className="fixed inset-0 bg-[#09090B] flex flex-col justify-between p-4 sm:p-8 select-none overflow-y-auto animate-in fade-in duration-200"
+    >
       {/* Blurred ambient background effect */}
       <div
         className="fixed inset-0 opacity-25 filter blur-3xl pointer-events-none scale-125"

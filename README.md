@@ -239,23 +239,39 @@ Open `http://localhost:3000` in your web browser.
 
 ## 🚢 Production Deployment
 
-### 1. Database (PostgreSQL)
-Use any managed PostgreSQL provider (e.g., [Neon](https://neon.tech), [Supabase](https://supabase.com), or [Render PostgreSQL](https://render.com)):
-1. Create a PostgreSQL database instance.
+### 1. Database (PostgreSQL) & Migrations
+Use any managed PostgreSQL provider (e.g., [Render PostgreSQL](https://render.com), [Neon](https://neon.tech), or [Supabase](https://supabase.com)):
+1. Create a PostgreSQL database instance (e.g. `tamiltunes-db`).
 2. Copy the connection string (`postgresql://user:password@host/database?sslmode=require`).
-3. Run migrations: `npx prisma db push` or `npx prisma migrate deploy`.
+3. **For new databases**: Run migrations:
+   ```bash
+   npm run prisma:deploy --prefix backend
+   # or: npx prisma migrate deploy
+   ```
+4. **For existing databases previously created with `db push`**:
+   Run the one-time baseline step to record the initial migration as applied:
+   ```bash
+   npm run db:baseline --prefix backend
+   # or: npx prisma migrate resolve --applied 20261117000000_init
+   ```
+5. **Optional Catalog Seeding**:
+   Seeding is completely idempotent (`upsert`) and executed on-demand:
+   ```bash
+   npm run seed --prefix backend
+   ```
 
 ### 2. Backend (Render)
 
 [![Deploy to Render](https://render.com/images/deploy-to-render-button.svg)](https://render.com/deploy?repo=https://github.com/Deepak-G-T/tamiltunes)
 
 #### Option A: One-Click Blueprint (Recommended)
-1. Click the **Deploy to Render** button above or open **[Render Blueprints](https://dashboard.render.com/blueprints/new)**.
+1. Open **[Render Blueprints](https://dashboard.render.com/blueprints/new)**.
 2. Connect your GitHub repository: `Deepak-G-T/tamiltunes`.
 3. Render automatically discovers `render.yaml` and provisions:
    - `tamiltunes-backend` (Node.js Web Service)
    - `tamiltunes-db` (Free PostgreSQL Database)
-4. Click **Apply** to deploy.
+4. Migrations are executed at startup: `npx prisma migrate deploy && npm start`. If a migration fails, the deployment halts visibly.
+5. Click **Apply** to deploy.
 
 #### Option B: Manual Web Service Setup
 1. In Render Dashboard, click **New +** -> **Web Service**.
@@ -265,7 +281,7 @@ Use any managed PostgreSQL provider (e.g., [Neon](https://neon.tech), [Supabase]
    - **Environment**: `Node`
    - **Region**: `Singapore` or `Ohio`
    - **Build Command**: `npm install && npx prisma generate`
-   - **Start Command**: `npm start`
+   - **Start Command**: `npx prisma migrate deploy && npm start`
    - **Plan**: `Free`
 4. Set Environment Variables:
    - `NODE_ENV`: `production`
@@ -273,6 +289,7 @@ Use any managed PostgreSQL provider (e.g., [Neon](https://neon.tech), [Supabase]
    - `JWT_SECRET`: *(auto-generated or random 32 characters)*
    - `CORS_ORIGIN`: `*`
    - `DATABASE_URL`: *(PostgreSQL connection string)*
+   - `MUSIC_PROVIDER`: `jiosaavn` *(or `youtube` for YouTube IFrame engine, `local`)*
 
 ### 3. Frontend (Vercel)
 1. Link repository to Vercel.

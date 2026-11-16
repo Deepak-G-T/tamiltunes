@@ -10,11 +10,11 @@ const OFFICIAL_LABELS = [
   'zee music', 'muzik247', 'star music', 'ayngaran', 'five star',
   'mass audios', 'sun pictures', 'lyca', 'trend music', 'noise and grains',
   'ananda audio', 'rajshri', 'tips', 'universal', 'warner', 'think indie',
-  'dvo', 'aditya music', 'v creations', 'gemini'
+  'dvo', 'aditya music', 'v creations', 'gemini', 'junglee music', 'trendmusic'
 ];
 
-// Unofficial social media audio formats to filter out
-const SOCIAL_MEDIA_JUNK = [
+// Unofficial social media and amateur meme audio to strictly filter out
+const JUNK_AUDIO_PATTERNS = [
   /whatsapp\s+status/i,
   /status\s+video/i,
   /bass\s+boosted/i,
@@ -26,46 +26,103 @@ const SOCIAL_MEDIA_JUNK = [
   /cover\s+version/i,
   /karaoke/i,
   /ringtone/i,
-  /bgm\s+cut/i
+  /bgm\s+cut/i,
+  /\bmashup\b/i,
+  /\btribute\b/i,
+  /trending\s+version/i,
+  /the\s+independeners/i,
+  /salem\s+gana/i,
+  /trending\s+gana/i,
+  /gana\s+surya/i,
+  /gana\s+suriya/i,
+  /gana\s+velu/i,
+  /gana\s+mani/i,
+  /gana\s+stephen/i,
+  /gana\s+vinoth/i,
+  /gana\s+killer/i,
+  /gana\s+harish/i,
+  /gana\s+prabha/i,
+  /gana\s+micheal/i,
+  /trending\s+la\s+alla/i,
+  /unakosam\s+en\s+usura/i,
+  /veruthutu\s+pora/i,
+  /independent\s+gana/i
+];
+
+// Top authentic Tamil music directors, singers, and lyricists
+const RECOGNIZED_TAMIL_ARTISTS = [
+  'anirudh', 'a.r. rahman', 'ar rahman', 'rahman', 'yuvan', 'ilaiyaraaja', 'ilayaraja',
+  'harris jayaraj', 'sid sriram', 'g.v. prakash', 'gv prakash', 'santhosh narayanan',
+  'd. imman', 'imman', 'hiphop tamizha', 'vijay antony', 'sean roldan', 'sai abhyankkar',
+  'sam c.s.', 'sam cs', 'vidyasagar', 'deva', 'gana bala', 's.p. balasubrahmanyam',
+  'spb', 'k.j. yesudas', 'yesudas', 'hariharan', 'shankar mahadevan', 'shreya ghoshal',
+  'chinmayi', 'pradeep kumar', 'haricharan', 'andrea', 'jonita', 'dhee', 'anthony daasan',
+  'karthik', 'sujatha', 'chitra', 'swarnalatha', 'mano', 'sadhana sargam', 'unni menon',
+  'tippu', 'harish raghavendra', 'naresh iyer', 'alisha thomas', 'shashaa tirupati',
+  'sathyaprakash', 'deepthi suresh', 'arunraja kamaraj', 'super subu', 'vignesh shivan',
+  'kaala bhairava', 'silambarasan', 'dhanush', 'kamal haasan', 'rajinikanth', 'vijay',
+  'marana gana viji', 'rokesh', 'gana ulaganathan', 'shankar ganesh'
 ];
 
 /**
  * Validates whether a song originates from an official film release or reputable label
- * Instead of banning "gana", verifies film legitimacy and accepts authentic film gaana.
+ * Strictly excludes amateur meme/independent uploads while preserving authentic film Gaana
  */
 export const isOfficialFilmRelease = (song) => {
   if (!song) return false;
   const combined = `${song.title || ''} ${song.artist || ''} ${song.album || ''} ${song.singers || ''}`.toLowerCase();
 
-  // Reject social media junk audio
-  if (SOCIAL_MEDIA_JUNK.some((pattern) => pattern.test(combined))) {
+  // Reject non-Tamil language versions (Telugu, Hindi, Kannada, Malayalam, etc.)
+  const lang = (song.language || song.more_info?.language || '').toLowerCase();
+  if (['telugu', 'hindi', 'kannada', 'malayalam', 'punjabi', 'bhojpuri'].includes(lang)) {
+    return false;
+  }
+  if (
+    combined.includes('[telugu]') ||
+    combined.includes('[hindi]') ||
+    combined.includes('[kannada]') ||
+    combined.includes('[malayalam]')
+  ) {
     return false;
   }
 
-  // Curated catalog is pre-verified
-  if (song.id && song.id.startsWith('tt_')) {
+  // Reject social media junk audio and amateur meme creators
+  if (JUNK_AUDIO_PATTERNS.some((pattern) => pattern.test(combined))) {
+    return false;
+  }
+
+  // Curated catalog and verified YouTube collection are pre-verified
+  if (song.id && (song.id.startsWith('tt_') || song.id.startsWith('yt_'))) {
     return true;
   }
 
-  // Check if labeled by official distributor
+  // Check if labeled by recognized official distributor
   const songLabel = (song.label || song.more_info?.label || '').toLowerCase();
   if (OFFICIAL_LABELS.some((lbl) => songLabel.includes(lbl))) {
     return true;
   }
 
   // Check film release indicators in title or album
-  if (
+  const hasFilmIndicator =
     combined.includes('from "') ||
     combined.includes("from '") ||
     combined.includes('soundtrack') ||
     combined.includes('original motion picture') ||
-    combined.includes('ost')
-  ) {
+    combined.includes('ost');
+
+  if (hasFilmIndicator) {
     return true;
   }
 
-  // If album is present and doesn't look like generic "Tamil Single" or amateur release
-  if (song.album && song.album !== 'Tamil Single' && song.album.length > 2) {
+  // Check if track features a recognized Tamil music director/singer
+  const hasRecognizedArtist = RECOGNIZED_TAMIL_ARTISTS.some((a) => combined.includes(a));
+  if (hasRecognizedArtist) {
+    const normTitle = (song.title || '').toLowerCase().trim();
+    const normAlbum = (song.album || '').toLowerCase().trim();
+    // Reject self-titled amateur singles
+    if (normTitle && normAlbum && normTitle === normAlbum && !hasFilmIndicator) {
+      return false;
+    }
     return true;
   }
 
@@ -77,7 +134,8 @@ export class MusicProviderManager {
     this.providers = {
       jiosaavn: new JioSaavnProvider(),
       youtube: new YouTubeIframeProvider(),
-      local: new LocalAudioProvider()
+      local: new LocalAudioProvider(),
+      mock: new LocalAudioProvider()
     };
 
     // Active provider initialized via environment variable (default: jiosaavn)
@@ -265,7 +323,7 @@ export class MusicProviderManager {
       this.activeProvider.searchSongs?.('ar rahman 90s hits tamil', 10).catch(() => []) || [],
       this.activeProvider.searchSongs?.('harris jayaraj hits tamil', 10).catch(() => []) || [],
       this.activeProvider.searchSongs?.('yuvan shankar raja melodies tamil', 10).catch(() => []) || [],
-      this.activeProvider.searchSongs?.('tamil film gaana deva anirudh', 10).catch(() => []) || [],
+      this.activeProvider.searchSongs?.('marana mass aaluma doluma vaathi coming danga maari', 10).catch(() => []) || [],
       this.activeProvider.searchSongs?.('sid sriram romantic tamil', 10).catch(() => []) || [],
       this.activeProvider.searchSongs?.('ilaiyaraaja sad evergreen tamil', 10).catch(() => []) || [],
       this.activeProvider.searchSongs?.('anirudh dhee kuthu beats tamil', 10).catch(() => []) || [],

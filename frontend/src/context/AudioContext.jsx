@@ -1,11 +1,13 @@
-import React, { createContext, useContext, useState, useRef, useEffect } from 'react';
+import React, { createContext, useContext, useState, useRef, useEffect, useCallback } from 'react';
 import api from '../services/api';
+import YouTubePlayer from '../components/player/YouTubePlayer';
 
 const AudioContext = createContext();
 
 export const AudioProvider = ({ children }) => {
   const audioRef = useRef(new Audio());
-  
+  const ytPlayerRef = useRef(null);
+
   const [currentSong, setCurrentSong] = useState(null);
   const [isPlaying, setIsPlaying] = useState(false);
   const [currentTime, setCurrentTime] = useState(0);
@@ -17,14 +19,14 @@ export const AudioProvider = ({ children }) => {
   const [isMuted, setIsMuted] = useState(false);
   const [isBuffering, setIsBuffering] = useState(false);
   const [playbackError, setPlaybackError] = useState(null);
-  
+
   // Playback playlist / queue
   const [queue, setQueue] = useState([]);
   const [queueIndex, setQueueIndex] = useState(-1);
   const [isShuffle, setIsShuffle] = useState(false);
   const [repeatMode, setRepeatMode] = useState('off'); // 'off' | 'all' | 'one'
-  
-  // Adaptive streaming fallback tracking
+
+  // Adaptive streaming fallback tracking for HTML5 audio
   const activeCandidatesRef = useRef([]);
   const candidateIndexRef = useRef(0);
   const currentSongRef = useRef(null);
@@ -34,7 +36,12 @@ export const AudioProvider = ({ children }) => {
   const [isQueueOpen, setIsQueueOpen] = useState(false);
   const [historyRecordedSongId, setHistoryRecordedSongId] = useState(null);
 
-  // Build ordered list of candidate URLs for multi-tiered resilient playback
+  const isYouTubeSong = useCallback((song) => {
+    if (!song) return false;
+    return song.source === 'youtube' || !!song.videoId || !!song.youtubeId;
+  }, []);
+
+  // Build candidate audio URLs for HTML5 engine
   const buildCandidateUrls = (song) => {
     const candidates = [];
     const rawUrl = song.streamUrl || song.downloadUrl || song.media_url;
@@ -45,7 +52,7 @@ export const AudioProvider = ({ children }) => {
       // If JioSaavn high-res mp4, add alternate bitrates & backend proxy
       if (rawUrl.includes('saavncdn.com')) {
         const url160 = rawUrl.replace(/_320\.mp4$/, '_160.mp4');
-        const url96 = rawUrl.replace(/_320\.mp4$/, '_96.mp4');
+        const url96 = rawUrl.replace(/_96\.mp4$/, '_96.mp4');
         if (!candidates.includes(url160)) candidates.push(url160);
         if (!candidates.includes(url96)) candidates.push(url96);
 
@@ -58,64 +65,72 @@ export const AudioProvider = ({ children }) => {
     return candidates;
   };
 
-  // Initialize audio volume and events
+  // Record listening history after 5 seconds of playback
+  const checkRecordHistory = useCallback((song, time) => {
+    if (time > 5 && song && historyRecordedSongId !== song.id) {
+      setHistoryRecordedSongId(song.id);
+      const token = localStorage.getItem('tamiltunes_token');
+      if (token) {
+        api.post('/history', {
+          songId: song.id,
+          title: song.title,
+          artist: song.artist || song.singers,
+          album: song.album,
+          image: song.image,
+          duration: song.duration,
+          streamUrl: song.streamUrl
+        }).catch(() => {});
+      }
+    }
+  }, [historyRecordedSongId]);
+
+  // Initialize HTML5 audio element events
   useEffect(() => {
     const audio = audioRef.current;
     audio.volume = volume;
     window.__tamiltunes_audio = audio;
 
     const onTimeUpdate = () => {
-      setCurrentTime(audio.currentTime);
-      // Automatically record to listening history after 5s of playback
-      if (audio.currentTime > 5 && currentSongRef.current && historyRecordedSongId !== currentSongRef.current.id) {
-        setHistoryRecordedSongId(currentSongRef.current.id);
-        const token = localStorage.getItem('tamiltunes_token');
-        if (token) {
-          api.post('/history', {
-            songId: currentSongRef.current.id,
-            title: currentSongRef.current.title,
-            artist: currentSongRef.current.artist || currentSongRef.current.singers,
-            album: currentSongRef.current.album,
-            image: currentSongRef.current.image,
-            duration: currentSongRef.current.duration,
-            streamUrl: currentSongRef.current.streamUrl
-          }).catch(() => {});
-        }
+      if (!isYouTubeSong(currentSongRef.current)) {
+        setCurrentTime(audio.currentTime);
+        checkRecordHistory(currentSongRef.current, audio.currentTime);
       }
     };
 
     const onLoadedMetadata = () => {
-      setDuration(audio.duration || currentSongRef.current?.duration || 0);
-      setIsBuffering(false);
+      if (!isYouTubeSong(currentSongRef.current)) {
+        setDuration(audio.duration || currentSongRef.current?.duration || 0);
+        setIsBuffering(false);
+      }
     };
 
     const onWaiting = () => {
-      setIsBuffering(true);
+      if (!isYouTubeSong(currentSongRef.current)) setIsBuffering(true);
     };
 
     const onCanPlay = () => {
-      setIsBuffering(false);
+      if (!isYouTubeSong(currentSongRef.current)) setIsBuffering(false);
     };
 
     const onPlaying = () => {
-      setIsPlaying(true);
-      setIsBuffering(false);
-      setPlaybackError(null);
+      if (!isYouTubeSong(currentSongRef.current)) {
+        setIsPlaying(true);
+        setIsBuffering(false);
+        setPlaybackError(null);
+      }
     };
 
     const onPause = () => {
-      setIsPlaying(false);
+      if (!isYouTubeSong(currentSongRef.current)) setIsPlaying(false);
     };
 
-    // Resilient fallback logic when audio error occurs
-    const onError = async (e) => {
+    const onError = async () => {
+      if (isYouTubeSong(currentSongRef.current)) return;
       console.warn('Playback error encountered on source:', audio.src);
 
-      // Attempt next stream candidate
       if (candidateIndexRef.current < activeCandidatesRef.current.length - 1) {
         candidateIndexRef.current += 1;
         const nextUrl = activeCandidatesRef.current[candidateIndexRef.current];
-        console.log(`Auto-recovering: Switching to fallback candidate [${candidateIndexRef.current + 1}/${activeCandidatesRef.current.length}]:`, nextUrl);
         try {
           const resolvedUrl = new URL(nextUrl, window.location.origin).href;
           audio.src = resolvedUrl;
@@ -126,7 +141,7 @@ export const AudioProvider = ({ children }) => {
           setPlaybackError(null);
           return;
         } catch (err) {
-          console.warn('Fallback stream attempt failed, continuing recovery chain:', err.message);
+          console.warn('Fallback stream attempt failed:', err.message);
         }
       }
 
@@ -138,7 +153,9 @@ export const AudioProvider = ({ children }) => {
     };
 
     const onEnded = () => {
-      handleTrackEnd();
+      if (!isYouTubeSong(currentSongRef.current)) {
+        handleTrackEnd();
+      }
     };
 
     audio.addEventListener('timeupdate', onTimeUpdate);
@@ -160,25 +177,26 @@ export const AudioProvider = ({ children }) => {
       audio.removeEventListener('error', onError);
       audio.removeEventListener('ended', onEnded);
     };
-  }, [historyRecordedSongId]);
+  }, [isYouTubeSong, checkRecordHistory]);
 
-  // Handle track end according to repeat and shuffle
+  // Handle track end
   const handleTrackEnd = () => {
     if (repeatMode === 'one') {
-      audioRef.current.currentTime = 0;
-      audioRef.current.play().catch(console.error);
+      seek(0);
+      resume();
     } else {
       nextTrack();
     }
   };
 
-  // Play a specific song and optionally update the queue
+  // Play a specific song and choose engine by source
   const playSong = async (song, newQueue = null) => {
     if (!song) return;
 
     setPlaybackError(null);
     setCurrentSong(song);
     currentSongRef.current = song;
+    setCurrentTime(0);
 
     if (newQueue && Array.isArray(newQueue) && newQueue.length > 0) {
       setQueue(newQueue);
@@ -189,38 +207,58 @@ export const AudioProvider = ({ children }) => {
       setQueueIndex(queue.length);
     }
 
-    const audio = audioRef.current;
-    const candidates = buildCandidateUrls(song);
-    activeCandidatesRef.current = candidates;
-    candidateIndexRef.current = 0;
+    const isYT = isYouTubeSong(song);
 
-    const initialUrl = candidates[0];
+    if (isYT) {
+      // 1. YouTube IFrame Player engine
+      const audio = audioRef.current;
+      audio.pause();
+      audio.removeAttribute('src');
+      audio.load();
 
-    try {
-      const resolvedUrl = new URL(initialUrl, window.location.origin).href;
-      if (audio.src !== resolvedUrl) {
-        audio.src = resolvedUrl;
-        audio.load();
-      }
+      const vid = song.videoId || song.youtubeId;
+      setDuration(song.duration || 0);
       setIsBuffering(true);
-      await audio.play();
       setIsPlaying(true);
-      setPlaybackError(null);
-    } catch (err) {
-      console.warn('Primary stream playback delayed, triggering candidate recovery:', err.message);
-      // Trigger error fallback recovery
-      if (candidates.length > 1) {
-        candidateIndexRef.current = 1;
-        try {
-          const fallbackResolved = new URL(candidates[1], window.location.origin).href;
-          audio.src = fallbackResolved;
+
+      if (ytPlayerRef.current) {
+        ytPlayerRef.current.loadVideo(vid, true);
+        ytPlayerRef.current.setVolume(isMuted ? 0 : volume);
+      }
+    } else {
+      // 2. HTML5 Audio engine
+      if (ytPlayerRef.current) {
+        ytPlayerRef.current.pause();
+      }
+
+      const audio = audioRef.current;
+      const candidates = buildCandidateUrls(song);
+      activeCandidatesRef.current = candidates;
+      candidateIndexRef.current = 0;
+
+      const initialUrl = candidates[0];
+      try {
+        const resolvedUrl = new URL(initialUrl, window.location.origin).href;
+        if (audio.src !== resolvedUrl) {
+          audio.src = resolvedUrl;
           audio.load();
-          setIsBuffering(true);
-          await audio.play();
-          setIsPlaying(true);
-          setPlaybackError(null);
-        } catch (fallbackErr) {
-          console.warn('Initial fallback delayed:', fallbackErr.message);
+        }
+        setIsBuffering(true);
+        await audio.play();
+        setIsPlaying(true);
+        setPlaybackError(null);
+      } catch (err) {
+        console.warn('Primary stream error, trying fallback:', err.message);
+        if (candidates.length > 1) {
+          candidateIndexRef.current = 1;
+          try {
+            const fallbackResolved = new URL(candidates[1], window.location.origin).href;
+            audio.src = fallbackResolved;
+            audio.load();
+            setIsBuffering(true);
+            await audio.play();
+            setIsPlaying(true);
+          } catch (e2) {}
         }
       }
     }
@@ -228,64 +266,90 @@ export const AudioProvider = ({ children }) => {
 
   const togglePlay = async () => {
     if (!currentSong) return;
-    const audio = audioRef.current;
-    if (isPlaying) {
-      audio.pause();
-      setIsPlaying(false);
-    } else {
-      try {
-        setIsBuffering(true);
-        await audio.play();
+    const isYT = isYouTubeSong(currentSong);
+
+    if (isYT) {
+      if (isPlaying) {
+        ytPlayerRef.current?.pause();
+        setIsPlaying(false);
+      } else {
+        ytPlayerRef.current?.play();
         setIsPlaying(true);
-      } catch (err) {
-        console.error('Failed to resume audio:', err);
-        setIsBuffering(false);
+      }
+    } else {
+      const audio = audioRef.current;
+      if (isPlaying) {
+        audio.pause();
+        setIsPlaying(false);
+      } else {
+        try {
+          setIsBuffering(true);
+          await audio.play();
+          setIsPlaying(true);
+        } catch (err) {
+          console.error('Failed to resume audio:', err);
+          setIsBuffering(false);
+        }
       }
     }
   };
 
   const pause = () => {
-    audioRef.current.pause();
+    if (isYouTubeSong(currentSong)) {
+      ytPlayerRef.current?.pause();
+    } else {
+      audioRef.current.pause();
+    }
     setIsPlaying(false);
   };
 
   const resume = async () => {
-    try {
-      await audioRef.current.play();
+    if (isYouTubeSong(currentSong)) {
+      ytPlayerRef.current?.play();
       setIsPlaying(true);
-    } catch (err) {
-      console.error(err);
+    } else {
+      try {
+        await audioRef.current.play();
+        setIsPlaying(true);
+      } catch (err) {
+        console.error(err);
+      }
     }
   };
 
   const seek = (timeInSeconds) => {
-    if (audioRef.current && isFinite(timeInSeconds)) {
-      audioRef.current.currentTime = timeInSeconds;
+    if (!isFinite(timeInSeconds)) return;
+    const isYT = isYouTubeSong(currentSong);
+
+    if (isYT) {
+      ytPlayerRef.current?.seek(timeInSeconds);
       setCurrentTime(timeInSeconds);
+    } else {
+      if (audioRef.current) {
+        audioRef.current.currentTime = timeInSeconds;
+        setCurrentTime(timeInSeconds);
+      }
     }
   };
 
   const setVolume = (val) => {
     const clamped = Math.max(0, Math.min(1, val));
     setVolumeState(clamped);
-    if (audioRef.current) {
-      audioRef.current.volume = clamped;
-    }
+    if (audioRef.current) audioRef.current.volume = clamped;
+    if (ytPlayerRef.current) ytPlayerRef.current.setVolume(clamped);
     localStorage.setItem('tamiltunes_vol', clamped.toString());
-    if (clamped > 0 && isMuted) {
-      setIsMuted(false);
-    }
+    if (clamped > 0 && isMuted) setIsMuted(false);
   };
 
   const toggleMute = () => {
-    if (audioRef.current) {
-      if (isMuted) {
-        audioRef.current.volume = volume;
-        setIsMuted(false);
-      } else {
-        audioRef.current.volume = 0;
-        setIsMuted(true);
-      }
+    if (isMuted) {
+      if (audioRef.current) audioRef.current.volume = volume;
+      if (ytPlayerRef.current) ytPlayerRef.current.unMute();
+      setIsMuted(false);
+    } else {
+      if (audioRef.current) audioRef.current.volume = 0;
+      if (ytPlayerRef.current) ytPlayerRef.current.mute();
+      setIsMuted(true);
     }
   };
 
@@ -334,9 +398,7 @@ export const AudioProvider = ({ children }) => {
     playSong(queue[prevIndex]);
   };
 
-  const toggleShuffle = () => {
-    setIsShuffle((prev) => !prev);
-  };
+  const toggleShuffle = () => setIsShuffle((prev) => !prev);
 
   const toggleRepeat = () => {
     setRepeatMode((prev) => {
@@ -364,6 +426,52 @@ export const AudioProvider = ({ children }) => {
     setQueue([]);
     setQueueIndex(-1);
   };
+
+  // Media Session API integration for Lock-screen, Headphone, & Bluetooth controls
+  useEffect(() => {
+    if (!('mediaSession' in navigator) || !currentSong) return;
+
+    try {
+      navigator.mediaSession.metadata = new window.MediaMetadata({
+        title: currentSong.title,
+        artist: currentSong.artist || currentSong.singers || 'TamilTunes Artist',
+        album: currentSong.album || 'TamilTunes',
+        artwork: [
+          { src: currentSong.image, sizes: '512x512', type: 'image/jpeg' }
+        ]
+      });
+
+      navigator.mediaSession.setActionHandler('play', () => resume());
+      navigator.mediaSession.setActionHandler('pause', () => pause());
+      navigator.mediaSession.setActionHandler('previoustrack', () => previousTrack());
+      navigator.mediaSession.setActionHandler('nexttrack', () => nextTrack());
+      navigator.mediaSession.setActionHandler('seekto', (details) => {
+        if (details.seekTime !== undefined) seek(details.seekTime);
+      });
+    } catch (e) {
+      console.warn('MediaSession handler warning:', e);
+    }
+  }, [currentSong, queueIndex, queue]);
+
+  // Sync playback state to MediaSession
+  useEffect(() => {
+    if ('mediaSession' in navigator) {
+      navigator.mediaSession.playbackState = isPlaying ? 'playing' : 'paused';
+    }
+  }, [isPlaying]);
+
+  // Sync position state to MediaSession
+  useEffect(() => {
+    if ('mediaSession' in navigator && 'setPositionState' in navigator.mediaSession && duration > 0 && isFinite(currentTime)) {
+      try {
+        navigator.mediaSession.setPositionState({
+          duration: Math.max(0, duration),
+          playbackRate: 1,
+          position: Math.min(Math.max(0, currentTime), duration)
+        });
+      } catch (e) {}
+    }
+  }, [currentTime, duration]);
 
   return (
     <AudioContext.Provider
@@ -402,6 +510,45 @@ export const AudioProvider = ({ children }) => {
         setPlaybackError
       }}
     >
+      {/* Hidden YouTube IFrame Engine */}
+      <YouTubePlayer
+        ref={ytPlayerRef}
+        onPlaying={() => {
+          if (isYouTubeSong(currentSongRef.current)) {
+            setIsPlaying(true);
+            setIsBuffering(false);
+            setPlaybackError(null);
+          }
+        }}
+        onPause={() => {
+          if (isYouTubeSong(currentSongRef.current)) {
+            setIsPlaying(false);
+          }
+        }}
+        onBuffering={() => {
+          if (isYouTubeSong(currentSongRef.current)) {
+            setIsBuffering(true);
+          }
+        }}
+        onEnded={() => {
+          if (isYouTubeSong(currentSongRef.current)) {
+            handleTrackEnd();
+          }
+        }}
+        onTimeUpdate={(cur, dur) => {
+          if (isYouTubeSong(currentSongRef.current)) {
+            setCurrentTime(cur);
+            if (dur > 0) setDuration(dur);
+            checkRecordHistory(currentSongRef.current, cur);
+          }
+        }}
+        onError={() => {
+          if (isYouTubeSong(currentSongRef.current)) {
+            setPlaybackError('YouTube stream failed to play. Skipping to next...');
+            setTimeout(() => nextTrack(), 1500);
+          }
+        }}
+      />
       {children}
     </AudioContext.Provider>
   );
@@ -414,3 +561,5 @@ export const useAudio = () => {
   }
   return context;
 };
+
+export default AudioContext;
