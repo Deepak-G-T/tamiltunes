@@ -152,8 +152,13 @@ export class JioSaavnProvider extends MusicProvider {
       try {
         data = JSON.parse(text);
       } catch (err) {
-        const cleaned = text.replace(/^[^{]*(\{.*\})[^}]*$/, '$1');
-        data = JSON.parse(cleaned);
+        try {
+          const cleaned = text.replace(/^[^{]*(\{.*\})[^}]*$/, '$1');
+          data = JSON.parse(cleaned);
+        } catch (e2) {
+          console.warn(`[JioSaavn] JSON parse failed for [${callName}], status: ${res.status}, snippet: ${text.slice(0, 150)}`);
+          return null;
+        }
       }
 
       this.cache.set(cacheKey, { data, timestamp: Date.now() });
@@ -173,11 +178,13 @@ export class JioSaavnProvider extends MusicProvider {
         query: query,
         includeMetaTags: '1'
       });
+      console.log(`[JioSaavn] autocomplete.get for "${query}": songs count = ${autoData?.songs?.data?.length || 0}`);
 
       if (autoData?.songs?.data && autoData.songs.data.length > 0) {
         const songItems = autoData.songs.data;
         const pids = songItems.map((s) => s.id).join(',');
         const detailsData = await this._fetchDirect('song.getDetails', { pids });
+        console.log(`[JioSaavn] song.getDetails returned keys:`, detailsData ? Object.keys(detailsData) : null);
 
         if (detailsData) {
           const songs = [];
