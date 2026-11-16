@@ -176,7 +176,9 @@ export class MusicProviderManager {
       folk: mergeUnique(folkCurated, liveFolk),
       instrumental: liveInstrumental.length > 0 ? liveInstrumental : ninetiesCurated,
       popularAlbums: CURATED_ALBUMS,
-      popularArtists: CURATED_ARTISTS
+      popularArtists: CURATED_ARTISTS,
+      albums: CURATED_ALBUMS,
+      artists: CURATED_ARTISTS
     };
 
     this.homeCache = feed;

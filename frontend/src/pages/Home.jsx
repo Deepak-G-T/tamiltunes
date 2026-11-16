@@ -200,7 +200,7 @@ const Home = () => {
           </div>
 
           <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-4">
-            {homeData.albums?.slice(0, 5).map((album) => (
+            {(homeData.albums || homeData.popularAlbums)?.slice(0, 5).map((album) => (
               <AlbumCard key={album.id} album={album} />
             ))}
           </div>
@@ -218,7 +218,7 @@ const Home = () => {
           </div>
 
           <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 gap-4">
-            {homeData.artists?.map((artist) => (
+            {(homeData.artists || homeData.popularArtists)?.map((artist) => (
               <ArtistCard key={artist.id || artist.name} artist={artist} />
             ))}
           </div>
