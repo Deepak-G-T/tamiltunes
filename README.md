@@ -245,17 +245,34 @@ Use any managed PostgreSQL provider (e.g., [Neon](https://neon.tech), [Supabase]
 2. Copy the connection string (`postgresql://user:password@host/database?sslmode=require`).
 3. Run migrations: `npx prisma db push` or `npx prisma migrate deploy`.
 
-### 2. Backend (Render / Railway)
-1. Link your repository to Render Web Service.
-2. **Root Directory**: `backend`
-3. **Build Command**: `npm install && npx prisma generate`
-4. **Start Command**: `npm start`
-5. **Environment Variables**:
-   - `NODE_ENV=production`
-   - `PORT=5000`
-   - `DATABASE_URL=<your-postgres-url>`
-   - `JWT_SECRET=<secure-random-32-char-string>`
-   - `CORS_ORIGIN=https://your-frontend-domain.vercel.app`
+### 2. Backend (Render)
+
+[![Deploy to Render](https://render.com/images/deploy-to-render-button.svg)](https://render.com/deploy?repo=https://github.com/Deepak-G-T/tamiltunes)
+
+#### Option A: One-Click Blueprint (Recommended)
+1. Click the **Deploy to Render** button above or open **[Render Blueprints](https://dashboard.render.com/blueprints/new)**.
+2. Connect your GitHub repository: `Deepak-G-T/tamiltunes`.
+3. Render automatically discovers `render.yaml` and provisions:
+   - `tamiltunes-backend` (Node.js Web Service)
+   - `tamiltunes-db` (Free PostgreSQL Database)
+4. Click **Apply** to deploy.
+
+#### Option B: Manual Web Service Setup
+1. In Render Dashboard, click **New +** -> **Web Service**.
+2. Select your repository `Deepak-G-T/tamiltunes`.
+3. Configure settings:
+   - **Root Directory**: `backend`
+   - **Environment**: `Node`
+   - **Region**: `Singapore` or `Ohio`
+   - **Build Command**: `npm install && npx prisma generate`
+   - **Start Command**: `npm start`
+   - **Plan**: `Free`
+4. Set Environment Variables:
+   - `NODE_ENV`: `production`
+   - `PORT`: `10000`
+   - `JWT_SECRET`: *(auto-generated or random 32 characters)*
+   - `CORS_ORIGIN`: `*`
+   - `DATABASE_URL`: *(PostgreSQL connection string)*
 
 ### 3. Frontend (Vercel)
 1. Link repository to Vercel.
