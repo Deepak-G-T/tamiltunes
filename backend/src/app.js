@@ -5,6 +5,7 @@ import path from 'path';
 import fs from 'fs';
 import { fileURLToPath } from 'url';
 import { config } from './config/env.js';
+import { db } from './prisma/client.js';
 import { apiLimiter } from './middleware/rateLimiter.js';
 import { errorHandler } from './middleware/errorHandler.js';
 
@@ -36,12 +37,27 @@ app.use(express.urlencoded({ extended: true, limit: '1mb' }));
 // Apply rate limiter to /api
 app.use('/api', apiLimiter);
 
-// Health check endpoint
-app.get('/api/health', (req, res) => {
+// Health check endpoint with database inspection
+app.get('/api/health', async (req, res) => {
+  let dbInfo = { status: 'unknown' };
+  try {
+    const userCount = await db.user.count();
+    const songCount = await db.song.count();
+    const albumCount = (await db.album?.count()) ?? 0;
+    const artistCount = (await db.artist?.count()) ?? 0;
+    dbInfo = {
+      status: 'connected',
+      engine: 'PostgreSQL (Prisma)',
+      counts: { users: userCount, songs: songCount, albums: albumCount, artists: artistCount }
+    };
+  } catch (e) {
+    dbInfo = { status: 'degraded', error: e.message };
+  }
   res.json({
     status: 'ok',
     app: 'TamilTunes API',
     version: '1.0.0',
+    database: dbInfo,
     timestamp: new Date().toISOString()
   });
 });
