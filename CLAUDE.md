@@ -58,3 +58,19 @@ Songs may carry an optional `videoId`. It comes from the curated map `backend/sr
   `VIDEO_SEARCH_FALLBACK` on for songs the index misses.
 - The YouTube API lookup (when enabled) prefers titles with "Official Video"/"Video Song" and rejects lyric, audio,
   jukebox, teaser, live and similar uploads.
+
+## Comments and profiles (feature/comments-profile)
+- Backend: `backend/src/community/` (sanitiser, Tamil/English filter, username/avatar rules, zod schemas, store layer with Prisma
+  and in-memory implementations), controllers `comment|profile|user`, routes `/api/songs/:id/comments`, `/api/comments/:id/*`,
+  `/api/profile/me`, `/api/users/:username/*`. Authorization is enforced in the API (there is no RLS on this stack).
+- Migration `20261118000000_comments_profile` is additive and idempotent (backfills `users.username`). Run with the
+  UNPOOLED database URL: `npm run migrate --prefix backend`. Seed demo data locally: `npm run seed:community --prefix backend`.
+- Roles: `users.role` is `user` | `artist` | `admin`. Set it by hand in the database; it cannot be changed through the API.
+  Artists/admins can pin comments; an artist's like shows the "Liked by artist" badge.
+- Blocklists live in `backend/src/community/contentFilterWords.js`. The Tamil list is a conservative starter set and needs native review.
+- Env: `FRONTEND_URL` (alias of `CORS_ORIGIN`); Vercel optional `BACKEND_URL` for `frontend/api/og.js` (link-preview HTML for bots).
+- Comments poll every 8s while the sheet is open (no websockets). New comments show live; likes/edits/deletes by others on refresh.
+- Playlists are private by default (`isPublic`); `GET /api/playlists/:id` returns 404 to non-owners of private playlists.
+- UNTESTED: Prisma store + migration on real Postgres/Neon, `frontend/api/og.js` + the bot rewrite on Vercel, real-phone crop/gestures.
+- `npm run test:ui` runs two suites; the older `runPlaywrightAudit.mjs` needs real network (YouTube iframe) and also rewrites
+  tracked files in `audit/screenshots/` (restore them with `git checkout -- audit/screenshots` before committing).

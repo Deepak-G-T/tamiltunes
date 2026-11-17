@@ -1,6 +1,17 @@
 {
   "rewrites": [
     {
+      "source": "/u/:username",
+      "has": [
+        {
+          "type": "header",
+          "key": "user-agent",
+          "value": "(?i).*(facebookexternalhit|twitterbot|slackbot|whatsapp|telegrambot|discordbot|linkedinbot|embedly|skypeuripreview|googlebot|bingbot).*"
+        }
+      ],
+      "destination": "/api/og?u=:username"
+    },
+    {
       "source": "/api/:path*",
       "destination": "https://tamiltunes-backend.onrender.com/api/:path*"
     },
