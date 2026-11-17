@@ -1,4 +1,7 @@
-import { Readable } from 'stream';
+import { Readable, Transform } from 'stream';
+import { pipeline } from 'stream';
+import { config } from '../config/env.js';
+import { validateStreamUrl, MAX_STREAM_BYTES, STREAM_TIMEOUT_MS } from '../services/streamGuard.js';
 import { musicService } from '../services/music/providerManager.js';
 
 export const getHomeFeed = async (req, res, next) => {
@@ -76,37 +79,71 @@ export const getArtistById = async (req, res, next) => {
   }
 };
 
-export const proxyStream = async (req, res, next) => {
-  try {
-    const { url } = req.query;
-    if (!url || !url.startsWith('http')) {
-      return res.status(400).send('Invalid audio URL');
-    }
+export const proxyStream = async (req, res) => {
+  if (!config.enableExternalStreams) {
+    return res.status(403).json({ success: false, message: 'External stream proxy is disabled' });
+  }
 
+  const target = validateStreamUrl(req.query.url);
+  if (!target) {
+    return res.status(400).json({ success: false, message: 'Stream URL not allowed' });
+  }
+
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), STREAM_TIMEOUT_MS);
+  res.on('close', () => controller.abort());
+
+  try {
     const headers = {
       'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36'
     };
-    if (req.headers.range) {
+    if (typeof req.headers.range === 'string' && /^bytes=\d*-\d*$/.test(req.headers.range)) {
       headers.range = req.headers.range;
     }
 
-    const response = await fetch(url, { headers });
+    // redirect: 'manual' so an allowed host cannot bounce us to an internal address
+    const response = await fetch(target, { headers, redirect: 'manual', signal: controller.signal });
+    clearTimeout(timer);
+
+    if (response.status >= 300 && response.status < 400) {
+      return res.status(502).json({ success: false, message: 'Upstream redirect refused' });
+    }
+
+    const declared = Number(response.headers.get('content-length'));
+    if (declared > MAX_STREAM_BYTES) {
+      controller.abort();
+      return res.status(413).json({ success: false, message: 'Stream too large' });
+    }
+
     res.status(response.status);
+    for (const key of ['content-type', 'content-length', 'content-range', 'accept-ranges']) {
+      const val = response.headers.get(key);
+      if (val) res.setHeader(key, val);
+    }
 
-    for (const [key, val] of response.headers.entries()) {
-      if (['content-type', 'content-length', 'content-range', 'accept-ranges'].includes(key.toLowerCase())) {
-        res.setHeader(key, val);
+    if (!response.body) return res.end();
+
+    // Count bytes as they stream and cut the connection at the cap
+    let sent = 0;
+    const counter = new Transform({
+      transform(chunk, _enc, cb) {
+        sent += chunk.length;
+        if (sent > MAX_STREAM_BYTES) {
+          controller.abort();
+          return cb(new Error('Stream byte cap exceeded'));
+        }
+        cb(null, chunk);
       }
-    }
-
-    if (response.body) {
-      Readable.fromWeb(response.body).pipe(res);
-    } else {
-      res.end();
-    }
+    });
+    pipeline(Readable.fromWeb(response.body), counter, res, (err) => {
+      if (err && !res.headersSent) res.status(502).end();
+      else if (err) res.destroy();
+    });
   } catch (err) {
-    console.warn('Streaming proxy error:', err.message);
-    res.status(502).send('Streaming proxy error');
+    clearTimeout(timer);
+    console.warn('Streaming proxy error:', err.name === 'AbortError' ? 'aborted/timeout' : err.message);
+    if (!res.headersSent) res.status(502).json({ success: false, message: 'Streaming proxy error' });
+    else res.destroy();
   }
 };
 
