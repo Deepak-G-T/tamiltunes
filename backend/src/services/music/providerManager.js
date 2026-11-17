@@ -14,7 +14,7 @@ const OFFICIAL_LABELS = [
   'symphony', 'giri', 'ramana', 'divine'
 ];
 
-// Short junk filter for obvious spam audio formats and amateur social media meme songs
+// Short junk filter for obvious spam audio formats, amateur meme songs, and remix variants
 const SPAM_PATTERNS = [
   /whatsapp\s+status/i,
   /status\s+video/i,
@@ -23,7 +23,8 @@ const SPAM_PATTERNS = [
   /karaoke/i,
   /slowed\s*(?:and|n|&|\+)?\s*reverb(?:ed)?/i,
   /speed\s*up/i,
-  /dj\s+remix/i,
+  /\b(dj\s+)?remix\b/i,
+  /\b(remake|mashup|trap\s*mix|trap\s*remix|club\s*mix)\b/i,
   /ringtone/i,
   /bgm\s+cut/i,
   /trending\s+version/i,
@@ -57,6 +58,41 @@ const RECOGNIZED_TAMIL_ARTISTS = [
 ];
 
 /**
+ * Extracts and splits all credited artists from primary, featured, singer, composer fields
+ */
+export const extractCreditedArtists = (song) => {
+  if (!song) return [];
+  const sources = [
+    song.artist,
+    song.singers,
+    song.primary_artists,
+    song.music,
+    song.more_info?.singers,
+    song.more_info?.music,
+    ...(Array.isArray(song.more_info?.artistMap?.artists)
+      ? song.more_info.artistMap.artists.map((a) => a.name)
+      : []),
+    ...(Array.isArray(song.more_info?.artistMap?.primary_artists)
+      ? song.more_info.artistMap.primary_artists.map((a) => a.name)
+      : [])
+  ].filter(Boolean);
+
+  const artists = new Set();
+  for (const src of sources) {
+    if (typeof src === 'string') {
+      const parts = src.split(/[,;/&|]|\band\b|\bwith\b|\bfeat\.?\b|\bft\.?\b/i);
+      for (const p of parts) {
+        const clean = p.trim().toLowerCase();
+        if (clean.length > 1) {
+          artists.add(clean);
+        }
+      }
+    }
+  }
+  return Array.from(artists);
+};
+
+/**
  * Validates whether a song originates from an official film release or reputable label
  * Uses positive signals (official label, "From <film>", recognized composer/singer)
  * with a short junk filter for obvious spam.
@@ -81,8 +117,11 @@ export const isOfficialFilmRelease = (song) => {
     return false;
   }
 
-  // Reject obvious spam audio formats
-  if (SPAM_PATTERNS.some((pattern) => pattern.test(combined))) {
+  // Reject obvious spam audio formats and amateur remix variants
+  if (
+    SPAM_PATTERNS.some((pattern) => pattern.test(combined)) ||
+    /\b(remix|remake|mashup)\b/i.test(song.title || '')
+  ) {
     return false;
   }
 
@@ -93,7 +132,8 @@ export const isOfficialFilmRelease = (song) => {
 
   // Positive Signal 1: Check if distributed by recognized official label
   const songLabel = (song.label || song.more_info?.label || '').toLowerCase();
-  if (OFFICIAL_LABELS.some((lbl) => songLabel.includes(lbl))) {
+  const hasRecognizedLabel = OFFICIAL_LABELS.some((lbl) => songLabel.includes(lbl));
+  if (hasRecognizedLabel) {
     return true;
   }
 
@@ -111,16 +151,37 @@ export const isOfficialFilmRelease = (song) => {
   }
 
   // Positive Signal 3: Check if track features a recognized Tamil music director/singer/lyricist
-  const hasRecognizedArtist = RECOGNIZED_TAMIL_ARTISTS.some((a) => combined.includes(a));
+  // Multi-artist whitelist check so any credited artist counts
+  const creditedArtists = extractCreditedArtists(song);
+  const hasRecognizedArtist =
+    creditedArtists.some((credited) =>
+      RECOGNIZED_TAMIL_ARTISTS.some((whitelisted) =>
+        credited.includes(whitelisted) || whitelisted.includes(credited)
+      )
+    ) || RECOGNIZED_TAMIL_ARTISTS.some((a) => combined.includes(a));
+
   if (hasRecognizedArtist) {
     return true;
   }
 
   // Positive Signal 4: Traditional Tamil devotional scripture / prayers
-  const isTraditionalDevotional =
+  // Requires BOTH a scripture-name match AND at least one more corroborating signal
+  // (known label, recognized artist, film indicator, or devotional/traditional album marker)
+  const isScriptureMatch =
     /\b(kavasam|kavacham|agaval|thiru[p]+ugazh|thevaram|thiruvasagam|abirami\s+andhadhi)\b/i.test(combined);
-  if (isTraditionalDevotional && (lang === 'tamil' || !lang)) {
-    return true;
+
+  if (isScriptureMatch && (lang === 'tamil' || !lang)) {
+    const hasDevotionalAlbumMarker =
+      /soundtrack|original|traditional|devotional|classical|temple|bakthi|spiritual/i.test(song.album || '');
+    const hasCorroboratingSignal =
+      hasRecognizedLabel ||
+      hasFilmIndicator ||
+      hasRecognizedArtist ||
+      hasDevotionalAlbumMarker;
+
+    if (hasCorroboratingSignal) {
+      return true;
+    }
   }
 
   return false;

@@ -87,9 +87,9 @@ export const inspectFilterDecision = (song) => {
     return { pass: false, reason: 'REJECT_DUB_TAG_IN_TITLE', language: lang || 'non-tamil' };
   }
 
-  // 2. Spam & Meme audio patterns
-  const SPAM_REGEX = /whatsapp\s+status|status\s+video|status\s+la\s+potu|bass\s+boosted|karaoke|slowed\s*(?:and|n|&|\+)?\s*reverb(?:ed)?|speed\s*up|dj\s+remix|ringtone|bgm\s+cut|trending\s+version|salem\s+gana|trending\s+gana|gana\s+surya|gana\s+suriya|gana\s+velu/i;
-  if (SPAM_REGEX.test(combined)) {
+  // 2. Spam & Meme audio patterns and remix variants
+  const SPAM_REGEX = /whatsapp\s+status|status\s+video|status\s+la\s+potu|bass\s+boosted|karaoke|slowed\s*(?:and|n|&|\+)?\s*reverb(?:ed)?|speed\s*up|\b(dj\s+)?remix\b|\b(remake|mashup|trap\s*mix|trap\s*remix|club\s*mix)\b|ringtone|bgm\s+cut|trending\s+version|salem\s+gana|trending\s+gana|gana\s+surya|gana\s+suriya|gana\s+velu/i;
+  if (SPAM_REGEX.test(combined) || /\b(remix|remake|mashup)\b/i.test(song.title || '')) {
     return { pass: false, reason: 'REJECT_SPAM_PATTERN', language: lang || 'tamil' };
   }
 
@@ -108,7 +108,8 @@ export const inspectFilterDecision = (song) => {
     'dvo', 'aditya music', 'v creations', 'gemini', 'junglee music', 'trendmusic',
     'symphony', 'giri', 'ramana', 'divine'
   ];
-  if (OFFICIAL_LABELS.some((lbl) => songLabel.includes(lbl))) {
+  const hasRecognizedLabel = OFFICIAL_LABELS.some((lbl) => songLabel.includes(lbl));
+  if (hasRecognizedLabel) {
     return { pass: true, reason: 'PASS_OFFICIAL_LABEL', language: lang || 'tamil' };
   }
 
@@ -124,7 +125,7 @@ export const inspectFilterDecision = (song) => {
     return { pass: true, reason: 'PASS_FILM_INDICATOR', language: lang || 'tamil' };
   }
 
-  // 6. Recognized Tamil artists
+  // 6. Recognized Tamil artists (Multi-artist whitelist check so any credited artist counts)
   const RECOGNIZED_TAMIL_ARTISTS = [
     'anirudh', 'a.r. rahman', 'ar rahman', 'rahman', 'yuvan', 'ilaiyaraaja', 'ilayaraja',
     'harris jayaraj', 'sid sriram', 'g.v. prakash', 'gv prakash', 'santhosh narayanan',
@@ -145,15 +146,57 @@ export const inspectFilterDecision = (song) => {
     'sirkazhi', 'sivachidambaram', 'vani jayaram', 'veeramani', 'murugadas',
     'srinivas', 'ravi basrur', 'ghibran', 'ananya bhat'
   ];
-  if (RECOGNIZED_TAMIL_ARTISTS.some((a) => combined.includes(a))) {
+
+  const artistSources = [
+    song.artist,
+    song.singers,
+    song.primary_artists,
+    song.music,
+    song.more_info?.singers,
+    song.more_info?.music,
+    ...(Array.isArray(song.more_info?.artistMap?.artists) ? song.more_info.artistMap.artists.map((a) => a.name) : []),
+    ...(Array.isArray(song.more_info?.artistMap?.primary_artists) ? song.more_info.artistMap.primary_artists.map((a) => a.name) : [])
+  ].filter(Boolean);
+
+  const creditedArtists = new Set();
+  for (const src of artistSources) {
+    if (typeof src === 'string') {
+      const parts = src.split(/[,;/&|]|\band\b|\bwith\b|\bfeat\.?\b|\bft\.?\b/i);
+      for (const p of parts) {
+        const clean = p.trim().toLowerCase();
+        if (clean.length > 1) creditedArtists.add(clean);
+      }
+    }
+  }
+
+  const hasRecognizedArtist =
+    Array.from(creditedArtists).some((credited) =>
+      RECOGNIZED_TAMIL_ARTISTS.some((whitelisted) =>
+        credited.includes(whitelisted) || whitelisted.includes(credited)
+      )
+    ) || RECOGNIZED_TAMIL_ARTISTS.some((a) => combined.includes(a));
+
+  if (hasRecognizedArtist) {
     return { pass: true, reason: 'PASS_RECOGNIZED_ARTIST', language: lang || 'tamil' };
   }
 
   // 7. Traditional Tamil devotional scripture / prayers
-  const isTraditionalDevotional =
-    /\b(kavasam|kavacham|agaval|thiruppugazh|thevaram|thiruvasagam|abirami\s+andhadhi)\b/i.test(combined);
-  if (isTraditionalDevotional && (lang === 'tamil' || !lang)) {
-    return { pass: true, reason: 'PASS_DEVOTIONAL_SCRIPTURE', language: lang || 'tamil' };
+  // Requires BOTH a scripture-name match AND at least one corroborating signal
+  const isScriptureMatch =
+    /\b(kavasam|kavacham|agaval|thiru[p]+ugazh|thevaram|thiruvasagam|abirami\s+andhadhi)\b/i.test(combined);
+
+  if (isScriptureMatch && (lang === 'tamil' || !lang)) {
+    const hasDevotionalAlbumMarker =
+      /soundtrack|original|traditional|devotional|classical|temple|bakthi|spiritual/i.test(song.album || '');
+    const hasCorroboratingSignal =
+      hasRecognizedLabel ||
+      hasFilmIndicator ||
+      hasRecognizedArtist ||
+      hasDevotionalAlbumMarker;
+
+    if (hasCorroboratingSignal) {
+      return { pass: true, reason: 'PASS_DEVOTIONAL_SCRIPTURE', language: lang || 'tamil' };
+    }
   }
 
   return { pass: false, reason: 'REJECT_NO_OFFICIAL_SIGNALS', language: lang || 'unknown' };
