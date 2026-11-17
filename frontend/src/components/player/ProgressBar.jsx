@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState } from 'react';
 
 const formatTime = (seconds) => {
   if (isNaN(seconds) || seconds < 0) return '0:00';
@@ -8,30 +8,60 @@ const formatTime = (seconds) => {
 };
 
 const ProgressBar = ({ currentTime, duration, onSeek, isBuffering }) => {
-  const progressPercent = duration > 0 ? (currentTime / duration) * 100 : 0;
+  const [dragging, setDragging] = useState(false);
+  const [dragTime, setDragTime] = useState(0);
+
+  const shown = dragging ? dragTime : currentTime;
+  const progressPercent = duration > 0 ? Math.min(100, Math.max(0, (shown / duration) * 100)) : 0;
 
   const handleChange = (e) => {
     const newTime = parseFloat(e.target.value);
+    setDragTime(newTime);
     onSeek(newTime);
   };
+
+  const stopDrag = () => setDragging(false);
 
   return (
     <div className="w-full flex items-center gap-2.5 text-xs text-zinc-400 select-none">
       <span className="w-9 text-right font-mono text-[11px] tabular-nums">
-        {formatTime(currentTime)}
+        {formatTime(shown)}
       </span>
 
-      <div className="relative flex-1 flex items-center group">
-        {/* Background track */}
-        <div className="w-full h-1 bg-zinc-800 rounded-full overflow-hidden">
-          {/* Active progress fill */}
+      {/* 32px-tall touch target around a thin track; the track grows and a thumb appears while touched */}
+      <div className="relative flex-1 flex items-center group h-8">
+        <div
+          className={`w-full bg-white/15 rounded-full overflow-hidden transition-all duration-150 ${
+            dragging ? 'h-2' : 'h-1 group-hover:h-1.5'
+          }`}
+        >
           <div
-            className={`h-full rounded-full transition-all duration-75 ${
-              isBuffering ? 'bg-brand-400/70 animate-pulse' : 'bg-brand-500 group-hover:bg-brand-400'
+            className={`h-full rounded-full transition-[width] duration-75 ${
+              isBuffering ? 'bg-brand-400/70 animate-pulse' : dragging ? 'bg-brand-400' : 'bg-brand-500 group-hover:bg-brand-400'
             }`}
             style={{ width: `${progressPercent}%` }}
           />
         </div>
+
+        {/* Thumb: always visible on touch screens, on hover/drag with a mouse */}
+        <span
+          aria-hidden="true"
+          className={`pointer-events-none absolute top-1/2 w-3.5 h-3.5 rounded-full bg-white shadow-md -translate-x-1/2 -translate-y-1/2 transition-opacity [@media(hover:none)]:opacity-100 ${
+            dragging ? 'opacity-100 scale-125' : 'opacity-0 group-hover:opacity-100'
+          }`}
+          style={{ left: `${progressPercent}%` }}
+        />
+
+        {/* Time bubble while scrubbing */}
+        {dragging && (
+          <span
+            data-testid="scrub-time"
+            className="pointer-events-none absolute -top-6 -translate-x-1/2 px-2 py-0.5 rounded-md bg-white text-black text-[11px] font-bold tabular-nums shadow-lg"
+            style={{ left: `${Math.min(92, Math.max(8, progressPercent))}%` }}
+          >
+            {formatTime(dragTime)}
+          </span>
+        )}
 
         {/* Real range input overlaid */}
         <input
@@ -39,8 +69,15 @@ const ProgressBar = ({ currentTime, duration, onSeek, isBuffering }) => {
           min="0"
           max={duration || 100}
           step="0.1"
-          value={currentTime || 0}
+          value={shown || 0}
           onChange={handleChange}
+          onPointerDown={(e) => {
+            setDragTime(parseFloat(e.currentTarget.value));
+            setDragging(true);
+          }}
+          onPointerUp={stopDrag}
+          onPointerCancel={stopDrag}
+          onBlur={stopDrag}
           className="absolute inset-0 w-full h-full opacity-0 cursor-pointer"
           title="Seek playback"
         />
