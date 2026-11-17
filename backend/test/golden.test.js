@@ -9,18 +9,27 @@ export function runGoldenEvaluation() {
   const labeledPath = path.resolve(__dirname, '../../audit/golden_labeled.csv');
 
   console.log('--- TamilTunes Golden Dataset Accuracy Test ---');
+
+  const handleMissingLabels = (reason) => {
+    console.warn(`\n⚠️  WARNING: Golden dataset evaluation cannot run: ${reason}`);
+    console.warn(`   Exported candidates are in "audit/golden_candidates.csv".`);
+    console.warn(`   To evaluate Tamil filter precision and recall, label rows and save to "${labeledPath}".`);
+    if (process.env.GOLDEN_REQUIRED?.trim() === '1') {
+      console.error(`\n❌ FATAL: GOLDEN_REQUIRED=1 is set, but golden labels are missing! Exiting non-zero.\n`);
+      process.exit(1);
+    }
+    console.warn(`   [SKIPPED] Non-fatal in current mode (run with GOLDEN_REQUIRED=1 to enforce strict failure).\n`);
+  };
+
   if (!fs.existsSync(labeledPath)) {
-    console.log(`ℹ Notice: "${labeledPath}" does not exist yet.`);
-    console.log('  Exported candidates are in "audit/golden_candidates.csv".');
-    console.log('  Once labeled as "audit/golden_labeled.csv", this test will measure precision, recall, and mismatches.');
-    console.log('✓ Golden Dataset Evaluation: SKIPPED (Awaiting human labels)');
+    handleMissingLabels(`File "${labeledPath}" does not exist yet.`);
     return;
   }
 
   const rawContent = fs.readFileSync(labeledPath, 'utf8').trim();
   const lines = rawContent.split('\n').filter((l) => l.trim().length > 0);
   if (lines.length <= 1) {
-    console.log('ℹ Notice: "audit/golden_labeled.csv" is empty or has only headers.');
+    handleMissingLabels(`File "${labeledPath}" is empty or contains only headers.`);
     return;
   }
 
@@ -58,7 +67,8 @@ export function runGoldenEvaluation() {
   const keepIdx = headers.indexOf('should_keep');
 
   if (keepIdx === -1) {
-    throw new Error('CSV error: "should_keep" column not found in golden_labeled.csv');
+    handleMissingLabels('Column "should_keep" not found in golden_labeled.csv');
+    return;
   }
 
   let tp = 0;
@@ -94,7 +104,7 @@ export function runGoldenEvaluation() {
 
   const totalLabeled = tp + fp + tn + fn;
   if (totalLabeled === 0) {
-    console.log('ℹ Notice: No rows with filled "should_keep" ground truth found.');
+    handleMissingLabels('No rows in golden_labeled.csv contain non-empty "should_keep" ground truth labels.');
     return;
   }
 
