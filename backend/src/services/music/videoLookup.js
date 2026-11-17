@@ -16,6 +16,38 @@ export const normalizeTitle = (t) =>
     .replace(/[^a-z0-9]+/g, ' ')
     .trim();
 
+// Words that mark a different recording (remix, cover, lofi...). Checked on the RAW title, including
+// parenthetical text, so "Badass (Remix)" is rejected even though normalizeTitle() drops the brackets.
+const JUNK_WORD_RE = /\b(remix|remixed|lofi|lo-fi|flip|mashup|cover|karaoke|instrumental|reprise|slowed|reverb|sped|boosted|8d|ringtone|bgm|tribute|unplugged|acoustic|live|dj|trap|chill|status)\b/i;
+
+const levenshtein = (a, b) => {
+  if (a === b) return 0;
+  const prev = Array.from({ length: b.length + 1 }, (_, i) => i);
+  for (let i = 1; i <= a.length; i++) {
+    let last = prev[0];
+    prev[0] = i;
+    for (let j = 1; j <= b.length; j++) {
+      const tmp = prev[j];
+      prev[j] = Math.min(prev[j] + 1, prev[j - 1] + 1, last + (a[i - 1] === b[j - 1] ? 0 : 1));
+      last = tmp;
+    }
+  }
+  return prev[b.length];
+};
+
+const FUZZY_MIN_LENGTH = 10; // only tolerate one typo on longer titles ("Aalaporan Thamizhan")
+
+// Title candidates for matching: the whole normalized title, and its main part before a " - subtitle"
+// (JioSaavn: "Hukum - Thalaivar Alappara", "Arabic Kuthu - Halamithi Habibo (From "Beast")").
+export const titleCandidates = (title) => {
+  const noBrackets = (title || '').replace(/[([{][^)\]}]*[)\]}]/g, ' ');
+  const mainPart = noBrackets.split(/\s[-\u2013\u2014:]\s/)[0];
+  return [...new Set([normalizeTitle(title), normalizeTitle(mainPart)].filter(Boolean))];
+};
+
+const aliasMatches = (candidate, alias) =>
+  candidate === alias || (alias.length >= FUZZY_MIN_LENGTH && levenshtein(candidate, alias) <= 1);
+
 const artistText = (song) => `${song.artist || ''} ${song.singers || ''}`.toLowerCase();
 
 const songKey = (song) => `${normalizeTitle(song.title)}|${normalizeTitle((song.artist || song.singers || '').split(',')[0])}`;
@@ -50,12 +82,15 @@ export const createVideoLookup = ({
 
   const curatedMatch = (song) => {
     if (!song) return null;
-    const t = normalizeTitle(song.title);
     const art = artistText(song);
+    const junk = JUNK_WORD_RE.test(song.title || '');
+    const candidates = titleCandidates(song.title);
     return (
       curated.find((e) => !e.candidate && (
         (e.songId && e.songId === song.id) ||
-        (e.titles.includes(t) && e.artistHints.some((h) => art.includes(h)))
+        (!junk &&
+          e.artistHints.some((h) => art.includes(h)) &&
+          candidates.some((c) => e.titles.some((alias) => aliasMatches(c, alias))))
       )) || null
     );
   };
