@@ -48,7 +48,14 @@ export const buildConfig = (env = process.env) => {
     corsOrigins: corsList,
     vercelTeamSlug: env.VERCEL_TEAM_SLUG || '',
     trustProxy,
-    enableExternalStreams: env.ENABLE_EXTERNAL_STREAMS === 'true'
+    enableExternalStreams: env.ENABLE_EXTERNAL_STREAMS === 'true',
+    // Optional video lookup (all off unless a key AND an allow-list are provided)
+    youtubeApiKey: env.YOUTUBE_API_KEY || '',
+    videoChannelAllowlist: (env.VIDEO_CHANNEL_ALLOWLIST || '').split(',').map((s) => s.trim()).filter(Boolean),
+    // Daily YouTube Data API quota units we allow ourselves (search=100 + videos.list=1 per lookup)
+    youtubeDailyBudget: Number.isFinite(Number(env.YOUTUBE_DAILY_BUDGET)) && env.YOUTUBE_DAILY_BUDGET !== undefined && env.YOUTUBE_DAILY_BUDGET !== ''
+      ? Math.max(0, Number(env.YOUTUBE_DAILY_BUDGET))
+      : 5000
   };
 };
 

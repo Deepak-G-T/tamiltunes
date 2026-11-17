@@ -21,3 +21,15 @@ export const authLimiter = rateLimit({
     message: 'Too many authentication attempts, please try again after 15 minutes'
   }
 });
+
+// Single-song lookups may trigger an upstream video lookup, so keep them tighter than /api
+export const songLimiter = rateLimit({
+  windowMs: 60 * 1000,
+  max: 30,
+  standardHeaders: true,
+  legacyHeaders: false,
+  message: {
+    success: false,
+    message: 'Too many song lookups, please slow down'
+  }
+});

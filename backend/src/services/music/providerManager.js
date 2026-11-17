@@ -239,9 +239,9 @@ export class MusicProviderManager {
   /**
    * Get single track by ID (with 10-minute cache)
    */
-  async getSong(id) {
+  async getSong(id, { fresh = false } = {}) {
     const cacheKey = `song_${this.providerName}_${id}`;
-    const cached = musicCache.get(cacheKey);
+    const cached = fresh ? null : musicCache.get(cacheKey);
     if (cached) return cached;
 
     // Check curated tracks

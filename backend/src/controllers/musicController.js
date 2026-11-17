@@ -3,10 +3,25 @@ import { pipeline } from 'stream';
 import { config } from '../config/env.js';
 import { validateStreamUrl, MAX_STREAM_BYTES, STREAM_TIMEOUT_MS } from '../services/streamGuard.js';
 import { musicService } from '../services/music/providerManager.js';
+import { videoLookup } from '../services/music/videoLookup.js';
+
+const SONG_LIST_KEYS = [
+  'trending', 'latest', 'gana', 'nineties', 'twoThousands',
+  'melodies', 'love', 'sad', 'folk', 'instrumental'
+];
+
+// Adds videoId from curated map / cache only (no network). Never mutates the cached feed.
+const withVideoIds = (data) => {
+  const out = { ...data };
+  for (const k of SONG_LIST_KEYS) {
+    if (Array.isArray(out[k])) out[k] = videoLookup.attach(out[k]);
+  }
+  return out;
+};
 
 export const getHomeFeed = async (req, res, next) => {
   try {
-    const data = await musicService.getHomeFeed();
+    const data = withVideoIds(await musicService.getHomeFeed());
     res.json({
       success: true,
       data
@@ -27,11 +42,34 @@ export const searchMusic = async (req, res, next) => {
       });
     }
 
-    const data = await musicService.search(query.trim(), type);
+    const found = await musicService.search(query.trim(), type);
+    const data = { ...found, songs: videoLookup.attach(found.songs) };
     res.json({
       success: true,
       data
     });
+  } catch (err) {
+    next(err);
+  }
+};
+
+export const getSongById = async (req, res, next) => {
+  try {
+    const { id } = req.params;
+    if (!/^[\w.:-]{1,200}$/.test(id)) {
+      return res.status(400).json({ success: false, message: 'Invalid song id' });
+    }
+    const fresh = req.query.fresh === '1';
+    if (fresh && !req.user) {
+      return res.status(401).json({ success: false, message: 'Authentication required for fresh=1' });
+    }
+
+    const found = await musicService.getSong(id, { fresh });
+    if (!found) {
+      return res.status(404).json({ success: false, message: 'Song not found' });
+    }
+    const song = await videoLookup.attachOne(found);
+    res.json({ success: true, song });
   } catch (err) {
     next(err);
   }
