@@ -18,6 +18,7 @@ import api from '../../services/api';
 const Sidebar = ({ onOpenCreatePlaylist }) => {
   const { isAuthenticated } = useAuth();
   const [playlists, setPlaylists] = useState([]);
+  const [hasMorePlaylists, setHasMorePlaylists] = useState(false);
   const navigate = useNavigate();
 
   useEffect(() => {
@@ -25,12 +26,18 @@ const Sidebar = ({ onOpenCreatePlaylist }) => {
       api.get('/playlists')
         .then(({ data }) => {
           if (data.success) {
-            setPlaylists(data.playlists || []);
+            setPlaylists(data.items || data.playlists || []);
+            setHasMorePlaylists(!!data.hasMore);
           }
         })
-        .catch(() => {});
+        .catch((err) => {
+          if (err.response?.status !== 401) {
+            console.warn('Failed to fetch sidebar playlists:', err);
+          }
+        });
     } else {
       setPlaylists([]);
+      setHasMorePlaylists(false);
     }
   }, [isAuthenticated]);
 

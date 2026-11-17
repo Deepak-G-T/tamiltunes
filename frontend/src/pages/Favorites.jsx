@@ -19,26 +19,59 @@ const Favorites = () => {
 
   const [favorites, setFavorites] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [loadingMore, setLoadingMore] = useState(false);
+  const [total, setTotal] = useState(0);
+  const [hasMore, setHasMore] = useState(false);
+  const [offset, setOffset] = useState(0);
+  const LIMIT = 50;
 
-  const fetchFavorites = () => {
+  const fetchFavorites = (newOffset = 0, isAppend = false) => {
     if (!isAuthenticated) {
       setLoading(false);
       return;
     }
-    setLoading(true);
-    api.get('/favorites')
+    if (isAppend) {
+      setLoadingMore(true);
+    } else {
+      setLoading(true);
+    }
+
+    api.get('/favorites', { params: { limit: LIMIT, offset: newOffset } })
       .then(({ data }) => {
         if (data.success) {
-          setFavorites(data.favorites || []);
+          const items = data.items || data.favorites || [];
+          const totalCount = data.total !== undefined ? data.total : (items.length + newOffset);
+          const more = data.hasMore !== undefined ? data.hasMore : (items.length === LIMIT && items.length + newOffset < totalCount);
+
+          if (isAppend) {
+            setFavorites((prev) => [...prev, ...items]);
+          } else {
+            setFavorites(items);
+          }
+          setTotal(totalCount);
+          setHasMore(more);
+          setOffset(newOffset);
         }
       })
-      .catch(console.error)
-      .finally(() => setLoading(false));
+      .catch((err) => {
+        if (err.response?.status !== 401) {
+          console.error('Error fetching favorites:', err);
+        }
+      })
+      .finally(() => {
+        setLoading(false);
+        setLoadingMore(false);
+      });
   };
 
   useEffect(() => {
-    fetchFavorites();
+    fetchFavorites(0, false);
   }, [isAuthenticated]);
+
+  const handleLoadMore = () => {
+    if (loadingMore || !hasMore) return;
+    fetchFavorites(offset + LIMIT, true);
+  };
 
   const handleRemove = async (songId, e) => {
     e.stopPropagation();
@@ -105,7 +138,7 @@ const Favorites = () => {
             Favourite Songs
           </h1>
           <p className="text-xs text-zinc-400">
-            {favorites.length} saved Tamil songs
+            {total || favorites.length} saved Tamil songs
           </p>
 
           {favorites.length > 0 && (
@@ -193,6 +226,19 @@ const Favorites = () => {
               </div>
             );
           })
+        )}
+
+        {hasMore && (
+          <div className="pt-4 text-center">
+            <button
+              onClick={handleLoadMore}
+              disabled={loadingMore}
+              className="px-6 py-2 rounded-full bg-zinc-800 hover:bg-zinc-700 text-zinc-300 hover:text-white text-xs font-semibold transition-all inline-flex items-center gap-2 border border-zinc-700/60"
+            >
+              {loadingMore && <Loader2 className="w-3.5 h-3.5 animate-spin text-purple-400" />}
+              <span>{loadingMore ? 'Loading more...' : 'Load more favourites'}</span>
+            </button>
+          </div>
         )}
       </div>
     </div>

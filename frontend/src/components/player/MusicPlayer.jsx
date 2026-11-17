@@ -52,19 +52,22 @@ const MusicPlayer = () => {
   const { isAuthenticated } = useAuth();
   const [isFavorite, setIsFavorite] = useState(false);
 
-  // Check if currentSong is in user favorites
+  // Check if currentSong is in user favorites via lightweight IDs endpoint
   useEffect(() => {
     if (isAuthenticated && currentSong?.id) {
-      api.get('/favorites')
+      api.get('/favorites/ids')
         .then(({ data }) => {
-          if (data.success && Array.isArray(data.favorites)) {
-            const exists = data.favorites.some(
-              (f) => f.songId === currentSong.id || f.id === currentSong.id
-            );
-            setIsFavorite(exists);
+          if (data.success && Array.isArray(data.ids)) {
+            setIsFavorite(data.ids.includes(currentSong.id));
           }
         })
-        .catch(() => {});
+        .catch((err) => {
+          if (err.response?.status !== 401) {
+            console.warn('Failed to verify favorite status:', err);
+          }
+        });
+    } else {
+      setIsFavorite(false);
     }
   }, [isAuthenticated, currentSong]);
 
