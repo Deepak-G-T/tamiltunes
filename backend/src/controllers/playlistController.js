@@ -26,26 +26,31 @@ export const getPlaylists = async (req, res, next) => {
     const limit = Math.min(Math.max(parseInt(req.query.limit, 10) || 50, 1), 100);
     const offset = Math.max(parseInt(req.query.offset, 10) || 0, 0);
 
-    const playlists = await db.playlist.findMany({
-      where: { userId: req.user.id },
-      include: {
-        songs: {
-          include: { song: true }
-        }
-      },
-      orderBy: { createdAt: 'desc' },
-      take: limit,
-      skip: offset
-    });
+    const [total, playlists] = await Promise.all([
+      db.playlist.count({ where: { userId: req.user.id } }),
+      db.playlist.findMany({
+        where: { userId: req.user.id },
+        include: {
+          songs: {
+            include: { song: true }
+          }
+        },
+        orderBy: { createdAt: 'desc' },
+        take: limit,
+        skip: offset
+      })
+    ]);
+
+    const hasMore = offset + playlists.length < total;
 
     res.json({
       success: true,
+      items: playlists,
       playlists,
-      pagination: {
-        limit,
-        offset,
-        count: playlists.length
-      }
+      total,
+      limit,
+      offset,
+      hasMore
     });
   } catch (err) {
     next(err);
