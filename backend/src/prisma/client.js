@@ -229,9 +229,22 @@ export const initDb = async () => {
 
   if (prismaInstance) {
     try {
-      await prismaInstance.$connect();
-      // Verify database connectivity
-      await prismaInstance.user.count();
+      // Neon scales to zero: the first connection after idle can take several seconds or fail once.
+      // Retry with backoff in production; fail fast in dev so the in-memory fallback kicks in.
+      const attempts = isProduction ? 5 : 1;
+      for (let i = 1; ; i++) {
+        try {
+          await prismaInstance.$connect();
+          // Verify database connectivity
+          await prismaInstance.user.count();
+          break;
+        } catch (e) {
+          if (i >= attempts) throw e;
+          const wait = Math.min(1000 * 2 ** (i - 1), 8000);
+          console.warn(`Database not ready (attempt ${i}/${attempts}): ${e.message.split('\n').pop()}. Retrying in ${wait}ms`);
+          await new Promise((r) => setTimeout(r, wait));
+        }
+      }
       isPostgresAvailable = true;
       console.log('Connected to PostgreSQL via Prisma (tables verified)');
       return prismaInstance;
@@ -279,3 +292,7 @@ export const db = new Proxy({}, {
     return fallbackDb[prop];
   }
 });
+
+export const closeDb = async () => {
+  if (prismaInstance && isPostgresAvailable) await prismaInstance.$disconnect();
+};

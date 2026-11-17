@@ -17,6 +17,8 @@ services:
         sync: false # REQUIRED: exact Vercel origin(s), comma-separated. "*" is NOT a wildcard (it matches nothing)
       - key: VERCEL_TEAM_SLUG
         sync: false # REQUIRED in production: startup fails if unset. Pins the Vercel preview-origin regex to your team
+      - key: FRONTEND_URL
+        sync: false # Optional alias for CORS_ORIGIN: your Vercel origin
       - key: MUSIC_PROVIDER
         value: jiosaavn
       - key: ENABLE_EXTERNAL_STREAMS
