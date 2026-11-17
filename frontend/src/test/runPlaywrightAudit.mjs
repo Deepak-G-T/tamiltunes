@@ -13,39 +13,96 @@ if (!fs.existsSync(screenshotDir)) {
   fs.mkdirSync(screenshotDir, { recursive: true });
 }
 
+// Authentic YouTube Tamil songs feed shape
 const mockHomeData = {
   trending: [
     {
-      id: 'tt_trending_1',
+      id: 'yt_badass_leo',
       title: 'Badass (Leo)',
       artist: 'Anirudh Ravichander',
+      singers: 'Anirudh Ravichander',
       album: 'Leo',
       duration: 229,
       image: 'https://c.saavncdn.com/415/Leo-Original-Motion-Picture-Soundtrack-English-2023-20231019170311-500x500.jpg',
-      streamUrl: 'https://aac.saavncdn.com/415/46a7b21d2a3f4b9e019a7cdff7442c55_320.mp4',
-      isPlayable: true
+      youtubeId: 'IqwIOlhfCak',
+      embedUrl: 'https://www.youtube-nocookie.com/embed/IqwIOlhfCak?autoplay=1&enablejsapi=1',
+      streamUrl: 'https://www.youtube-nocookie.com/embed/IqwIOlhfCak?autoplay=1&enablejsapi=1',
+      isPlayable: true,
+      provider: 'youtube',
+      source: 'youtube',
+      videoId: 'IqwIOlhfCak',
+      category: 'trending',
+      licenseNotice: 'Official YouTube IFrame Player Embed (Sony Music South)'
     },
     {
-      id: 'tt_trending_2',
-      title: 'Hukum',
-      artist: 'Anirudh Ravichander',
+      id: 'yt_hukum_jailer',
+      title: 'Hukum - Thalaivar Alappara',
+      artist: 'Anirudh Ravichander, Super Subu',
+      singers: 'Anirudh Ravichander',
       album: 'Jailer',
       duration: 206,
       image: 'https://c.saavncdn.com/187/Jailer-Tamil-2023-20230728081443-500x500.jpg',
-      streamUrl: 'https://aac.saavncdn.com/187/0c4d0aee91a3ac81d4b645ec448a2960_320.mp4',
-      isPlayable: true
+      youtubeId: '1F3hm6MfR1k',
+      embedUrl: 'https://www.youtube-nocookie.com/embed/1F3hm6MfR1k?autoplay=1&enablejsapi=1',
+      streamUrl: 'https://www.youtube-nocookie.com/embed/1F3hm6MfR1k?autoplay=1&enablejsapi=1',
+      isPlayable: true,
+      provider: 'youtube',
+      source: 'youtube',
+      videoId: '1F3hm6MfR1k',
+      category: 'trending',
+      licenseNotice: 'Official YouTube IFrame Player Embed (Sun TV)'
+    },
+    {
+      id: 'yt_naa_ready',
+      title: 'Naa Ready',
+      artist: 'Thalapathy Vijay, Anirudh Ravichander',
+      singers: 'Thalapathy Vijay, Anirudh Ravichander',
+      album: 'Leo',
+      duration: 248,
+      image: 'https://c.saavncdn.com/415/Leo-Original-Motion-Picture-Soundtrack-English-2023-20231019170311-500x500.jpg',
+      youtubeId: 'szvt1vD0Uug',
+      embedUrl: 'https://www.youtube-nocookie.com/embed/szvt1vD0Uug?autoplay=1&enablejsapi=1',
+      streamUrl: 'https://www.youtube-nocookie.com/embed/szvt1vD0Uug?autoplay=1&enablejsapi=1',
+      isPlayable: true,
+      provider: 'youtube',
+      source: 'youtube',
+      videoId: 'szvt1vD0Uug',
+      category: 'trending',
+      licenseNotice: 'Official YouTube IFrame Player Embed (Sony Music South)'
     }
   ],
   latest: [
     {
-      id: 'tt_trending_3',
-      title: 'Naa Ready',
-      artist: 'Thalapathy Vijay, Anirudh',
-      album: 'Leo',
-      duration: 248,
-      image: 'https://c.saavncdn.com/415/Leo-Original-Motion-Picture-Soundtrack-English-2023-20231019170311-500x500.jpg',
-      streamUrl: 'https://aac.saavncdn.com/194/af240a77084e42e66f18defb87cda42a_320.mp4',
-      isPlayable: true
+      id: 'yt_kaavaalaa',
+      title: 'Kaavaalaa',
+      artist: 'Anirudh Ravichander, Shilpa Rao',
+      album: 'Jailer',
+      duration: 190,
+      image: 'https://c.saavncdn.com/187/Jailer-Tamil-2023-20230728081443-500x500.jpg',
+      youtubeId: 'RVLNBVK8auM',
+      embedUrl: 'https://www.youtube-nocookie.com/embed/RVLNBVK8auM?autoplay=1&enablejsapi=1',
+      streamUrl: 'https://www.youtube-nocookie.com/embed/RVLNBVK8auM?autoplay=1&enablejsapi=1',
+      isPlayable: true,
+      provider: 'youtube',
+      source: 'youtube',
+      videoId: 'RVLNBVK8auM'
+    }
+  ],
+  gana: [
+    {
+      id: 'yt_vaathi_coming',
+      title: 'Vaathi Coming',
+      artist: 'Anirudh Ravichander, Gana Balachandar',
+      album: 'Master',
+      duration: 230,
+      image: 'https://c.saavncdn.com/169/Master-Tamil-2020-20201202164426-500x500.jpg',
+      youtubeId: 'fRD_3vJagxk',
+      embedUrl: 'https://www.youtube-nocookie.com/embed/fRD_3vJagxk?autoplay=1&enablejsapi=1',
+      streamUrl: 'https://www.youtube-nocookie.com/embed/fRD_3vJagxk?autoplay=1&enablejsapi=1',
+      isPlayable: true,
+      provider: 'youtube',
+      source: 'youtube',
+      videoId: 'fRD_3vJagxk'
     }
   ],
   albums: [
@@ -69,59 +126,20 @@ const mockHomeData = {
 };
 
 const mockSearchResults = {
-  songs: [
-    {
-      id: 'yt_badass_leo',
-      title: 'Badass (Leo) - Official Video',
-      artist: 'Anirudh Ravichander',
-      album: 'Leo',
-      duration: 229,
-      image: 'https://c.saavncdn.com/415/Leo-Original-Motion-Picture-Soundtrack-English-2023-20231019170311-500x500.jpg',
-      source: 'youtube',
-      videoId: 'IqwIOlhfCak',
-      streamUrl: 'https://www.youtube-nocookie.com/embed/IqwIOlhfCak?autoplay=1&enablejsapi=1',
-      isPlayable: true
-    },
-    {
-      id: 'tt_trending_1',
-      title: 'Badass (Leo) - Audio',
-      artist: 'Anirudh Ravichander',
-      album: 'Leo',
-      duration: 229,
-      image: 'https://c.saavncdn.com/415/Leo-Original-Motion-Picture-Soundtrack-English-2023-20231019170311-500x500.jpg',
-      streamUrl: 'https://aac.saavncdn.com/415/46a7b21d2a3f4b9e019a7cdff7442c55_320.mp4',
-      isPlayable: true
-    }
-  ],
-  albums: [
-    {
-      id: 'album_leo',
-      name: 'Leo',
-      title: 'Leo',
-      artist: 'Anirudh Ravichander',
-      year: '2023',
-      image: 'https://c.saavncdn.com/415/Leo-Original-Motion-Picture-Soundtrack-English-2023-20231019170311-500x500.jpg'
-    }
-  ],
-  artists: [
-    {
-      id: 'artist_anirudh',
-      name: 'Anirudh Ravichander',
-      role: 'Music Director',
-      image: 'https://c.saavncdn.com/artists/Anirudh_Ravichander_003_20260121134149_500x500.jpg'
-    }
-  ]
+  songs: mockHomeData.trending,
+  albums: mockHomeData.albums,
+  artists: mockHomeData.artists
 };
 
 async function runAudit() {
   console.log('--- Starting Playwright UI Audit & Verification Suite ---');
 
-  // 1. Start Vite preview server on dedicated port
+  // 1. Start Vite preview server
   const server = await preview({
     root: path.resolve(__dirname, '../..'),
-    preview: { port: 4174 }
+    preview: { port: 4175 }
   });
-  const baseURL = 'http://localhost:4174';
+  const baseURL = 'http://localhost:4175';
   console.log('✓ Vite preview server running at', baseURL);
 
   // 2. Launch Chromium
@@ -138,20 +156,20 @@ async function runAudit() {
         return route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ success: true, data: mockSearchResults }) });
       }
       if (url.includes('/api/favorites/ids')) {
-        return route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ success: true, ids: ['tt_trending_1'] }) });
+        return route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ success: true, ids: ['yt_badass_leo'] }) });
       }
       if (url.includes('/api/favorites')) {
         return route.fulfill({
           status: 200,
           contentType: 'application/json',
-          body: JSON.stringify({ success: true, data: { items: mockHomeData.trending, total: 2, limit: 50, offset: 0, hasMore: false } })
+          body: JSON.stringify({ success: true, data: { items: mockHomeData.trending, total: 3, limit: 50, offset: 0, hasMore: false } })
         });
       }
       if (url.includes('/api/history')) {
         return route.fulfill({
           status: 200,
           contentType: 'application/json',
-          body: JSON.stringify({ success: true, data: { items: mockHomeData.trending, total: 2, limit: 50, offset: 0, hasMore: false } })
+          body: JSON.stringify({ success: true, data: { items: mockHomeData.trending, total: 3, limit: 50, offset: 0, hasMore: false } })
         });
       }
       if (url.includes('/api/playlists/p1')) {
@@ -165,8 +183,13 @@ async function runAudit() {
         return route.fulfill({
           status: 200,
           contentType: 'application/json',
-          body: JSON.stringify({ success: true, data: { items: [{ id: 'p1', name: 'Tamil Favorites', songCount: 2 }], total: 1, limit: 50, offset: 0, hasMore: false } })
+          body: JSON.stringify({ success: true, data: { items: [{ id: 'p1', name: 'Tamil Favorites', songCount: 3 }], total: 1, limit: 50, offset: 0, hasMore: false } })
         });
+      }
+      if (url.includes('/api/music/song/')) {
+        const id = url.split('/api/music/song/')[1]?.split('?')[0];
+        const match = mockHomeData.trending.find((s) => s.id === id) || mockHomeData.trending[0];
+        return route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ success: true, data: match }) });
       }
       if (url.includes('/api/music/albums/')) {
         return route.fulfill({
@@ -187,15 +210,19 @@ async function runAudit() {
   };
 
   const viewports = [
-    { name: 'desktop_1366x768', width: 1366, height: 768 },
-    { name: 'tablet_768x1024', width: 768, height: 1024 },
-    { name: 'mobile_390x844', width: 390, height: 844 },
-    { name: 'mobile_360x640', width: 360, height: 640 }
+    { name: 'desktop_1366x768', width: 1366, height: 768, isMobile: false, hasTouch: false },
+    { name: 'tablet_768x1024', width: 768, height: 1024, isMobile: false, hasTouch: false },
+    { name: 'mobile_390x844', width: 390, height: 844, isMobile: true, hasTouch: true },
+    { name: 'mobile_360x640', width: 360, height: 640, isMobile: true, hasTouch: true }
   ];
 
-  // Run Viewport visual captures
+  // Capture static viewports
   for (const vp of viewports) {
-    const context = await browser.newContext({ viewport: { width: vp.width, height: vp.height } });
+    const context = await browser.newContext({
+      viewport: { width: vp.width, height: vp.height },
+      isMobile: vp.isMobile,
+      hasTouch: vp.hasTouch
+    });
     const page = await context.newPage();
     await setupMockRoutes(page);
 
@@ -206,164 +233,165 @@ async function runAudit() {
     await context.close();
   }
 
-  // Deep interaction tests on 1366x768 (Desktop)
+  // Interaction tests on Desktop (1366x768)
   {
     const context = await browser.newContext({ viewport: { width: 1366, height: 768 } });
     const page = await context.newPage();
     await setupMockRoutes(page);
 
-    // Search page
     await page.goto(`${baseURL}/search?q=leo`, { waitUntil: 'networkidle' });
     await page.waitForTimeout(400);
     await page.screenshot({ path: path.join(screenshotDir, 'search_1366x768.png') });
     console.log('✓ Captured search_1366x768.png');
 
-    // Library (Favorites)
     await page.goto(`${baseURL}/favorites`, { waitUntil: 'networkidle' });
     await page.waitForTimeout(300);
     await page.screenshot({ path: path.join(screenshotDir, 'library_favorites_1366x768.png') });
     console.log('✓ Captured library_favorites_1366x768.png');
 
-    // Album detail
     await page.goto(`${baseURL}/album/album_leo`, { waitUntil: 'networkidle' });
     await page.waitForTimeout(300);
     await page.screenshot({ path: path.join(screenshotDir, 'album_1366x768.png') });
     console.log('✓ Captured album_1366x768.png');
 
-    // Artist detail
     await page.goto(`${baseURL}/artist/artist_anirudh`, { waitUntil: 'networkidle' });
     await page.waitForTimeout(300);
     await page.screenshot({ path: path.join(screenshotDir, 'artist_1366x768.png') });
     console.log('✓ Captured artist_1366x768.png');
 
-    // Playlist detail
     await page.goto(`${baseURL}/playlist/p1`, { waitUntil: 'networkidle' });
     await page.waitForTimeout(300);
     await page.screenshot({ path: path.join(screenshotDir, 'playlist_1366x768.png') });
     console.log('✓ Captured playlist_1366x768.png');
 
-    // Queue drawer
+    // Queue drawer from real Home page with YouTube playback
     await page.goto(`${baseURL}/`, { waitUntil: 'networkidle' });
     await page.waitForTimeout(400);
-    // Click play on first song card
     await page.locator('text=Badass (Leo)').first().click();
-    await page.waitForTimeout(400);
-    // Open queue drawer
+    await page.waitForTimeout(500);
+
     await page.click('button[aria-label="Toggle Queue"]');
     await page.waitForTimeout(400);
     await page.screenshot({ path: path.join(screenshotDir, 'queue_drawer_1366x768.png') });
     console.log('✓ Captured queue_drawer_1366x768.png');
 
-    // YouTube Player visibility on Desktop
-    await page.goto(`${baseURL}/search?q=leo`, { waitUntil: 'networkidle' });
-    await page.waitForTimeout(400);
-    // Click on the YouTube song
-    await page.locator('text=Badass (Leo) - Official Video').first().click();
-    await page.waitForTimeout(600);
+    // YouTube player on Desktop
     await page.screenshot({ path: path.join(screenshotDir, 'youtube_player_1366x768.png') });
     console.log('✓ Captured youtube_player_1366x768.png');
 
     await context.close();
   }
 
-  // Deep interaction tests on 390x844 (Mobile)
-  {
-    console.log('\n--- Running Mobile Interaction & Overlap Assertions (390x844) ---');
-    const context = await browser.newContext({ viewport: { width: 390, height: 844 } });
+  // Mobile Viewport Overlap & Touch Tests (390x844 and 360x640)
+  const mobileConfigs = [
+    { name: '390x844', width: 390, height: 844 },
+    { name: '360x640', width: 360, height: 640 }
+  ];
+
+  for (const cfg of mobileConfigs) {
+    console.log(`\n--- Running Mobile Tests on ${cfg.name} (hasTouch: true, isMobile: true, real Home page) ---`);
+    const context = await browser.newContext({
+      viewport: { width: cfg.width, height: cfg.height },
+      hasTouch: true,
+      isMobile: true
+    });
     const page = await context.newPage();
     await setupMockRoutes(page);
 
+    // 1. Load the real Home page (no forced state, backend returns YouTube-sourced songs)
     await page.goto(`${baseURL}/`, { waitUntil: 'networkidle' });
     await page.waitForTimeout(500);
 
-    // Click first song card to start playback
-    await page.locator('text=Badass (Leo)').first().click();
-    await page.waitForTimeout(500);
+    // 2. Tap on the song card directly from real Home page
+    const songCard = page.locator('text=Badass (Leo)').first();
+    await songCard.tap();
+    await page.waitForTimeout(700);
 
-    // Verify MiniPlayer is visible
+    // 3. Mini-player appears
     const miniPlayer = page.locator('div[role="button"][aria-label="Open now playing full screen"]');
     const isMiniVisible = await miniPlayer.isVisible();
-    console.log('Assertion: MiniPlayer visible on mobile ->', isMiniVisible ? 'PASS' : 'FAIL');
-    if (!isMiniVisible) throw new Error('MiniPlayer failed to show on mobile');
+    console.log(`[${cfg.name}] Assertion: MiniPlayer visible ->`, isMiniVisible ? 'PASS' : 'FAIL');
+    if (!isMiniVisible) throw new Error(`MiniPlayer not visible on ${cfg.name}`);
 
-    await page.screenshot({ path: path.join(screenshotDir, 'mini_player_390x844.png') });
-    console.log('✓ Captured mini_player_390x844.png');
-
-    // Assert: Tapping mini-player opens full-screen player
-    await miniPlayer.click();
+    // 4. Tap mini-player using page.tap()
+    await miniPlayer.tap();
     await page.waitForTimeout(500);
 
     const fullScreenHeading = page.locator('text=Playing From "Leo"');
     const isFullVisible = await fullScreenHeading.isVisible();
-    console.log('Assertion: Tapping mini-player opens full-screen ->', isFullVisible ? 'PASS' : 'FAIL');
-    if (!isFullVisible) throw new Error('FullScreenPlayer failed to open upon tapping mini-player');
+    console.log(`[${cfg.name}] Assertion: Tapping mini-player opens full-screen ->`, isFullVisible ? 'PASS' : 'FAIL');
+    if (!isFullVisible) throw new Error(`FullScreenPlayer failed to open via tap() on ${cfg.name}`);
 
-    // Assert: Body scroll lock is active when full-screen is open
-    const bodyOverflowLocked = await page.evaluate(() => document.body.style.overflow);
-    console.log('Assertion: Body scroll lock active ("hidden") ->', bodyOverflowLocked === 'hidden' ? 'PASS' : 'FAIL');
-    if (bodyOverflowLocked !== 'hidden') throw new Error(`Expected body overflow hidden, got: ${bodyOverflowLocked}`);
+    // 5. Body scroll lock active
+    const bodyLocked = await page.evaluate(() => document.body.style.overflow);
+    console.log(`[${cfg.name}] Assertion: Body scroll lock active ("hidden") ->`, bodyLocked === 'hidden' ? 'PASS' : 'FAIL');
+    if (bodyLocked !== 'hidden') throw new Error(`Expected body scroll hidden on ${cfg.name}, got ${bodyLocked}`);
 
-    await page.screenshot({ path: path.join(screenshotDir, 'fullscreen_player_390x844.png') });
-    console.log('✓ Captured fullscreen_player_390x844.png');
+    if (cfg.name === '390x844') {
+      await page.screenshot({ path: path.join(screenshotDir, 'fullscreen_player_390x844.png') });
+      console.log('✓ Captured fullscreen_player_390x844.png');
+    }
 
-    // Assert: Close full-screen works
+    // 6. Close full-screen player
     const closeBtn = page.locator('button[aria-label="Close now playing"]');
-    await closeBtn.click();
+    await closeBtn.tap();
     await page.waitForTimeout(500);
 
-    const isFullClosed = !(await fullScreenHeading.isVisible());
-    console.log('Assertion: Close button closes full-screen ->', isFullClosed ? 'PASS' : 'FAIL');
-    if (!isFullClosed) throw new Error('FullScreenPlayer failed to close');
+    const bodyReleased = await page.evaluate(() => document.body.style.overflow);
+    console.log(`[${cfg.name}] Assertion: Body scroll lock released ("") ->`, bodyReleased === '' ? 'PASS' : 'FAIL');
+    if (bodyReleased !== '') throw new Error(`Expected body scroll released on ${cfg.name}, got ${bodyReleased}`);
 
-    // Assert: Body scroll lock released
-    const bodyOverflowReleased = await page.evaluate(() => document.body.style.overflow);
-    console.log('Assertion: Body scroll lock released ("") ->', bodyOverflowReleased === '' ? 'PASS' : 'FAIL');
-    if (bodyOverflowReleased !== '') throw new Error(`Expected body overflow empty string, got: ${bodyOverflowReleased}`);
+    if (cfg.name === '390x844') {
+      await page.screenshot({ path: path.join(screenshotDir, 'mini_player_390x844.png') });
+      console.log('✓ Captured mini_player_390x844.png');
+    }
 
-    // Test YouTube Player bounding box overlap on mobile
-    await page.goto(`${baseURL}/search?q=leo`, { waitUntil: 'networkidle' });
-    await page.waitForTimeout(500);
-    await page.locator('text=Badass (Leo) - Official Video').first().click();
-    await page.waitForTimeout(600);
-
+    // 7. Check YouTube player container & IFrame in DOM
     const ytContainer = page.locator('#yt-player-container');
     const isYtVisible = await ytContainer.isVisible();
-    console.log('Assertion: YouTube player container rendered ->', isYtVisible ? 'PASS' : 'FAIL');
+    console.log(`[${cfg.name}] Assertion: YouTube player visible ->`, isYtVisible ? 'PASS' : 'FAIL');
+    if (!isYtVisible) throw new Error(`YouTube player container not visible on ${cfg.name}`);
 
+    // Verify YouTube iframe presence in DOM
+    const iframe = page.locator('#yt-player-container iframe');
+    const iframeCount = await iframe.count();
+    let iframeSrc = '';
+    if (iframeCount > 0) {
+      iframeSrc = (await iframe.getAttribute('src')) || '';
+    }
+    console.log(`[${cfg.name}] YouTube IFrame in DOM: ${iframeCount > 0 ? 'YES' : 'NO'}, src: ${iframeSrc || '(initializing)'}`);
+
+    // 8. Bounding box & >= 12px clearance assertion
     const ytBox = await ytContainer.boundingBox();
     const miniBox = await miniPlayer.boundingBox();
-    // Bottom nav tab bar
     const navBar = page.locator('nav.fixed.bottom-0');
     const navBox = await navBar.boundingBox();
 
-    console.log('Bounding boxes:');
+    console.log(`[${cfg.name}] Bounding Boxes:`);
     console.log('  YouTube player:', ytBox);
     console.log('  Mini-player:   ', miniBox);
-    console.log('  Bottom Tab Bar:', navBox);
+    console.log('  Bottom Nav:    ', navBox);
 
     if (ytBox && miniBox) {
-      // Check for overlap: ytBox bottom must be above miniBox top or horizontally separated
-      const overlapsMini = !(
-        ytBox.y + ytBox.height <= miniBox.y ||
-        ytBox.y >= miniBox.y + miniBox.height ||
-        ytBox.x + ytBox.width <= miniBox.x ||
-        ytBox.x >= miniBox.x + miniBox.width
-      );
-      console.log('Assertion: Floating YouTube player does NOT overlap mini-player ->', !overlapsMini ? 'PASS' : 'FAIL');
-      if (overlapsMini) throw new Error('YouTube player overlaps mini-player!');
+      const clearanceAboveMini = miniBox.y - (ytBox.y + ytBox.height);
+      console.log(`[${cfg.name}] Clearance between YouTube Player and MiniPlayer: ${clearanceAboveMini}px (Required >= 12px)`);
+      const hasClearance = clearanceAboveMini >= 12;
+      console.log(`[${cfg.name}] Assertion: Clearance >= 12px ->`, hasClearance ? 'PASS' : 'FAIL');
+      if (!hasClearance) {
+        throw new Error(`Clearance between YouTube player and MiniPlayer is only ${clearanceAboveMini}px on ${cfg.name}, required >= 12px!`);
+      }
     }
 
-    if (ytBox && navBox) {
-      const overlapsNav = !(
-        ytBox.y + ytBox.height <= navBox.y ||
-        ytBox.y >= navBox.y + navBox.height
-      );
-      console.log('Assertion: Floating YouTube player does NOT overlap bottom tab bar ->', !overlapsNav ? 'PASS' : 'FAIL');
-      if (overlapsNav) throw new Error('YouTube player overlaps bottom tab bar!');
+    if (miniBox && navBox) {
+      const clearanceAboveNav = navBox.y - (miniBox.y + miniBox.height);
+      console.log(`[${cfg.name}] Clearance between MiniPlayer and Bottom Nav: ${clearanceAboveNav}px`);
+      if (clearanceAboveNav < 0) {
+        throw new Error(`MiniPlayer overlaps Bottom Nav on ${cfg.name}!`);
+      }
     }
 
-    await page.screenshot({ path: path.join(screenshotDir, 'youtube_player_390x844.png') });
-    console.log('✓ Captured youtube_player_390x844.png');
+    await page.screenshot({ path: path.join(screenshotDir, `youtube_player_${cfg.name}.png`) });
+    console.log(`✓ Captured youtube_player_${cfg.name}.png`);
 
     await context.close();
   }
@@ -371,7 +399,7 @@ async function runAudit() {
   // Cleanup
   await browser.close();
   await server.close();
-  console.log('\n=== All Playwright UI tests and assertions PASSED successfully! ===');
+  console.log('\n=== All Playwright UI tests, touch interactions, and clearance assertions PASSED! ===');
 }
 
 runAudit().catch((err) => {

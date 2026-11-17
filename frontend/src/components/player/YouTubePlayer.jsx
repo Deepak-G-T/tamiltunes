@@ -193,9 +193,9 @@ const YouTubePlayer = forwardRef(({
     }
   }));
 
-  // On mobile: sits at bottom 136px (above 64px mini-player + 56px bottom nav + 16px buffer)
+  // On mobile: sits at bottom 154px (above 64px mini-player + 56px bottom nav + >= 12px buffer)
   // On desktop: sits at bottom 96px (above 80px player bar + 16px buffer)
-  const computedBottom = visible ? (isMobile ? '136px' : '96px') : '-400px';
+  const computedBottom = visible ? (isMobile ? '154px' : '96px') : '-400px';
 
   return (
     <div
