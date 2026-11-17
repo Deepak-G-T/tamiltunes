@@ -63,8 +63,17 @@ api.interceptors.response.use(
       }
     }
 
-    // If request timed out or network error on cold start, retry automatically once after 2.5s
-    if (config && !config._hasColdStartRetried && (error.code === 'ECONNABORTED' || (!error.response && error.message.includes('Network Error')))) {
+    // If GET request timed out or network error on cold start, retry automatically once after 2.5s
+    // Never retry mutating requests (POST, PUT, DELETE, PATCH)
+    const method = (config?.method || 'get').toLowerCase();
+    const isGet = method === 'get';
+
+    if (
+      isGet &&
+      config &&
+      !config._hasColdStartRetried &&
+      (error.code === 'ECONNABORTED' || (!error.response && error.message && error.message.includes('Network Error')))
+    ) {
       config._hasColdStartRetried = true;
       notifySlowStatus(true);
       await new Promise((resolve) => setTimeout(resolve, 2500));
@@ -75,6 +84,9 @@ api.interceptors.response.use(
       // Clear token if invalid or expired
       localStorage.removeItem('tamiltunes_token');
       localStorage.removeItem('tamiltunes_user');
+      if (typeof window !== 'undefined' && !window.location.pathname.startsWith('/login') && !window.location.pathname.startsWith('/signup')) {
+        window.location.href = '/login';
+      }
     }
 
     return Promise.reject(error);

@@ -133,7 +133,7 @@ export const AudioProvider = ({ children }) => {
     }
   };
 
-  // Attempt to refresh expired stream URL by searching the catalog once
+  // Attempt to refresh expired stream URL by song ID (GET /api/music/song/:id)
   const handleExpiredStream = async (song) => {
     if (!song || song._hasRetriedFreshFetch) {
       setPlaybackError('Stream unavailable or expired. Skipping to next track...');
@@ -145,15 +145,14 @@ export const AudioProvider = ({ children }) => {
 
     song._hasRetriedFreshFetch = true;
     try {
-      const searchQuery = `${song.title} ${song.artist || song.singers || ''}`.trim();
-      const { data } = await api.get(`/music/search?q=${encodeURIComponent(searchQuery)}`);
-      const foundSongs = data.songs || (Array.isArray(data) ? data : []);
-      const matched = foundSongs.find((s) => s.title?.toLowerCase() === song.title?.toLowerCase()) || foundSongs[0];
+      // Refetch strictly by song ID from /api/music/song/:id
+      const { data } = await api.get(`/music/song/${encodeURIComponent(song.id)}`);
+      const refreshedSong = data.data || data;
 
-      if (matched && matched.streamUrl && matched.streamUrl !== song.streamUrl) {
+      if (refreshedSong && refreshedSong.streamUrl && refreshedSong.streamUrl !== song.streamUrl) {
         const audio = audioRef.current;
-        song.streamUrl = matched.streamUrl;
-        const candidates = buildCandidateUrls(matched);
+        song.streamUrl = refreshedSong.streamUrl;
+        const candidates = buildCandidateUrls(refreshedSong);
         activeCandidatesRef.current = candidates;
         candidateIndexRef.current = 0;
 
@@ -165,7 +164,7 @@ export const AudioProvider = ({ children }) => {
         return;
       }
     } catch (e) {
-      console.warn('Refetching expired stream failed:', e.message);
+      console.warn(`Refetching expired stream for song ID [${song.id}] failed:`, e.message);
     }
 
     setPlaybackError('Stream expired. Skipping to next track...');
