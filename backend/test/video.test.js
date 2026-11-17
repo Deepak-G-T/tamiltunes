@@ -177,6 +177,39 @@ console.log('✓ non-embeddable / non-public / missing status rejected');
   console.log('✓ title matching: JioSaavn variants match, remixes/covers/lookalikes rejected');
 }
 
+// 10. API lookup prefers the official video song and rejects lyric/audio uploads
+{
+  const mkItems = (...ids) => ids.map((id) => ({ id: { videoId: id } }));
+  const vid = (id, title, channelId = OFFICIAL) => ({
+    id, status: { embeddable: true, privacyStatus: 'public' }, snippet: { channelId, title }
+  });
+  const run = async (details, items) => {
+    const f = mkFetch({ items, details });
+    const v = createVideoLookup({ fetchImpl: f, cfg: cfgWith() });
+    return v.lookup({ id: 'saavn_q', title: 'Some Unmapped Song', artist: 'Someone' });
+  };
+  const A = 'AAAAAAAAAAA', B = 'BBBBBBBBBBB', C = 'CCCCCCCCCCC';
+
+  // lyric video listed first, official video second -> official wins
+  assert.equal(await run([vid(A, 'Some Song - Lyric Video | Film'), vid(B, 'Some Song - Video Song | Film')], mkItems(A, B)), B);
+  // only a lyric video exists -> nothing is returned (we want the video song, not the lyric video)
+  assert.equal(await run([vid(A, 'Some Song (Lyrical)')], mkItems(A)), null);
+  // audio-only / jukebox / teaser / live rejected
+  assert.equal(await run([vid(A, 'Some Song (Official Audio)')], mkItems(A)), null);
+  assert.equal(await run([vid(A, 'Film - Jukebox')], mkItems(A)), null);
+  assert.equal(await run([vid(A, 'Some Song Live at Concert')], mkItems(A)), null);
+  // "Official Video" beats a plain title; ties keep search order
+  assert.equal(await run([vid(A, 'Some Song | Film'), vid(B, 'Some Song (Official Video)')], mkItems(A, B)), B);
+  assert.equal(await run([vid(A, 'Some Song | Film'), vid(B, 'Some Song | Film Reprise Cut')], mkItems(A, B)), A);
+  // a lyric video on a NON-allow-listed channel never wins either
+  assert.equal(await run([vid(A, 'Some Song - Video Song', 'UC_not_allowed')], mkItems(A)), null);
+  // the query asks for the official video song
+  const f = mkFetch({ items: mkItems(A), details: [vid(A, 'Some Song - Video Song')] });
+  await createVideoLookup({ fetchImpl: f, cfg: cfgWith() }).lookup({ id: 'x', title: 'Zzz Song', artist: 'Aaa' });
+  assert.match(f.calls[0].searchParams.get('q'), /official video song/);
+  console.log('✓ API lookup: official video song preferred, lyric/audio/live uploads rejected');
+}
+
 // ---- HTTP level: home/search/song carry videoId, existing fields unchanged ----
 await initDb();
 musicService.setProvider('mock');
