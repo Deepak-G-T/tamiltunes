@@ -214,6 +214,131 @@ console.log('✓ non-embeddable / non-public / missing status rejected');
   console.log('✓ API lookup: official video song preferred, lyric/audio/live uploads rejected');
 }
 
+// 11. channel uploads index: cheap catalogue matching for songs outside the curated map
+{
+  const CH = `UC${'a'.repeat(22)}`;
+  const V = (n) => `VID_${String(n).padStart(7, '0')}`; // 11-char video ids
+  const json = (body) => ({ ok: true, status: 200, json: async () => body });
+  const mkIndexFetch = ({ uploads, statuses = {}, searchItems = [], searchDetails = [] }) => {
+    const calls = [];
+    const fn = async (url) => {
+      const u = new URL(url);
+      const name = u.pathname.split('/').pop();
+      calls.push({ name, params: u.searchParams });
+      if (name === 'playlistItems') {
+        return json({ items: uploads.map(([n, title]) => ({ contentDetails: { videoId: V(n) }, snippet: { title } })) });
+      }
+      if (name === 'videos') {
+        const ids = u.searchParams.get('id').split(',');
+        const part = u.searchParams.get('part');
+        return json({
+          items: ids.map((id) => {
+            const hit = searchDetails.find((d) => d.id === id);
+            return hit || { id, status: statuses[id] || { embeddable: true, privacyStatus: 'public' }, snippet: { channelId: CH, title: '' } };
+          })
+        });
+      }
+      if (name === 'search') return json({ items: searchItems });
+      return { ok: false, status: 404, json: async () => ({}) };
+    };
+    fn.calls = calls;
+    return fn;
+  };
+  const uploads = [
+    [1, 'JAILER - Hukum Lyric Video'],
+    [2, 'JAILER - Hukum Video Song'],
+    [3, 'JAILER - Hukum (Official Audio)'],
+    [4, 'LEO - Naa Ready Video Song'],
+    [5, 'Master - Vaathi Coming 8K/4K Video Song'],
+    [6, 'LEO - Badass Video Song'],
+    [7, 'Leo Official Trailer']
+  ];
+  const statuses = { [V(6)]: { embeddable: false, privacyStatus: 'public' } };
+  const cfg = (over = {}) => ({
+    youtubeApiKey: 'k', videoChannelAllowlist: [CH], youtubeDailyBudget: 5000,
+    videoIndexMaxPages: 2, videoSearchFallback: false, ...over
+  });
+  const mk = (over = {}, fetchOpts = {}) => {
+    const f = mkIndexFetch({ uploads, statuses, ...fetchOpts });
+    return { f, v: createVideoLookup({ fetchImpl: f, cfg: cfg(over), curated: [] }) }; // curated map off: test the index alone
+  };
+  const song = (title, album, artist = 'Anirudh Ravichander') => ({ id: `saavn_${title}`, title, album, artist });
+
+  // a) matches by title, picks the video song over lyric/audio, costs 2 API calls (no per-song search)
+  {
+    const { f, v } = mk();
+    assert.equal(await v.lookup(song('Hukum - Thalaivar Alappara', 'Jailer')), V(2));
+    assert.deepEqual(f.calls.map((c) => c.name), ['playlistItems', 'videos']);
+    assert.equal(f.calls[0].params.get('playlistId'), `UU${'a'.repeat(22)}`); // uploads playlist of the channel
+    // the index is now in memory: a different song of the same film is matched with NO network
+    assert.equal(v.peek(song('Hukum (From "Jailer")', 'Jailer')), V(2));
+    // second lookups do not re-read the channel
+    await v.lookup(song('Naa Ready', 'Leo'));
+    assert.equal(f.calls.filter((c) => c.name === 'playlistItems').length, 1);
+  }
+  // b) two-word title needs no film match; one-word title needs the film name too
+  {
+    const { v } = mk();
+    await v.lookup(song('Whatever', 'X')); // loads the index
+    assert.equal(v.peek(song('Naa Ready', 'Some Album')), V(4));
+    assert.equal(v.peek(song('Hukum', 'Jailer')), V(2));
+    assert.equal(v.peek(song('Hukum', 'Other Film')), undefined);
+    assert.equal(v.peek(song('Leo', 'Leo')), undefined, 'title equal to the film name is ambiguous');
+  }
+  // c) remixes/covers never get the official video; non-embeddable and lyric-only uploads are not served
+  {
+    const { v } = mk();
+    await v.lookup(song('Whatever', 'X'));
+    assert.equal(v.peek(song('Hukum (Remix)', 'Jailer')), undefined);
+    assert.equal(v.peek(song('Naa Ready (Cover)', 'Leo')), undefined);
+    assert.equal(v.peek(song('Badass', 'Leo')), undefined, 'non-embeddable upload excluded');
+    assert.equal(v.peek(song('Vaathi Coming', 'Master')), V(5));
+  }
+  const only = (rows) => mkIndexFetch({ uploads: rows });
+  {
+    const f = only([[1, 'JAILER - Hukum Lyric Video'], [2, 'JAILER - Hukum (Official Audio)']]);
+    const v = createVideoLookup({ fetchImpl: f, cfg: cfg(), curated: [] });
+    assert.equal(await v.lookup(song('Hukum - Thalaivar Alappara', 'Jailer')), null, 'lyric/audio only -> no video');
+  }
+  // d) turned off / unsafe configs make no calls
+  for (const over of [{ videoIndexMaxPages: 0 }, { videoChannelAllowlist: [] }, { youtubeApiKey: '' }, { videoChannelAllowlist: ['UC_short'] }, { youtubeDailyBudget: 0 }]) {
+    const { f, v } = mk(over);
+    await v.lookup(song('Hukum - Thalaivar Alappara', 'Jailer'));
+    assert.equal(f.calls.filter((c) => c.name === 'playlistItems').length, 0, `no index calls for ${JSON.stringify(over)}`);
+  }
+  // e) quota: the whole channel index costs a handful of units, far below one per-song search
+  {
+    const { v } = mk();
+    await v.lookup(song('Hukum - Thalaivar Alappara', 'Jailer'));
+    assert.ok(v._budget.used <= 3, `index load used ${v._budget.used} quota units`);
+  }
+  // f) concurrent lookups share a single index load
+  {
+    const { f, v } = mk();
+    await Promise.all([1, 2, 3, 4].map(() => v.lookup(song('Hukum - Thalaivar Alappara', 'Jailer'))));
+    assert.equal(f.calls.filter((c) => c.name === 'playlistItems').length, 1);
+  }
+  // g) index miss falls back to the per-song search only when VIDEO_SEARCH_FALLBACK is on
+  {
+    const { f, v } = mk({ videoSearchFallback: true }, { searchItems: [{ id: { videoId: V(9) } }], searchDetails: [{ id: V(9), status: { embeddable: true, privacyStatus: 'public' }, snippet: { channelId: CH, title: 'Zzz - Video Song' } }] });
+    assert.equal(await v.lookup(song('Totally Unindexed Song', 'Nowhere')), V(9));
+    assert.ok(f.calls.some((c) => c.name === 'search'));
+    const off = mk({ videoSearchFallback: false });
+    assert.equal(await off.v.lookup(song('Totally Unindexed Song', 'Nowhere')), null);
+    assert.ok(!off.f.calls.some((c) => c.name === 'search'), 'no per-song search when the fallback is off');
+  }
+  // h) attach() picks up indexed videos without mutating inputs, once the index is loaded
+  {
+    const { v } = mk();
+    await v.lookup(song('Whatever', 'X'));
+    const input = Object.freeze(song('Naa Ready', 'Leo'));
+    const [out] = v.attach([input]);
+    assert.equal(out.videoId, V(4));
+    assert.equal(input.videoId, undefined);
+  }
+  console.log('✓ channel index: matches the whole catalogue cheaply, official video songs only, off unless configured');
+}
+
 // ---- HTTP level: home/search/song carry videoId, existing fields unchanged ----
 await initDb();
 musicService.setProvider('mock');

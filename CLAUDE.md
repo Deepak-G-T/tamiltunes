@@ -33,6 +33,13 @@ Songs may carry an optional `videoId`. It comes from the curated map `backend/sr
   Results must also be `status.embeddable === true` and public.
 - `YOUTUBE_DAILY_BUDGET` (optional, default 5000): quota units per UTC day we allow ourselves. One lookup costs
   101 units (search 100 + videos.list 1); the platform default quota is 10,000 units/day.
+- `VIDEO_INDEX_MAX_PAGES` (optional, default 10, max 40, 0 = off): how many pages of 50 uploads to index per allow-listed
+  channel. The index costs about 1 quota unit per 50 videos (plus 1 per 50 to check embeddability), is refreshed daily,
+  and lets songs be matched locally with no per-song search, so most songs from those channels can get a video.
+  A song matches when its title appears in an upload title (one-word titles must also match the film name); lyric,
+  audio, live and remix uploads are skipped. Channel IDs must look like `UC` + 22 characters.
+- `VIDEO_SEARCH_FALLBACK` (optional, default true): after an index miss, spend about 101 quota units on a per-song search
+  (within `YOUTUBE_DAILY_BUDGET`). `false` = index only.
 - Results (including "no video found") are cached 24h; transient errors 10 min. Home/search never call the API
   inline: they use the curated map and cache, and queue background lookups. Only `GET /api/music/song/:id` awaits one
   (that route is limited to 30 requests/min per IP; `?fresh=1` stays open to guests for expired-stream recovery).
