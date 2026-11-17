@@ -1,10 +1,28 @@
-import app from '../src/app.js';
+import { execSync } from 'child_process';
+import app, { isOriginAllowed } from '../src/app.js';
 import { initDb } from '../src/prisma/client.js';
 import { musicService, isOfficialFilmRelease } from '../src/services/music/providerManager.js';
 import { musicCache } from '../src/services/cacheService.js';
 
 const runTests = async () => {
   console.log('--- Starting TamilTunes Backend Integration Tests ---');
+
+  if (process.env.TEST_DATABASE_URL) {
+    console.log('--- TEST_DATABASE_URL detected: Running prisma migrate deploy and testing against real PostgreSQL ---');
+    try {
+      execSync('npx prisma migrate deploy --schema=backend/prisma/schema.prisma', {
+        env: { ...process.env, DATABASE_URL: process.env.TEST_DATABASE_URL },
+        stdio: 'inherit'
+      });
+      console.log('✓ prisma migrate deploy completed on real test database');
+    } catch (migErr) {
+      console.error('Failed to run prisma migrate deploy on real test database:', migErr);
+      process.exit(1);
+    }
+  } else {
+    console.log('ℹ Real PostgreSQL integration tests: UNTESTED (TEST_DATABASE_URL not set)');
+  }
+
   await initDb();
 
   // Use isolated Mock Provider by default so tests run fast and offline
@@ -30,16 +48,31 @@ const runTests = async () => {
     // 1A. CORS SECURITY SUITE (Origin Whitelist & Evil Origin Rejection)
     // =========================================================================
     console.log('--- Testing CORS Whitelist Enforcement ---');
-    // Test: Evil Vercel origin must be rejected (no Access-Control-Allow-Origin header)
+    // Test 1: https://in-five-11-evil.vercel.app must be rejected
+    const evilSubdomainRes = await fetch(`${BASE}/health`, {
+      headers: { Origin: 'https://in-five-11-evil.vercel.app' }
+    });
+    if (evilSubdomainRes.headers.get('access-control-allow-origin')) {
+      throw new Error('CORS Failure: https://in-five-11-evil.vercel.app was improperly allowed');
+    }
+
+    // Test 2: https://evil.vercel.app must be rejected
     const evilCorsRes = await fetch(`${BASE}/health`, {
       headers: { Origin: 'https://evil.vercel.app' }
     });
-    const evilAllowHeader = evilCorsRes.headers.get('access-control-allow-origin');
-    if (evilAllowHeader !== null && evilAllowHeader !== '') {
-      throw new Error(`CORS Security Failure: https://evil.vercel.app was improperly allowed with header: ${evilAllowHeader}`);
+    if (evilCorsRes.headers.get('access-control-allow-origin')) {
+      throw new Error('CORS Failure: https://evil.vercel.app was improperly allowed');
     }
 
-    // Test: Official production Vercel domain must be accepted
+    // Test 3: http://in-five-11.vercel.app (insecure HTTP) must be rejected
+    const insecureHttpRes = await fetch(`${BASE}/health`, {
+      headers: { Origin: 'http://in-five-11.vercel.app' }
+    });
+    if (insecureHttpRes.headers.get('access-control-allow-origin')) {
+      throw new Error('CORS Failure: http://in-five-11.vercel.app was improperly allowed');
+    }
+
+    // Test 4: https://in-five-11.vercel.app (production HTTPS) must be accepted
     const prodCorsRes = await fetch(`${BASE}/health`, {
       headers: { Origin: 'https://in-five-11.vercel.app' }
     });
@@ -47,14 +80,16 @@ const runTests = async () => {
       throw new Error('CORS Failure: https://in-five-11.vercel.app was rejected');
     }
 
-    // Test: Project Vercel preview domain pattern must be accepted
-    const previewCorsRes = await fetch(`${BASE}/health`, {
-      headers: { Origin: 'https://in-five-11-git-feat.vercel.app' }
-    });
-    if (previewCorsRes.headers.get('access-control-allow-origin') !== 'https://in-five-11-git-feat.vercel.app') {
-      throw new Error('CORS Failure: https://in-five-11-git-feat.vercel.app preview was rejected');
+    // Test 5: Pinned VERCEL_TEAM_SLUG preview origin matching
+    const teamSlug = 'deepakteam';
+    if (!isOriginAllowed(`https://in-five-11-preview-${teamSlug}.vercel.app`, teamSlug)) {
+      throw new Error('CORS Failure: Team preview URL was rejected');
     }
-    console.log('✓ CORS Whitelist: PASSED (evil.vercel.app rejected, in-five-11 accepted)');
+    if (isOriginAllowed('https://in-five-11-evil.vercel.app', teamSlug)) {
+      throw new Error('CORS Failure: Fake preview URL was accepted when team slug was pinned');
+    }
+
+    console.log('✓ CORS Whitelist: PASSED (evil and insecure origins rejected, in-five-11 and team preview accepted)');
 
     // 2. Music Home feed (including Film Gaana category via mock provider)
     const homeRes = await fetch(`${BASE}/music/home`).then((r) => r.json());
@@ -369,7 +404,25 @@ const runTests = async () => {
     if (oversizedRes.status !== 413) {
       throw new Error(`Expected 413 Payload Too Large for >1MB payload, got ${oversizedRes.status}`);
     }
-    console.log('✓ Input Validation & Zod Advisory Reachability: PASSED (Invalid Email/Password 400, >1MB Payload 413 before Zod)');
+
+    // Test E: Deeply nested JSON payload under 1MB
+    let nestedObj = {};
+    let pointer = nestedObj;
+    for (let i = 0; i < 300; i++) {
+      pointer.nested = {};
+      pointer = pointer.nested;
+    }
+    pointer.email = 'not-an-email';
+    pointer.password = '123';
+    const nestedRes = await fetch(`${BASE}/auth/register`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(nestedObj)
+    });
+    if (nestedRes.status !== 400) {
+      throw new Error(`Expected 400 validation error on deeply nested payload, got ${nestedRes.status}`);
+    }
+    console.log('✓ Input Validation & Zod Advisory Reachability: PASSED (Invalid Email/Password 400, >1MB Payload 413, Deeply Nested <1MB 400)');
 
     // =========================================================================
     // 15. NEW TEST SUITE: Table-Driven Tamil Filter Test (20 Sample Tracks)

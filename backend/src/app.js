@@ -38,16 +38,18 @@ const ALLOWED_ORIGINS = [
 
 const customOrigins = config.corsOrigin ? config.corsOrigin.split(',').map((o) => o.trim()) : [];
 
-// Allow project-specific Vercel preview URLs (e.g. in-five-11-*.vercel.app) or custom regex from env
-const defaultPreviewRegex = /^https:\/\/in-five-11(?:-[a-zA-Z0-9_-]+)?\.vercel\.app$/;
-const previewRegex = process.env.ALLOWED_PREVIEW_REGEX
-  ? new RegExp(process.env.ALLOWED_PREVIEW_REGEX)
-  : defaultPreviewRegex;
+// Build preview regex strictly from VERCEL_TEAM_SLUG without guessing
+export const getPreviewRegex = (teamSlug = config.vercelTeamSlug) => {
+  if (!teamSlug) return null;
+  const escapedSlug = teamSlug.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+  return new RegExp(`^https:\\/\\/in-five-11(?:-[a-zA-Z0-9_-]+)?-${escapedSlug}\\.vercel\\.app$`);
+};
 
-export const isOriginAllowed = (origin) => {
+export const isOriginAllowed = (origin, teamSlug = config.vercelTeamSlug) => {
   if (!origin) return true; // Server-to-server, curl, mobile native
   if (ALLOWED_ORIGINS.includes(origin)) return true;
   if (customOrigins.includes(origin)) return true;
+  const previewRegex = getPreviewRegex(teamSlug);
   if (previewRegex && previewRegex.test(origin)) return true;
   return false;
 };
