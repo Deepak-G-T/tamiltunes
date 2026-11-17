@@ -76,6 +76,7 @@ model Playlist {
   user  User           @relation(fields: [userId], references: [id], onDelete: Cascade)
   songs PlaylistSong[]
 
+  @@index([userId])
   @@map("playlists")
 }
 
@@ -90,6 +91,8 @@ model PlaylistSong {
   song     Song     @relation(fields: [songId], references: [id], onDelete: Cascade)
 
   @@unique([playlistId, songId])
+  @@index([playlistId])
+  @@index([songId])
   @@map("playlist_songs")
 }
 
@@ -103,17 +106,24 @@ model Favorite {
   song Song @relation(fields: [songId], references: [id], onDelete: Cascade)
 
   @@unique([userId, songId])
+  @@index([userId])
+  @@index([songId])
   @@map("favorites")
 }
 
 model ListeningHistory {
-  id       String   @id @default(uuid())
-  userId   String
-  songId   String
-  playedAt DateTime @default(now())
+  id        String   @id @default(uuid())
+  userId    String
+  songId    String
+  playedAt  DateTime @default(now())
+  createdAt DateTime @default(now())
 
   user User @relation(fields: [userId], references: [id], onDelete: Cascade)
   song Song @relation(fields: [songId], references: [id], onDelete: Cascade)
 
+  @@index([userId])
+  @@index([songId])
+  @@index([userId, playedAt(sort: Desc)])
+  @@index([userId, createdAt(sort: Desc)])
   @@map("listening_history")
 }

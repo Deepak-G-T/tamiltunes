@@ -248,11 +248,24 @@ Use any managed PostgreSQL provider (e.g., [Render PostgreSQL](https://render.co
    npm run prisma:deploy --prefix backend
    # or: npx prisma migrate deploy
    ```
-4. **For existing databases previously created with `db push`**:
-   Run the one-time baseline step to record the initial migration as applied:
-   ```bash
-   npm run db:baseline --prefix backend
-   # or: npx prisma migrate resolve --applied 20261117000000_init
+4. **For existing databases previously created with `db push` (Baseline)**:
+   Run the one-time baseline step to record the initial migration as applied without data loss.
+
+   **Windows PowerShell steps (against Render external database URL):**
+   ```powershell
+   # 1. Navigate to backend directory
+   cd f:\project\project\backend
+
+   # 2. Set the external database connection string from Render Dashboard (External Database URL)
+   $env:DATABASE_URL="postgresql://tamiltunes_user:YOUR_PASSWORD@dpg-xxxx-a.oregon-postgres.render.com/tamiltunes?sslmode=require"
+
+   # 3. Mark the initial migration as applied
+   npm run db:baseline
+   # Under the hood: npx prisma migrate resolve --applied 20261117000000_init
+
+   # 4. Deploy any subsequent migrations (e.g. indexes)
+   npm run prisma:deploy
+   # Under the hood: npx prisma migrate deploy
    ```
 5. **Optional Catalog Seeding**:
    Seeding is completely idempotent (`upsert`) and executed on-demand:

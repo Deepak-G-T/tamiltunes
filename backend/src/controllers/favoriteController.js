@@ -13,15 +13,25 @@ export const favoriteSchema = z.object({
 
 export const getFavorites = async (req, res, next) => {
   try {
+    const limit = Math.min(Math.max(parseInt(req.query.limit, 10) || 50, 1), 100);
+    const offset = Math.max(parseInt(req.query.offset, 10) || 0, 0);
+
     const favorites = await db.favorite.findMany({
       where: { userId: req.user.id },
       include: { song: true },
-      orderBy: { createdAt: 'desc' }
+      orderBy: { createdAt: 'desc' },
+      take: limit,
+      skip: offset
     });
 
     res.json({
       success: true,
-      favorites
+      favorites,
+      pagination: {
+        limit,
+        offset,
+        count: favorites.length
+      }
     });
   } catch (err) {
     next(err);

@@ -23,6 +23,9 @@ export const addSongSchema = z.object({
 
 export const getPlaylists = async (req, res, next) => {
   try {
+    const limit = Math.min(Math.max(parseInt(req.query.limit, 10) || 50, 1), 100);
+    const offset = Math.max(parseInt(req.query.offset, 10) || 0, 0);
+
     const playlists = await db.playlist.findMany({
       where: { userId: req.user.id },
       include: {
@@ -30,12 +33,19 @@ export const getPlaylists = async (req, res, next) => {
           include: { song: true }
         }
       },
-      orderBy: { createdAt: 'desc' }
+      orderBy: { createdAt: 'desc' },
+      take: limit,
+      skip: offset
     });
 
     res.json({
       success: true,
-      playlists
+      playlists,
+      pagination: {
+        limit,
+        offset,
+        count: playlists.length
+      }
     });
   } catch (err) {
     next(err);

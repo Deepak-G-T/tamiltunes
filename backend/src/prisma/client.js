@@ -65,8 +65,11 @@ class InMemoryDb {
   };
 
   playlist = {
-    findMany: async ({ where, include, orderBy }) => {
+    findMany: async ({ where, include, orderBy, take, skip }) => {
       let list = Array.from(this.playlists.values()).filter((p) => p.userId === where.userId);
+      const start = skip || 0;
+      const end = take !== undefined ? start + take : undefined;
+      list = list.slice(start, end);
       if (include?.songs) {
         list = list.map((p) => {
           const songs = Array.from(this.playlistSongs.values())
@@ -141,8 +144,11 @@ class InMemoryDb {
   };
 
   favorite = {
-    findMany: async ({ where, include, orderBy }) => {
+    findMany: async ({ where, include, orderBy, take, skip }) => {
       let list = Array.from(this.favorites.values()).filter((f) => f.userId === where.userId);
+      const start = skip || 0;
+      const end = take !== undefined ? start + take : undefined;
+      list = list.slice(start, end);
       return list.map((f) => ({
         ...f,
         song: this.songs.get(f.songId) || { id: f.songId, title: 'Tamil Song' }
@@ -171,12 +177,14 @@ class InMemoryDb {
   };
 
   listeningHistory = {
-    findMany: async ({ where, include, orderBy, take }) => {
+    findMany: async ({ where, include, orderBy, take, skip }) => {
       let list = this._historyItems
         .filter((h) => h.userId === where.userId)
         .slice()
-        .reverse()
-        .slice(0, take || 50);
+        .reverse();
+      const start = skip || 0;
+      const end = take !== undefined ? start + take : undefined;
+      list = list.slice(start, end);
       return list.map((h) => ({
         ...h,
         song: this.songs.get(h.songId) || { id: h.songId, title: 'Tamil Song' }
