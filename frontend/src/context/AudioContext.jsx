@@ -18,6 +18,7 @@ export const AudioProvider = ({ children }) => {
 
   const [currentSong, setCurrentSong] = useState(null);
   const [isPlaying, setIsPlaying] = useState(false);
+  const isPlayingRef = useRef(false);
   const [currentTime, setCurrentTime] = useState(0);
   const [duration, setDuration] = useState(0);
   const [volume, setVolumeState] = useState(() => {
@@ -64,6 +65,10 @@ export const AudioProvider = ({ children }) => {
 
   // Helper to extract video ID if missing from song object (videoId, youtubeId or embed URL)
   const getYouTubeVideoId = useCallback((song) => getVideoId(song), []);
+
+  useEffect(() => {
+    isPlayingRef.current = isPlaying;
+  }, [isPlaying]);
 
   const showToast = useCallback((message) => setToast({ id: Date.now(), message }), []);
   useEffect(() => {
@@ -420,8 +425,9 @@ export const AudioProvider = ({ children }) => {
     else audio.addEventListener('loadedmetadata', apply, { once: true });
   };
 
-  // Switch between Audio and Video. Both engines are stopped first, the new one is only
-  // PREPARED at the same position, and playback waits for a user tap (no silent autoplay).
+  // Switch between Audio and Video. Both engines are stopped first, then ONLY the new one is started at the
+  // same position, and only if the song was playing (the tap on the toggle is the user action). A paused song
+  // stays paused.
   const switchPlaybackMode = (target) => {
     const song = currentSongRef.current;
     const plan = planSwitch({
@@ -432,25 +438,34 @@ export const AudioProvider = ({ children }) => {
     });
     if (!plan.ok) return false;
 
+    const wasPlaying = isPlayingRef.current;
     const t = Math.max(0, getActiveTime());
-    playRequestIdRef.current += 1; // invalidate any in-flight audio play request
+    const requestId = (playRequestIdRef.current += 1); // invalidate any in-flight audio play request
     audioRef.current.pause();
     ytPlayerRef.current?.pause();
 
     playbackModeRef.current = target;
     setPlaybackModeState(target);
-    setIsPlaying(false);
-    setIsBuffering(false);
+    setIsPlaying(wasPlaying);
+    setIsBuffering(wasPlaying);
     setPlaybackError(null);
     setCurrentTime(t);
 
     if (target === 'video') {
-      ytPlayerRef.current?.loadVideo(getVideoId(song), false, t); // cue only
+      // autoplay only if it was playing; otherwise just cue at the same position
+      ytPlayerRef.current?.loadVideo(getVideoId(song), wasPlaying, t);
       ytPlayerRef.current?.setVolume(isMuted ? 0 : volume);
       setDuration(song.duration || duration || 0);
     } else {
       seekAudioWhenReady(t);
       setDuration(audioRef.current.duration || song.duration || duration || 0);
+      if (wasPlaying) {
+        safeAudioPlay(audioRef.current, requestId).catch((err) => {
+          console.warn('Could not resume audio after switching mode:', err.message);
+          setIsPlaying(false);
+          setIsBuffering(false);
+        });
+      }
     }
     return true;
   };
@@ -462,18 +477,29 @@ export const AudioProvider = ({ children }) => {
     const plan = planEmbedError({ song, code: event?.data });
     if (plan.action === 'fallback-audio') {
       // Embedding blocked (101/150): remember it, go back to audio at the same position, tell the user.
+      // If it was playing, audio resumes automatically (best effort: a browser may refuse without a tap).
+      const wasPlaying = isPlayingRef.current;
       const t = Math.max(0, ytPlayerRef.current?.getCurrentTime() || 0);
-      playRequestIdRef.current += 1; // invalidate any in-flight play request
+      const requestId = (playRequestIdRef.current += 1); // invalidate any in-flight play request
       ytPlayerRef.current?.pause();
       unavailableVideosRef.current.add(plan.videoId);
       setUnavailableVersion((v) => v + 1);
       playbackModeRef.current = 'audio';
       setPlaybackModeState('audio');
-      setIsPlaying(false);
-      setIsBuffering(false);
+      setIsPlaying(wasPlaying);
+      setIsBuffering(wasPlaying);
       setCurrentTime(t);
       seekAudioWhenReady(t);
-      showToast('This video can’t be played here. Switched to audio — tap play to continue.');
+      if (wasPlaying) {
+        showToast('This video can’t be played here. Switched back to audio.');
+        safeAudioPlay(audioRef.current, requestId).catch(() => {
+          setIsPlaying(false);
+          setIsBuffering(false);
+          showToast('This video can’t be played here. Switched to audio: tap play to continue.');
+        });
+      } else {
+        showToast('This video can’t be played here. Switched to audio.');
+      }
       return;
     }
 

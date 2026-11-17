@@ -41,10 +41,10 @@ describe('engine selection', () => {
 });
 
 describe('mode switching', () => {
-  it('allows audio -> video and never autoplays', () =>
-    expect(planSwitch({ song: jioVideo, currentMode: 'audio', targetMode: 'video' })).toEqual({ ok: true, autoplay: false }));
-  it('allows video -> audio and never autoplays', () =>
-    expect(planSwitch({ song: jioVideo, currentMode: 'video', targetMode: 'audio' })).toEqual({ ok: true, autoplay: false }));
+  it('allows audio -> video', () =>
+    expect(planSwitch({ song: jioVideo, currentMode: 'audio', targetMode: 'video' })).toEqual({ ok: true }));
+  it('allows video -> audio', () =>
+    expect(planSwitch({ song: jioVideo, currentMode: 'video', targetMode: 'audio' })).toEqual({ ok: true }));
   it('refuses a no-op switch', () =>
     expect(planSwitch({ song: jioVideo, currentMode: 'audio', targetMode: 'audio' }).ok).toBe(false));
   it('refuses video when no videoId', () =>

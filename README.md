@@ -325,7 +325,7 @@ Use any managed PostgreSQL provider (e.g., [Render PostgreSQL](https://render.co
 
 Songs can carry an optional `videoId`. When present (and the song also has an audio stream), the player shows an
 **Audio / Video** toggle. Video plays through the YouTube IFrame player, kept visible at 200×200 or larger; switching
-keeps the position and waits for a tap to play. If YouTube refuses to embed (errors 101/150) the player falls back to
+keeps the position, and keeps playing if the song was playing (a paused song stays paused). If YouTube refuses to embed (errors 101/150) the player falls back to
 audio with a toast.
 
 `videoId` comes from a curated map (`backend/src/services/music/curatedVideos.js`) and, **only if you opt in**, from a

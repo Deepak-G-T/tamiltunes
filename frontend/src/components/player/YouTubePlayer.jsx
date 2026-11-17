@@ -105,9 +105,10 @@ const YouTubePlayer = forwardRef(({
         events: {
           onReady: (event) => {
             isReadyRef.current = true;
-            window.__ytPlayerInstance = event.target;
-            if (autoPlay && typeof event.target.playVideo === 'function') {
-              event.target.playVideo();
+            const target = event?.target || playerRef.current; // the API passes the player as event.target
+            window.__ytPlayerInstance = target;
+            if (autoPlay && target && typeof target.playVideo === 'function') {
+              target.playVideo();
             }
             if (pendingRef.current) {
               const { videoId, autoPlay: pendingAutoPlay, startSeconds: pendingStart } = pendingRef.current;

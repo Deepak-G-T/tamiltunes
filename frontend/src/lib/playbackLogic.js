@@ -42,13 +42,14 @@ export const engineFor = (song, mode = 'audio', unavailable = new Set()) => {
 
 export const isFatalEmbedError = (code) => code === 101 || code === 150;
 
-// Decide whether a mode switch is allowed. A switch never autoplays (caller must wait for a tap).
+// Decide whether a mode switch is allowed. Whether to keep playing is decided by the caller (it continues
+// only if the song was playing).
 export const planSwitch = ({ song, currentMode, targetMode, unavailable = new Set() }) => {
   if (!song) return { ok: false, reason: 'no-song' };
   if (currentMode === targetMode) return { ok: false, reason: 'same-mode' };
   if (targetMode === 'video' && !canToggleVideo(song, unavailable)) return { ok: false, reason: 'no-video' };
   if (targetMode === 'audio' && !hasAudioStream(song)) return { ok: false, reason: 'no-audio' };
-  return { ok: true, autoplay: false };
+  return { ok: true };
 };
 
 // YouTube IFrame error handling: 101/150 mean "embedding disabled by owner".
