@@ -63,11 +63,11 @@ const FullScreenPlayer = ({ isOpen, onClose, onToggleFavorite, isFavorite }) => 
   const content = (
     <div
       style={{ zIndex: 99999 }}
-      className="fixed inset-0 bg-black flex flex-col justify-between p-4 sm:p-8 select-none overflow-y-auto animate-in fade-in duration-200"
+      className="fixed inset-0 bg-black bg-gradient-to-b from-brand-900 via-black to-black flex flex-col justify-between p-4 sm:p-8 select-none overflow-y-auto animate-in fade-in duration-200"
     >
       {/* Blurred ambient background effect */}
       <div
-        className="fixed inset-0 opacity-25 filter blur-3xl pointer-events-none scale-125"
+        className="fixed inset-0 opacity-20 filter blur-3xl pointer-events-none scale-125"
         style={{
           backgroundImage: `url(${currentSong.image || MUSIC_COVER_FALLBACK})`,
           backgroundPosition: 'center',
@@ -110,7 +110,7 @@ const FullScreenPlayer = ({ isOpen, onClose, onToggleFavorite, isFavorite }) => 
           <VideoSlot className="w-full aspect-video mb-6 shadow-2xl border border-zinc-800/80" />
         )}
         {activeEngine !== 'youtube' && (
-        <div className="relative w-56 h-56 xs:w-64 xs:h-64 sm:w-80 sm:h-80 rounded-2xl overflow-hidden shadow-2xl border border-zinc-800/80 mb-6 group bg-zinc-900">
+        <div className="relative w-60 h-60 sm:w-80 sm:h-80 rounded-lg overflow-hidden shadow-[0_24px_64px_rgba(0,0,0,0.7)] mb-6 group bg-surface-3">
           <img
             src={currentSong.image || MUSIC_COVER_FALLBACK}
             alt={currentSong.title}
@@ -136,7 +136,7 @@ const FullScreenPlayer = ({ isOpen, onClose, onToggleFavorite, isFavorite }) => 
         {/* Title, Artist, & Favorite */}
         <div className="w-full flex items-center justify-between mb-3 px-1">
           <div className="min-w-0 flex-1 mr-3">
-            <h2 className="text-xl sm:text-2xl font-bold text-white truncate tracking-tight">
+            <h2 className="text-2xl sm:text-3xl font-extrabold text-white truncate tracking-tight">
               {currentSong.title}
             </h2>
             <p className="text-sm font-medium text-zinc-400 truncate mt-1">
@@ -164,7 +164,7 @@ const FullScreenPlayer = ({ isOpen, onClose, onToggleFavorite, isFavorite }) => 
 
         {/* License Notice / Stream Status Badge */}
         <div className="w-full mb-3 px-1">
-          <div className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-zinc-900/80 border border-zinc-800 text-[11px] text-zinc-400">
+          <div className="flex items-center gap-1.5 text-[11px] text-zinc-500">
             <ShieldCheck className="w-3.5 h-3.5 text-emerald-400 flex-shrink-0" />
             <span className="truncate">
               {currentSong.licenseNotice || '320kbps CD Quality Audio • Direct Tamil Stream'}
@@ -213,7 +213,7 @@ const FullScreenPlayer = ({ isOpen, onClose, onToggleFavorite, isFavorite }) => 
             aria-label={isPlaying ? 'Pause' : 'Play'}
             data-testid="fs-play"
             aria-label={isPlaying ? 'Pause' : 'Play'}
-            className="w-16 h-16 rounded-full bg-brand-500 hover:bg-brand-400 text-black flex items-center justify-center shadow-lg shadow-brand-600/40 hover:scale-105 active:scale-95 focus-visible:ring-2 focus-visible:ring-brand-400 focus-visible:outline-none transition-all"
+            className="w-16 h-16 rounded-full bg-white hover:bg-zinc-100 text-black flex items-center justify-center shadow-lg hover:scale-105 active:scale-95 focus-visible:ring-2 focus-visible:ring-white focus-visible:outline-none transition-all"
           >
             {isPlaying ? <Pause className="w-7 h-7" /> : <Play className="w-7 h-7 ml-1" />}
           </button>

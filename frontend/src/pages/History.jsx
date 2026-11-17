@@ -104,7 +104,7 @@ const History = () => {
         </p>
         <button
           onClick={() => navigate('/login')}
-          className="px-6 py-2.5 rounded-full bg-brand-500 hover:bg-brand-400 text-black text-xs font-bold shadow-lg transition-all"
+          className="px-8 py-3 rounded-full bg-brand-500 hover:bg-brand-400 text-black text-sm font-bold shadow-lg transition-all"
         >
           Sign In
         </button>
@@ -125,7 +125,7 @@ const History = () => {
 
   return (
     <div className="space-y-6 animate-in fade-in duration-300">
-      <div className="flex items-center justify-between pb-3 border-b border-zinc-800">
+      <div className="flex items-center justify-between pb-3 border-b border-white/10">
         <div className="flex items-center gap-2.5">
           <HistoryIcon className="w-6 h-6 text-sky-400" />
           <h1 className="text-2xl font-bold text-white tracking-tight">Listening History</h1>

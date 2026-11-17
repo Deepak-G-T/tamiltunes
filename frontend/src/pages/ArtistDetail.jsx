@@ -102,7 +102,7 @@ const ArtistDetail = () => {
         </div>
 
         <div className="flex-1 text-center sm:text-left space-y-2">
-          <span className="text-[11px] font-bold uppercase tracking-widest text-brand-400">
+          <span className="text-xs font-bold text-white">
             Verified Tamil Artist
           </span>
           <h1 className="text-3xl sm:text-5xl font-black text-white tracking-tight">
@@ -115,7 +115,7 @@ const ArtistDetail = () => {
           <div className="pt-2">
             <button
               onClick={handlePlayTopTracks}
-              className="px-6 py-2.5 rounded-full bg-brand-500 hover:bg-brand-400 text-black text-xs font-bold flex items-center gap-2 shadow-lg shadow-brand-600/30 hover:scale-105 active:scale-95 transition-all mx-auto sm:mx-0"
+              className="px-8 py-3 rounded-full bg-brand-500 hover:bg-brand-400 text-black text-sm font-bold flex items-center gap-2 shadow-lg shadow-brand-600/30 hover:scale-105 active:scale-95 transition-all mx-auto sm:mx-0"
             >
               <Play className="w-4 h-4 fill-black" />
               <span>Play Popular Tracks</span>

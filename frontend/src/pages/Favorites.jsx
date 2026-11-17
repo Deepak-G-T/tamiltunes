@@ -103,7 +103,7 @@ const Favorites = () => {
         </p>
         <button
           onClick={() => navigate('/login')}
-          className="px-6 py-2.5 rounded-full bg-brand-500 hover:bg-brand-400 text-black text-xs font-bold shadow-lg transition-all"
+          className="px-8 py-3 rounded-full bg-brand-500 hover:bg-brand-400 text-black text-sm font-bold shadow-lg transition-all"
         >
           Sign In
         </button>
@@ -126,7 +126,7 @@ const Favorites = () => {
     <div className="space-y-8 animate-in fade-in duration-300">
       {/* Header */}
       <div className="flex flex-col md:flex-row items-center md:items-end gap-6 bg-gradient-to-b from-rose-950/40 via-brand-950/30 to-zinc-900/40 p-6 rounded-2xl border border-zinc-800/60 shadow-xl">
-        <div className="w-40 h-40 sm:w-48 sm:h-48 rounded-xl overflow-hidden shadow-2xl flex-shrink-0 bg-gradient-to-tr from-rose-600 to-brand-600 flex items-center justify-center">
+        <div className="w-40 h-40 sm:w-48 sm:h-48 rounded-md overflow-hidden shadow-[0_16px_48px_rgba(0,0,0,0.6)] flex-shrink-0 bg-gradient-to-tr from-rose-600 to-brand-600 flex items-center justify-center">
           <Heart className="w-20 h-20 text-white fill-white" />
         </div>
 
@@ -145,7 +145,7 @@ const Favorites = () => {
             <div className="pt-2">
               <button
                 onClick={handlePlayAll}
-                className="px-6 py-2.5 rounded-full bg-brand-500 hover:bg-brand-400 text-black text-xs font-bold flex items-center gap-2 shadow-lg shadow-brand-600/30 hover:scale-105 active:scale-95 transition-all mx-auto md:mx-0"
+                className="px-8 py-3 rounded-full bg-brand-500 hover:bg-brand-400 text-black text-sm font-bold flex items-center gap-2 shadow-lg shadow-brand-600/30 hover:scale-105 active:scale-95 transition-all mx-auto md:mx-0"
               >
                 <Play className="w-4 h-4 fill-black" />
                 <span>Play All Favourites</span>
@@ -157,7 +157,7 @@ const Favorites = () => {
 
       {/* Songs Table */}
       <div className="space-y-1">
-        <div className="grid grid-cols-12 px-4 py-2 text-[11px] uppercase tracking-wider font-semibold text-zinc-500 border-b border-zinc-800">
+        <div className="grid grid-cols-12 px-4 py-2 text-[11px] uppercase tracking-wider font-semibold text-zinc-500 border-b border-white/10">
           <div className="col-span-1">#</div>
           <div className="col-span-6 sm:col-span-7">Title</div>
           <div className="col-span-3 sm:col-span-2 hidden sm:block">Album</div>
@@ -180,8 +180,8 @@ const Favorites = () => {
               <div
                 key={fav.id || idx}
                 onClick={() => playSong(song, songsList)}
-                className={`grid grid-cols-12 items-center px-4 py-3 rounded-lg hover:bg-zinc-800/50 cursor-pointer group transition-colors ${
-                  isThisSong ? 'bg-brand-500/10 text-brand-400' : 'text-zinc-300'
+                className={`grid grid-cols-12 items-center px-4 py-3 rounded-md hover:bg-white/10 cursor-pointer group transition-colors ${
+                  isThisSong ? 'bg-white/10 text-brand-400' : 'text-zinc-300'
                 }`}
               >
                 <div className="col-span-1 text-xs text-zinc-500 group-hover:hidden">

@@ -31,7 +31,7 @@ const MiniPlayer = () => {
   return (
     <div className="md:hidden fixed bottom-16 left-0 right-0 z-40 px-2 pb-1 pointer-events-auto">
       <div
-        className="bg-surface-2/95 backdrop-blur-md rounded-xl p-2.5 border border-zinc-800/80 shadow-2xl flex items-center justify-between cursor-pointer active:scale-[0.98] transition-transform select-none touch-manipulation"
+        className="bg-surface-4 rounded-lg p-2 shadow-[0_8px_24px_rgba(0,0,0,0.5)] flex items-center justify-between cursor-pointer active:scale-[0.98] transition-transform select-none touch-manipulation"
         onClick={handleOpenFull}
         role="button"
         tabIndex={0}
@@ -47,7 +47,7 @@ const MiniPlayer = () => {
               e.currentTarget.onerror = null;
               e.currentTarget.src = MUSIC_COVER_FALLBACK;
             }}
-            className="w-10 h-10 rounded-lg object-cover flex-shrink-0 bg-zinc-900"
+            className="w-10 h-10 rounded object-cover flex-shrink-0 bg-surface-3"
           />
           <div className="min-w-0 flex-1">
             <h4 className="text-xs font-semibold text-white truncate">
@@ -64,7 +64,7 @@ const MiniPlayer = () => {
           <VideoModeToggle compact />
           <button
             onClick={togglePlay}
-            className="w-9 h-9 rounded-full bg-brand-500 hover:bg-brand-400 text-black flex items-center justify-center shadow-md active:scale-90 transition-transform"
+            className="w-9 h-9 rounded-full bg-white hover:bg-zinc-100 text-black flex items-center justify-center shadow-md active:scale-90 transition-transform"
             aria-label={isPlaying ? 'Pause' : 'Play'}
           >
             {isBuffering ? (
@@ -96,9 +96,9 @@ const MiniPlayer = () => {
       </div>
 
       {/* Mini bottom progress bar */}
-      <div className="w-full h-0.5 bg-zinc-800 rounded-full overflow-hidden mt-0.5">
+      <div className="w-full h-0.5 bg-white/20 rounded-full overflow-hidden mt-0.5">
         <div
-          className="h-full bg-brand-500 transition-all duration-100"
+          className="h-full bg-white transition-all duration-100"
           style={{ width: `${progressPercent}%` }}
         />
       </div>

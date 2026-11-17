@@ -99,8 +99,8 @@ const AlbumDetail = () => {
       </button>
 
       {/* Album Header */}
-      <div className="flex flex-col md:flex-row items-center md:items-end gap-6 bg-gradient-to-b from-brand-900/30 to-transparent p-6 rounded-2xl border border-zinc-800/60">
-        <div className="w-44 h-44 sm:w-52 sm:h-52 rounded-xl overflow-hidden shadow-2xl flex-shrink-0 bg-zinc-800">
+      <div className="flex flex-col md:flex-row items-center md:items-end gap-6 pt-2 pb-2">
+        <div className="w-44 h-44 sm:w-52 sm:h-52 rounded-md overflow-hidden shadow-[0_16px_48px_rgba(0,0,0,0.6)] flex-shrink-0 bg-zinc-800">
           <img
             src={album.image || 'https://images.unsplash.com/photo-1514525253161-7a46d19cd819?w=500&auto=format&fit=crop&q=80'}
             alt={album.name || album.title}
@@ -114,10 +114,10 @@ const AlbumDetail = () => {
         </div>
 
         <div className="flex-1 text-center md:text-left space-y-2">
-          <span className="text-[11px] font-bold uppercase tracking-widest text-brand-400">
+          <span className="text-xs font-bold text-white">
             Tamil Album
           </span>
-          <h1 className="text-2xl sm:text-4xl font-extrabold text-white tracking-tight">
+          <h1 className="text-3xl sm:text-6xl font-black text-white tracking-tight leading-tight">
             {album.name || album.title}
           </h1>
           <p className="text-sm text-zinc-300 font-medium">
@@ -130,7 +130,7 @@ const AlbumDetail = () => {
           <div className="pt-2">
             <button
               onClick={handlePlayAlbum}
-              className="px-6 py-2.5 rounded-full bg-brand-500 hover:bg-brand-400 text-black text-xs font-bold flex items-center gap-2 shadow-lg shadow-brand-600/30 hover:scale-105 active:scale-95 transition-all mx-auto md:mx-0"
+              className="px-8 py-3 rounded-full bg-brand-500 hover:bg-brand-400 text-black text-sm font-bold flex items-center gap-2 shadow-lg shadow-brand-600/30 hover:scale-105 active:scale-95 transition-all mx-auto md:mx-0"
             >
               {isCurrentAlbumPlaying ? (
                 <>
@@ -150,7 +150,7 @@ const AlbumDetail = () => {
 
       {/* Tracklist Table */}
       <div className="space-y-1">
-        <div className="grid grid-cols-12 px-4 py-2 text-[11px] uppercase tracking-wider font-semibold text-zinc-500 border-b border-zinc-800">
+        <div className="grid grid-cols-12 px-4 py-2 text-[11px] uppercase tracking-wider font-semibold text-zinc-500 border-b border-white/10">
           <div className="col-span-1">#</div>
           <div className="col-span-6 sm:col-span-7">Title</div>
           <div className="col-span-3 sm:col-span-2 hidden sm:block">Movie / Album</div>
@@ -166,8 +166,8 @@ const AlbumDetail = () => {
             <div
               key={song.id || idx}
               onClick={() => playSong(song, album.songs)}
-              className={`grid grid-cols-12 items-center px-4 py-3 rounded-lg hover:bg-zinc-800/50 cursor-pointer group transition-colors ${
-                isThisSong ? 'bg-brand-500/10 text-brand-400' : 'text-zinc-300'
+              className={`grid grid-cols-12 items-center px-4 py-3 rounded-md hover:bg-white/10 cursor-pointer group transition-colors ${
+                isThisSong ? 'bg-white/10 text-brand-400' : 'text-zinc-300'
               }`}
             >
               <div className="col-span-1 text-xs text-zinc-500 group-hover:hidden">
