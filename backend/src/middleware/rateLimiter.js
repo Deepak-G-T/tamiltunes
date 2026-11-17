@@ -33,3 +33,33 @@ export const songLimiter = rateLimit({
     message: 'Too many song lookups, please slow down'
   }
 });
+
+const perUser = ({ windowMs, max, message }) =>
+  rateLimit({
+    windowMs,
+    max,
+    standardHeaders: true,
+    legacyHeaders: false,
+    // Mount after requireAuth so the key is the account, not a shared NAT address.
+    keyGenerator: (req) => (req.user?.id ? `u:${req.user.id}` : `ip:${req.ip}`),
+    message: { success: false, message },
+  });
+
+// 5 new comments or replies per minute per account
+export const commentLimiter = perUser({
+  windowMs: 60 * 1000,
+  max: 5,
+  message: 'You are commenting too fast. Please wait a minute and try again.',
+});
+
+export const reportLimiter = perUser({
+  windowMs: 60 * 1000,
+  max: 10,
+  message: 'Too many reports, please slow down.',
+});
+
+export const usernameCheckLimiter = perUser({
+  windowMs: 60 * 1000,
+  max: 30,
+  message: 'Too many username checks, please slow down.',
+});
