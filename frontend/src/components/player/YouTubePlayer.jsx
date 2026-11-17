@@ -2,7 +2,8 @@ import React, { useEffect, useRef, useImperativeHandle, forwardRef } from 'react
 
 /**
  * YouTubePlayer Component
- * Uses the official YouTube IFrame Player API (hidden offscreen iframe)
+ * Uses the official YouTube IFrame Player API. The iframe is moved offscreen while the audio
+ * engine is active, and pinned over a registered <VideoSlot> (min 200x200, visible) while it plays.
  * Implements the exact same playback interface as HTML5 audio engine:
  * play, pause, seek, setVolume, mute, unMute, onTimeUpdate, onEnded, onPlaying, onPause, onBuffering.
  */
@@ -12,11 +13,13 @@ const YouTubePlayer = forwardRef(({
   onBuffering,
   onEnded,
   onTimeUpdate,
-  onError
+  onError,
+  rect = null
 }, ref) => {
   const playerRef = useRef(null);
   const isReadyRef = useRef(false);
   const progressTimerRef = useRef(null);
+  const pendingRef = useRef(null); // video requested before the iframe API was ready
 
   // Load YouTube IFrame API script once
   useEffect(() => {
@@ -56,8 +59,8 @@ const YouTubePlayer = forwardRef(({
 
     try {
       playerRef.current = new window.YT.Player('yt-player-iframe', {
-        height: '1',
-        width: '1',
+        height: '100%',
+        width: '100%',
         playerVars: {
           autoplay: 0,
           controls: 0,
@@ -69,8 +72,13 @@ const YouTubePlayer = forwardRef(({
           origin: window.location.origin
         },
         events: {
-          onReady: (event) => {
+          onReady: () => {
             isReadyRef.current = true;
+            if (pendingRef.current) {
+              const { videoId, autoPlay, startSeconds } = pendingRef.current;
+              pendingRef.current = null;
+              applyVideo(videoId, autoPlay, startSeconds);
+            }
           },
           onStateChange: (event) => {
             // YT.PlayerState: ENDED = 0, PLAYING = 1, PAUSED = 2, BUFFERING = 3, CUED = 5
@@ -98,6 +106,14 @@ const YouTubePlayer = forwardRef(({
     }
   };
 
+  const applyVideo = (videoId, autoPlay, startSeconds) => {
+    const player = playerRef.current;
+    if (!player) return;
+    const payload = { videoId, startSeconds: Math.max(0, Math.floor(startSeconds || 0)) };
+    if (autoPlay && typeof player.loadVideoById === 'function') player.loadVideoById(payload);
+    else if (typeof player.cueVideoById === 'function') player.cueVideoById(payload); // cue = no autoplay
+  };
+
   const startProgressTimer = () => {
     stopProgressTimer();
     progressTimerRef.current = setInterval(() => {
@@ -119,21 +135,12 @@ const YouTubePlayer = forwardRef(({
   };
 
   useImperativeHandle(ref, () => ({
-    loadVideo(videoId, autoPlay = true) {
+    loadVideo(videoId, autoPlay = true, startSeconds = 0) {
       if (!videoId) return;
-      if (playerRef.current && isReadyRef.current && typeof playerRef.current.loadVideoById === 'function') {
-        if (autoPlay) {
-          playerRef.current.loadVideoById(videoId);
-        } else {
-          playerRef.current.cueVideoById(videoId);
-        }
+      if (playerRef.current && isReadyRef.current) {
+        applyVideo(videoId, autoPlay, startSeconds);
       } else {
-        // Retry shortly once iframe finishes handshake
-        setTimeout(() => {
-          if (playerRef.current && typeof playerRef.current.loadVideoById === 'function') {
-            playerRef.current.loadVideoById(videoId);
-          }
-        }, 500);
+        pendingRef.current = { videoId, autoPlay, startSeconds };
       }
     },
     play() {
@@ -183,22 +190,39 @@ const YouTubePlayer = forwardRef(({
     }
   }));
 
-  return (
-    <div
-      id="yt-player-container"
-      style={{
+  // Visible: pinned over the registered slot. Otherwise parked offscreen (audio engine active).
+  const style = rect
+    ? {
         position: 'fixed',
-        bottom: -200,
-        right: -200,
-        width: 1,
-        height: 1,
+        top: rect.top,
+        left: rect.left,
+        width: Math.max(rect.width, 200),
+        height: Math.max(rect.height, 200),
+        zIndex: 100000,
+        overflow: 'hidden',
+        borderRadius: 12,
+        background: '#000'
+      }
+    : {
+        position: 'fixed',
+        bottom: -400,
+        right: -400,
+        width: 200,
+        height: 200,
         opacity: 0,
         pointerEvents: 'none',
         zIndex: -1
-      }}
-      aria-hidden="true"
+      };
+
+  return (
+    <div
+      id="yt-player-container"
+      data-testid="yt-player-container"
+      data-visible={rect ? 'true' : 'false'}
+      style={style}
+      aria-hidden={rect ? undefined : 'true'}
     >
-      <div id="yt-player-iframe" />
+      <div id="yt-player-iframe" style={{ width: '100%', height: '100%' }} />
     </div>
   );
 });

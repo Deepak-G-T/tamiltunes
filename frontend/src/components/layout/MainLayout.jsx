@@ -5,6 +5,7 @@ import TopNav from './TopNav';
 import MobileNav from './MobileNav';
 import MusicPlayer from '../player/MusicPlayer';
 import MiniPlayer from '../player/MiniPlayer';
+import VideoPanel from '../player/VideoPanel';
 import CreatePlaylistModal from '../modals/CreatePlaylistModal';
 import AddToPlaylistModal from '../modals/AddToPlaylistModal';
 
@@ -50,6 +51,9 @@ const MainLayout = () => {
             onOpenCreatePlaylist: () => setCreatePlaylistOpen(true)
           }} />
         </main>
+
+        {/* Visible video surface when the YouTube engine is active */}
+        <VideoPanel />
 
         {/* Mobile Mini Player */}
         <MiniPlayer />
