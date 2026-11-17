@@ -45,9 +45,17 @@ Songs may carry an optional `videoId`. It comes from the curated map `backend/sr
   (that route is limited to 30 requests/min per IP; `?fresh=1` stays open to guests for expired-stream recovery).
 - Curated entries are "oEmbed-verified by a previous agent, embeddability unverified"; the player falls back to audio
   with a toast on YouTube errors 101/150.
-- The curated map serves official *video songs*, not lyric videos. Entries marked `candidate` (older ids, lyric
-  videos) are kept in the file but never served. Served ids marked "found by web search" were matched by YouTube title
-  only (uploader and embeddability unverified): confirm each on a phone. Badass still uses its original id until a
-  confirmed video-song id is supplied (candidate seen: `ZdMZ40GSVmc`, "Leo - Badass Video").
+- The curated map serves official *video songs*, not lyric videos. Entries marked `candidate` (older ids, lyric videos)
+  are kept in the file but never served (e.g. Badass `IqwIOlhfCak` is titled "LEO - Badass Lyric"). All nine served ids
+  were checked by fetching the YouTube watch page and oEmbed endpoint: the uploader is an official channel, the title says
+  Video Song / Official Video, and oEmbed returned 200. That is not the Data API's `status.embeddable` flag, so
+  embeddability is still only likely. Badass is served from the VEVO upload `ZdMZ40GSVmc` ("Leo - Badass Video").
+- Official channels seen so far (ids copied from those pages; confirm before use). A starting point for
+  `VIDEO_CHANNEL_ALLOWLIST`:
+  `UCBnxEdpoZwstJqC1yZpOjRA` (Sun TV), `UCn4rEMqKtwBQ6-oEwbd4PcA` (Sony Music South),
+  `UCIx3RWYwikMlDiJeCEUbfEA` (Wunderbar Films), `UCTNtRdBAiZtHP9w7JinzfUg` (SonyMusicSouthVEVO).
+  Big channels upload constantly, so the default index (10 pages, newest ~500 uploads) may not reach older songs:
+  raise `VIDEO_INDEX_MAX_PAGES` (up to 40 = 2000 uploads, about 80 quota units per channel per day) and keep
+  `VIDEO_SEARCH_FALLBACK` on for songs the index misses.
 - The YouTube API lookup (when enabled) prefers titles with "Official Video"/"Video Song" and rejects lyric, audio,
   jukebox, teaser, live and similar uploads.

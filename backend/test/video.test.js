@@ -131,17 +131,17 @@ console.log('✓ non-embeddable / non-public / missing status rejected');
 // 8. curated map: matching rules, candidate not served, inputs not mutated
 {
   const v = createVideoLookup({ cfg: cfgWith({ youtubeApiKey: '' }) });
-  assert.equal(v.peek({ id: 'x', title: 'Badass (From "Leo")', artist: 'Anirudh Ravichander' }), 'IqwIOlhfCak');
+  assert.equal(v.peek({ id: 'x', title: 'Badass (From "Leo")', artist: 'Anirudh Ravichander' }), 'ZdMZ40GSVmc');
   assert.equal(v.peek({ id: 'x', title: 'Badass', artist: 'Some Random Band' }), undefined, 'title alone is not enough');
   assert.equal(v.peek({ id: 'x', title: 'Hukum - Thalaivar Alappara', artist: 'Anirudh' }), 'gB2zKZxESTg');
   // lyric-video ids and older conflicting ids stay in the file as candidates but are never served
-  for (const lyricId of ['1F3hm6MfR1k', '1F3HM635S0k', 'RVLNBVK8auM', 'szvt1vD0Uug', 'fRD_3vJagxk', 'xsbLtHql4g8']) {
+  for (const lyricId of ['1F3hm6MfR1k', '1F3HM635S0k', 'RVLNBVK8auM', 'szvt1vD0Uug', 'fRD_3vJagxk', 'xsbLtHql4g8', 'IqwIOlhfCak']) {
     assert.ok(CURATED_VIDEOS.some((e) => e.videoId === lyricId && e.candidate), `candidate kept: ${lyricId}`);
     assert.ok(!CURATED_VIDEOS.some((e) => e.videoId === lyricId && !e.candidate), `never served: ${lyricId}`);
   }
   assert.equal(CURATED_VIDEOS.filter((e) => !e.candidate).length, 9, '9 songs served');
-  assert.equal(CURATED_VIDEOS.filter((e) => e.candidate).length, 6, '6 candidates kept, not served');
-  assert.ok(CURATED_VIDEOS.every((e) => /embeddability unverified/.test(e.status)));
+  assert.equal(CURATED_VIDEOS.filter((e) => e.candidate).length, 7, '7 candidates kept, not served');
+  assert.ok(CURATED_VIDEOS.every((e) => typeof e.status === 'string' && /unverified/.test(e.status)), 'every entry states what is unverified');
   const input = Object.freeze({ id: 'x', title: 'Naa Ready', artist: 'Vijay' });
   const [out] = v.attach([input]);
   assert.equal(out.videoId, '5Qk6Xc2ZVkI');
@@ -349,25 +349,25 @@ try {
   const home = await fetch(`${BASE}/home`).then((r) => r.json());
   const badass = home.data.trending.find((s) => /badass/i.test(s.title));
   assert.ok(badass, 'mock home has Badass');
-  assert.equal(badass.videoId, 'IqwIOlhfCak');
+  assert.equal(badass.videoId, 'ZdMZ40GSVmc');
   assert.ok(badass.id && badass.title && badass.streamUrl, 'existing fields intact');
 
   const search = await fetch(`${BASE}/search?query=Badass`).then((r) => r.json());
-  assert.ok(search.data.songs.some((s) => s.videoId === 'IqwIOlhfCak'));
+  assert.ok(search.data.songs.some((s) => s.videoId === 'ZdMZ40GSVmc'));
 
   const one = await fetch(`${BASE}/song/${badass.id}`).then((r) => r.json());
   assert.equal(one.success, true);
-  assert.equal(one.data.videoId, 'IqwIOlhfCak'); // pre-existing response shape: { success, data }
+  assert.equal(one.data.videoId, 'ZdMZ40GSVmc'); // pre-existing response shape: { success, data }
   assert.equal(one.data.title, badass.title);
   const alias = await fetch(`${BASE}/songs/${badass.id}`).then((r) => r.json());
-  assert.equal(alias.data.videoId, 'IqwIOlhfCak');
+  assert.equal(alias.data.videoId, 'ZdMZ40GSVmc');
 
   assert.equal((await fetch(`${BASE}/song/does_not_exist`)).status, 404);
   assert.equal((await fetch(`${BASE}/song/${encodeURIComponent('a b/../c')}`)).status, 400);
   // fresh=1 keeps working for guests (expired-stream recovery); abuse is limited by songLimiter instead
   const fresh = await fetch(`${BASE}/song/${badass.id}?fresh=1`);
   assert.equal(fresh.status, 200);
-  assert.equal((await fresh.json()).data.videoId, 'IqwIOlhfCak');
+  assert.equal((await fresh.json()).data.videoId, 'ZdMZ40GSVmc');
   // cached feed objects must not have been mutated by enrichment
   const raw = await musicService.getHomeFeed();
   assert.equal(raw.trending.find((s) => /badass/i.test(s.title)).videoId, badass.source === 'youtube' ? badass.videoId : undefined);
