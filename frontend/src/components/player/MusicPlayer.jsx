@@ -21,7 +21,7 @@ import QueueDrawer from './QueueDrawer';
 import FullScreenPlayer from './FullScreenPlayer';
 import api from '../../services/api';
 
-const MUSIC_COVER_FALLBACK = "data:image/svg+xml;charset=UTF-8,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 300 300'%3E%3Cdefs%3E%3ClinearGradient id='bg' x1='0%25' y1='0%25' x2='100%25' y2='100%25'%3E%3Cstop offset='0%25' stop-color='%233b185f'/%3E%3Cstop offset='50%25' stop-color='%231f1338'/%3E%3Cstop offset='100%25' stop-color='%230f091f'/%3E%3C/linearGradient%3E%3C/defs%3E%3Crect width='300' height='300' rx='16' fill='url(%23bg)'/%3E%3Ccircle cx='150' cy='150' r='60' fill='%23a855f7' opacity='0.2'/%3E%3Cpath d='M135 180V120l50-14v54m-50 0a16 16 0 11-32 0 16 16 0 0132 0zm50-14a16 16 0 11-32 0 16 16 0 0132 0z' stroke='%23c084fc' stroke-width='6' fill='none' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E";
+const MUSIC_COVER_FALLBACK = "data:image/svg+xml;charset=UTF-8,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 300 300'%3E%3Cdefs%3E%3ClinearGradient id='bg' x1='0%25' y1='0%25' x2='100%25' y2='100%25'%3E%3Cstop offset='0%25' stop-color='%23143d24'/%3E%3Cstop offset='50%25' stop-color='%230f2a1a'/%3E%3Cstop offset='100%25' stop-color='%23071a10'/%3E%3C/linearGradient%3E%3C/defs%3E%3Crect width='300' height='300' rx='16' fill='url(%23bg)'/%3E%3Ccircle cx='150' cy='150' r='60' fill='%231db954' opacity='0.2'/%3E%3Cpath d='M135 180V120l50-14v54m-50 0a16 16 0 11-32 0 16 16 0 0132 0zm50-14a16 16 0 11-32 0 16 16 0 0132 0z' stroke='%236ee9a0' stroke-width='6' fill='none' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E";
 
 const MusicPlayer = () => {
   const {
@@ -102,7 +102,7 @@ const MusicPlayer = () => {
 
   if (!currentSong) {
     return (
-      <footer className="hidden md:flex h-20 bg-[#111114] border-t border-zinc-800/80 px-4 md:px-6 items-center justify-between text-zinc-500 text-xs">
+      <footer className="hidden md:flex h-20 bg-black px-4 md:px-6 items-center justify-between text-zinc-500 text-xs">
         <div className="flex items-center gap-3">
           <div className="w-12 h-12 rounded-lg bg-zinc-800/50 flex items-center justify-center">
             <ShieldCheck className="w-5 h-5 text-zinc-600" />
@@ -118,7 +118,7 @@ const MusicPlayer = () => {
 
   return (
     <>
-      <footer className="hidden md:flex h-22 bg-[#111114] border-t border-zinc-800/80 px-4 md:px-6 items-center justify-between select-none relative z-30">
+      <footer className="hidden md:flex h-22 bg-black px-4 md:px-6 items-center justify-between select-none relative z-30">
         {/* Left: Track Information */}
         <div className="flex items-center gap-3 w-1/4 min-w-[200px]">
           <div
@@ -169,7 +169,7 @@ const MusicPlayer = () => {
             onClick={() => toggleFavorite(currentSong)}
             title={isFavorite ? 'Remove from Favourites' : 'Add to Favourites'}
             aria-label={isFavorite ? 'Remove from Favourites' : 'Add to Favourites'}
-            className="p-2 rounded-full hover:bg-zinc-800/60 focus-visible:ring-2 focus-visible:ring-purple-500 focus-visible:outline-none transition-colors"
+            className="p-2 rounded-full hover:bg-zinc-800/60 focus-visible:ring-2 focus-visible:ring-brand-500 focus-visible:outline-none transition-colors"
           >
             <Heart
               className={`w-4 h-4 transition-colors ${
@@ -186,8 +186,8 @@ const MusicPlayer = () => {
               onClick={toggleShuffle}
               title={`Shuffle ${isShuffle ? 'On' : 'Off'}`}
               aria-label={`Shuffle ${isShuffle ? 'On' : 'Off'}`}
-              className={`p-1.5 rounded-full transition-colors focus-visible:ring-2 focus-visible:ring-purple-500 focus-visible:outline-none ${
-                isShuffle ? 'text-purple-400' : 'text-zinc-500 hover:text-zinc-300'
+              className={`p-1.5 rounded-full transition-colors focus-visible:ring-2 focus-visible:ring-brand-500 focus-visible:outline-none ${
+                isShuffle ? 'text-brand-400' : 'text-zinc-500 hover:text-zinc-300'
               }`}
             >
               <Shuffle className="w-4 h-4" />
@@ -197,7 +197,7 @@ const MusicPlayer = () => {
               onClick={previousTrack}
               title="Previous song"
               aria-label="Previous track"
-              className="p-1.5 rounded-full text-zinc-300 hover:text-white focus-visible:ring-2 focus-visible:ring-purple-500 focus-visible:outline-none transition-colors"
+              className="p-1.5 rounded-full text-zinc-300 hover:text-white focus-visible:ring-2 focus-visible:ring-brand-500 focus-visible:outline-none transition-colors"
             >
               <SkipBack className="w-5 h-5" />
             </button>
@@ -206,7 +206,7 @@ const MusicPlayer = () => {
               onClick={togglePlay}
               title={isPlaying ? 'Pause' : 'Play'}
               aria-label={isPlaying ? 'Pause' : 'Play'}
-              className="w-10 h-10 rounded-full bg-purple-600 hover:bg-purple-500 text-white flex items-center justify-center shadow-md shadow-purple-600/30 hover:scale-105 active:scale-95 focus-visible:ring-2 focus-visible:ring-purple-400 focus-visible:outline-none transition-all"
+              className="w-10 h-10 rounded-full bg-white hover:bg-zinc-100 text-black flex items-center justify-center hover:scale-105 active:scale-95 focus-visible:ring-2 focus-visible:ring-white focus-visible:outline-none transition-all"
             >
               {isBuffering ? (
                 <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
@@ -221,7 +221,7 @@ const MusicPlayer = () => {
               onClick={nextTrack}
               title="Next song"
               aria-label="Next track"
-              className="p-1.5 rounded-full text-zinc-300 hover:text-white focus-visible:ring-2 focus-visible:ring-purple-500 focus-visible:outline-none transition-colors"
+              className="p-1.5 rounded-full text-zinc-300 hover:text-white focus-visible:ring-2 focus-visible:ring-brand-500 focus-visible:outline-none transition-colors"
             >
               <SkipForward className="w-5 h-5" />
             </button>
@@ -230,8 +230,8 @@ const MusicPlayer = () => {
               onClick={toggleRepeat}
               title={`Repeat: ${repeatMode}`}
               aria-label={`Repeat: ${repeatMode}`}
-              className={`p-1.5 rounded-full transition-colors focus-visible:ring-2 focus-visible:ring-purple-500 focus-visible:outline-none ${
-                repeatMode !== 'off' ? 'text-purple-400' : 'text-zinc-500 hover:text-zinc-300'
+              className={`p-1.5 rounded-full transition-colors focus-visible:ring-2 focus-visible:ring-brand-500 focus-visible:outline-none ${
+                repeatMode !== 'off' ? 'text-brand-400' : 'text-zinc-500 hover:text-zinc-300'
               }`}
             >
               {repeatMode === 'one' ? <Repeat1 className="w-4 h-4" /> : <Repeat className="w-4 h-4" />}
@@ -252,8 +252,8 @@ const MusicPlayer = () => {
             onClick={() => setIsQueueOpen(!isQueueOpen)}
             title="Toggle Queue"
             aria-label="Toggle Queue"
-            className={`p-2 rounded-lg transition-colors focus-visible:ring-2 focus-visible:ring-purple-500 focus-visible:outline-none ${
-              isQueueOpen ? 'text-purple-400 bg-purple-500/10' : 'text-zinc-400 hover:text-white'
+            className={`p-2 rounded-lg transition-colors focus-visible:ring-2 focus-visible:ring-brand-500 focus-visible:outline-none ${
+              isQueueOpen ? 'text-brand-400 bg-brand-500/10' : 'text-zinc-400 hover:text-white'
             }`}
           >
             <ListMusic className="w-5 h-5" />
@@ -270,7 +270,7 @@ const MusicPlayer = () => {
             onClick={() => setIsFullScreen(true)}
             title="Full screen view"
             aria-label="Full screen view"
-            className="p-2 rounded-lg text-zinc-400 hover:text-white focus-visible:ring-2 focus-visible:ring-purple-500 focus-visible:outline-none transition-colors hidden lg:inline-block"
+            className="p-2 rounded-lg text-zinc-400 hover:text-white focus-visible:ring-2 focus-visible:ring-brand-500 focus-visible:outline-none transition-colors hidden lg:inline-block"
           >
             <Maximize2 className="w-4 h-4" />
           </button>

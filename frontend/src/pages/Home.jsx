@@ -1,10 +1,10 @@
 import React, { useState, useEffect } from 'react';
 import { useOutletContext, useNavigate } from 'react-router-dom';
-import { Play, Sparkles, Flame, Radio, Heart, Disc, Award, Headphones, ArrowRight } from 'lucide-react';
 import SongCard from '../components/cards/SongCard';
 import AlbumCard from '../components/cards/AlbumCard';
 import ArtistCard from '../components/cards/ArtistCard';
-import { useAudio } from '../context/AudioContext';
+import QuickPickCard from '../components/cards/QuickPickCard';
+import Shelf from '../components/common/Shelf';
 import { useAuth } from '../context/AuthContext';
 import api from '../services/api';
 
@@ -20,9 +20,15 @@ const CATEGORIES = [
   { id: 'instrumental', label: '🎻 Instrumental' }
 ];
 
+const greeting = () => {
+  const h = new Date().getHours();
+  if (h < 12) return 'Good morning';
+  if (h < 17) return 'Good afternoon';
+  return 'Good evening';
+};
+
 const Home = () => {
   const { onOpenAddToPlaylist } = useOutletContext();
-  const { playSong } = useAudio();
   const { isAuthenticated } = useAuth();
   const navigate = useNavigate();
 
@@ -109,251 +115,105 @@ const Home = () => {
     }
   };
 
+  const songCard = (song, list) => (
+    <SongCard
+      key={song.id}
+      song={song}
+      playlist={list}
+      onAddToPlaylist={onOpenAddToPlaylist}
+      onToggleFavorite={toggleFavorite}
+      isFavorite={!!favoritesMap[song.id]}
+    />
+  );
+
+  const show = (...tabs) => activeTab === 'all' || tabs.includes(activeTab);
+  const quickPicks = (homeData.trending || []).slice(0, 6);
+  const ganaList = homeData.gana?.length > 0 ? homeData.gana : homeData.folk;
+
   return (
-    <div className="space-y-8 animate-in fade-in duration-300">
-      {/* Hero Showcase Banner */}
-      <div className="relative rounded-2xl overflow-hidden bg-gradient-to-r from-purple-900/50 via-violet-950/40 to-zinc-900 border border-purple-500/20 p-6 md:p-10 shadow-2xl">
-        <div className="absolute top-0 right-0 -mr-16 -mt-16 w-80 h-80 rounded-full bg-purple-600/10 blur-3xl pointer-events-none" />
-        <div className="relative z-10 max-w-2xl">
-          <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-purple-500/20 text-purple-300 border border-purple-500/30 text-xs font-semibold uppercase tracking-wider mb-3">
-            <Sparkles className="w-3.5 h-3.5 text-purple-400" />
-            <span>Pure Tamil Audio & High Fidelity</span>
-          </div>
-          <h1 className="text-3xl md:text-5xl font-black text-white tracking-tight leading-tight mb-3">
-            Welcome to <span className="text-transparent bg-clip-text bg-gradient-to-r from-purple-400 to-violet-200">TamilTunes</span>
-          </h1>
-          <p className="text-sm md:text-base text-zinc-300 leading-relaxed mb-6 font-normal">
-            Stream your favorite Kollywood blockbusters, legendary 90s melodies, soulful acoustic instrumentals, and contemporary chartbusters. Completely ad-free.
-          </p>
-          <div className="flex flex-wrap items-center gap-3">
-            {homeData.trending?.[0] && (
-              <button
-                onClick={() => playSong(homeData.trending[0], homeData.trending)}
-                className="px-6 py-3 rounded-full bg-purple-600 hover:bg-purple-500 text-white text-sm font-bold flex items-center gap-2 shadow-lg shadow-purple-600/40 hover:scale-105 active:scale-95 transition-all"
-              >
-                <Play className="w-4 h-4 fill-white" />
-                <span>Play Trending Now</span>
-              </button>
-            )}
+    <div className="space-y-8 md:space-y-10 animate-in fade-in duration-300">
+      {/* Greeting + category pills */}
+      <div className="space-y-4">
+        <h1 className="text-2xl md:text-3xl font-extrabold text-white tracking-tight">{greeting()}</h1>
+        <div className="flex items-center gap-2 overflow-x-auto pb-1 scrollbar-none">
+          {CATEGORIES.map((cat) => (
             <button
-              onClick={() => navigate('/explore')}
-              className="px-6 py-3 rounded-full bg-zinc-800/80 hover:bg-zinc-700 text-zinc-200 text-sm font-semibold flex items-center gap-2 border border-zinc-700/60 transition-colors"
+              key={cat.id}
+              onClick={() => setActiveTab(cat.id)}
+              aria-pressed={activeTab === cat.id}
+              className={`px-4 py-1.5 rounded-full text-sm font-medium whitespace-nowrap transition-colors ${
+                activeTab === cat.id
+                  ? 'bg-white text-black'
+                  : 'bg-white/10 text-white hover:bg-white/20'
+              }`}
             >
-              <span>Explore Genres</span>
-              <ArrowRight className="w-4 h-4" />
+              {cat.label}
             </button>
-          </div>
+          ))}
         </div>
       </div>
 
-      {/* Category Filter Pills */}
-      <div className="flex items-center gap-2 overflow-x-auto pb-2 scrollbar-none">
-        {CATEGORIES.map((cat) => (
-          <button
-            key={cat.id}
-            onClick={() => setActiveTab(cat.id)}
-            className={`px-4 py-2 rounded-full text-xs font-semibold whitespace-nowrap transition-all ${
-              activeTab === cat.id
-                ? 'bg-purple-600 text-white shadow-md shadow-purple-600/30'
-                : 'bg-zinc-800/70 text-zinc-300 hover:bg-zinc-800 hover:text-white'
-            }`}
-          >
-            {cat.label}
-          </button>
-        ))}
-      </div>
-
-      {/* Section: Trending Tamil Music */}
-      {(activeTab === 'all' || activeTab === 'trending') && (
-        <section>
-          <div className="flex items-center justify-between mb-4">
-            <div className="flex items-center gap-2">
-              <Flame className="w-5 h-5 text-amber-400" />
-              <h2 className="text-xl font-bold text-white tracking-tight">Trending Tamil Songs</h2>
-            </div>
-            <button
-              onClick={() => navigate('/search?q=Tamil')}
-              className="text-xs font-semibold text-purple-400 hover:text-purple-300 flex items-center gap-1"
-            >
-              <span>View All</span>
-              <ArrowRight className="w-3.5 h-3.5" />
-            </button>
-          </div>
-
-          <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-4">
-            {homeData.trending?.slice(0, 10).map((song) => (
-              <SongCard
-                key={song.id}
-                song={song}
-                playlist={homeData.trending}
-                onAddToPlaylist={onOpenAddToPlaylist}
-                onToggleFavorite={toggleFavorite}
-                isFavorite={!!favoritesMap[song.id]}
-              />
-            ))}
-          </div>
+      {/* Quick picks: compact tiles that play on tap */}
+      {activeTab === 'all' && (loading || quickPicks.length > 0) && (
+        <section aria-label="Quick picks" className="grid grid-cols-2 lg:grid-cols-3 gap-2 md:gap-3">
+          {loading
+            ? Array.from({ length: 6 }, (_, i) => (
+                <div key={i} className="h-12 md:h-14 rounded-md bg-white/10 animate-pulse" />
+              ))
+            : quickPicks.map((song) => <QuickPickCard key={song.id} song={song} playlist={homeData.trending} />)}
         </section>
       )}
 
-      {/* Section: Popular Tamil Albums */}
+      {show('trending') && (
+        <Shelf title="Trending Tamil songs" loading={loading} onShowAll={() => navigate('/search?q=Tamil')}>
+          {homeData.trending?.slice(0, 12).map((song) => songCard(song, homeData.trending))}
+        </Shelf>
+      )}
+
       {activeTab === 'all' && (
-        <section>
-          <div className="flex items-center justify-between mb-4">
-            <div className="flex items-center gap-2">
-              <Disc className="w-5 h-5 text-violet-400" />
-              <h2 className="text-xl font-bold text-white tracking-tight">Popular Tamil Albums</h2>
-            </div>
-          </div>
-
-          <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-4">
-            {(homeData.albums || homeData.popularAlbums)?.slice(0, 5).map((album) => (
-              <AlbumCard key={album.id} album={album} />
-            ))}
-          </div>
-        </section>
+        <Shelf title="Popular albums" loading={loading}>
+          {(homeData.albums || homeData.popularAlbums)?.slice(0, 12).map((album) => (
+            <AlbumCard key={album.id} album={album} />
+          ))}
+        </Shelf>
       )}
 
-      {/* Section: Iconic Tamil Artists & Composers */}
       {activeTab === 'all' && (
-        <section>
-          <div className="flex items-center justify-between mb-4">
-            <div className="flex items-center gap-2">
-              <Award className="w-5 h-5 text-purple-400" />
-              <h2 className="text-xl font-bold text-white tracking-tight">Iconic Composers & Singers</h2>
-            </div>
-          </div>
-
-          <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 gap-4">
-            {(homeData.artists || homeData.popularArtists)?.map((artist) => (
-              <ArtistCard key={artist.id || artist.name} artist={artist} />
-            ))}
-          </div>
-        </section>
+        <Shelf title="Iconic composers & singers" loading={loading}>
+          {(homeData.artists || homeData.popularArtists)?.map((artist) => (
+            <ArtistCard key={artist.id || artist.name} artist={artist} />
+          ))}
+        </Shelf>
       )}
 
-      {/* Section: 90s Golden Era */}
-      {(activeTab === 'all' || activeTab === '90s') && (
-        <section>
-          <div className="flex items-center justify-between mb-4">
-            <div className="flex items-center gap-2">
-              <Radio className="w-5 h-5 text-rose-400" />
-              <h2 className="text-xl font-bold text-white tracking-tight">90s Golden Era Tamil Hits</h2>
-            </div>
-          </div>
-
-          <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-4">
-            {homeData.nineties?.slice(0, 5).map((song) => (
-              <SongCard
-                key={song.id}
-                song={song}
-                playlist={homeData.nineties}
-                onAddToPlaylist={onOpenAddToPlaylist}
-                onToggleFavorite={toggleFavorite}
-                isFavorite={!!favoritesMap[song.id]}
-              />
-            ))}
-          </div>
-        </section>
+      {show('90s') && (
+        <Shelf title="90s golden era hits" loading={loading}>
+          {homeData.nineties?.slice(0, 12).map((song) => songCard(song, homeData.nineties))}
+        </Shelf>
       )}
 
-      {/* Section: 2000s Kollywood Nostalgia */}
-      {(activeTab === 'all' || activeTab === '2000s') && (
-        <section>
-          <div className="flex items-center justify-between mb-4">
-            <div className="flex items-center gap-2">
-              <Headphones className="w-5 h-5 text-emerald-400" />
-              <h2 className="text-xl font-bold text-white tracking-tight">2000s Nostalgic Hits</h2>
-            </div>
-          </div>
-
-          <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-4">
-            {homeData.twoThousands?.slice(0, 5).map((song) => (
-              <SongCard
-                key={song.id}
-                song={song}
-                playlist={homeData.twoThousands}
-                onAddToPlaylist={onOpenAddToPlaylist}
-                onToggleFavorite={toggleFavorite}
-                isFavorite={!!favoritesMap[song.id]}
-              />
-            ))}
-          </div>
-        </section>
+      {show('2000s') && (
+        <Shelf title="2000s nostalgic hits" loading={loading}>
+          {homeData.twoThousands?.slice(0, 12).map((song) => songCard(song, homeData.twoThousands))}
+        </Shelf>
       )}
 
-      {/* Section: Soulful Melodies */}
-      {(activeTab === 'all' || activeTab === 'melodies' || activeTab === 'love') && (
-        <section>
-          <div className="flex items-center justify-between mb-4">
-            <div className="flex items-center gap-2">
-              <Heart className="w-5 h-5 text-pink-400" />
-              <h2 className="text-xl font-bold text-white tracking-tight">Heartfelt Melodies & Love Songs</h2>
-            </div>
-          </div>
-
-          <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-4">
-            {homeData.melodies?.slice(0, 5).map((song) => (
-              <SongCard
-                key={song.id}
-                song={song}
-                playlist={homeData.melodies}
-                onAddToPlaylist={onOpenAddToPlaylist}
-                onToggleFavorite={toggleFavorite}
-                isFavorite={!!favoritesMap[song.id]}
-              />
-            ))}
-          </div>
-        </section>
+      {show('melodies', 'love') && (
+        <Shelf title="Heartfelt melodies & love songs" loading={loading}>
+          {homeData.melodies?.slice(0, 12).map((song) => songCard(song, homeData.melodies))}
+        </Shelf>
       )}
 
-      {/* Section: Authentic Film Gaana Hits */}
-      {(activeTab === 'all' || activeTab === 'gana') && (
-        <section>
-          <div className="flex items-center justify-between mb-4">
-            <div className="flex items-center gap-2">
-              <span className="text-lg">🪘</span>
-              <h2 className="text-xl font-bold text-white tracking-tight">Authentic Film Gaana Hits</h2>
-            </div>
-          </div>
-
-          <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-4">
-            {(homeData.gana?.length > 0 ? homeData.gana : homeData.folk)?.slice(0, 5).map((song) => (
-              <SongCard
-                key={song.id}
-                song={song}
-                playlist={homeData.gana || homeData.folk}
-                onAddToPlaylist={onOpenAddToPlaylist}
-                onToggleFavorite={toggleFavorite}
-                isFavorite={!!favoritesMap[song.id]}
-              />
-            ))}
-          </div>
-        </section>
+      {show('gana') && (
+        <Shelf title="Authentic film gaana hits" loading={loading}>
+          {ganaList?.slice(0, 12).map((song) => songCard(song, homeData.gana || homeData.folk))}
+        </Shelf>
       )}
 
-      {/* Section: Folk & Traditional Beats */}
-      {(activeTab === 'all' || activeTab === 'folk') && (
-        <section>
-          <div className="flex items-center justify-between mb-4">
-            <div className="flex items-center gap-2">
-              <span className="text-lg">🥁</span>
-              <h2 className="text-xl font-bold text-white tracking-tight">Folk & Kuthu Beats</h2>
-            </div>
-          </div>
-
-          <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-4">
-            {homeData.folk?.slice(0, 5).map((song) => (
-              <SongCard
-                key={song.id}
-                song={song}
-                playlist={homeData.folk}
-                onAddToPlaylist={onOpenAddToPlaylist}
-                onToggleFavorite={toggleFavorite}
-                isFavorite={!!favoritesMap[song.id]}
-              />
-            ))}
-          </div>
-        </section>
+      {show('folk') && (
+        <Shelf title="Folk & kuthu beats" loading={loading}>
+          {homeData.folk?.slice(0, 12).map((song) => songCard(song, homeData.folk))}
+        </Shelf>
       )}
     </div>
   );

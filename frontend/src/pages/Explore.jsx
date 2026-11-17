@@ -12,13 +12,13 @@ const GENRES = [
   {
     title: 'Anirudh High Energy',
     query: 'Anirudh',
-    bg: 'from-violet-600 to-indigo-800',
+    bg: 'from-brand-600 to-brand-800',
     description: 'Modern chartbusters and pulsating bass'
   },
   {
     title: 'Ilaiyaraaja Magic',
     query: 'Ilaiyaraaja',
-    bg: 'from-purple-600 to-pink-700',
+    bg: 'from-brand-600 to-pink-700',
     description: 'Nostalgic orchestral compositions and melodies'
   },
   {
@@ -36,7 +36,7 @@ const GENRES = [
   {
     title: '90s Tamil Golden Hits',
     query: '90s Tamil',
-    bg: 'from-fuchsia-600 to-purple-800',
+    bg: 'from-brand-600 to-brand-800',
     description: 'Evergreen Kollywood hits that defined a generation'
   },
   {
@@ -54,7 +54,7 @@ const GENRES = [
   {
     title: 'Soulful Midnight Melodies',
     query: 'Tamil Melody',
-    bg: 'from-indigo-700 to-slate-900',
+    bg: 'from-brand-700 to-slate-900',
     description: 'Calm, soothing tunes for relaxation and focus'
   },
   {
@@ -71,7 +71,7 @@ const Explore = () => {
   return (
     <div className="space-y-6 animate-in fade-in duration-300">
       <div className="flex items-center gap-2.5">
-        <Compass className="w-6 h-6 text-purple-400" />
+        <Compass className="w-6 h-6 text-brand-400" />
         <h1 className="text-2xl font-bold text-white tracking-tight">Explore Tamil Music</h1>
       </div>
       <p className="text-xs text-zinc-400 max-w-xl">

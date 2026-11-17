@@ -27,7 +27,7 @@ const VolumeSlider = ({ volume, isMuted, onVolumeChange, onToggleMute }) => {
       <div className="relative w-20 sm:w-24 flex items-center">
         <div className="w-full h-1 bg-zinc-800 rounded-full overflow-hidden">
           <div
-            className="h-full bg-zinc-400 group-hover:bg-purple-500 rounded-full transition-colors"
+            className="h-full bg-zinc-400 group-hover:bg-brand-400 rounded-full transition-colors"
             style={{ width: `${currentVolume * 100}%` }}
           />
         </div>

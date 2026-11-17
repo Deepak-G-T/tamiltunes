@@ -27,7 +27,7 @@ const ProgressBar = ({ currentTime, duration, onSeek, isBuffering }) => {
           {/* Active progress fill */}
           <div
             className={`h-full rounded-full transition-all duration-75 ${
-              isBuffering ? 'bg-purple-400/70 animate-pulse' : 'bg-purple-500 group-hover:bg-purple-400'
+              isBuffering ? 'bg-brand-400/70 animate-pulse' : 'bg-brand-500 group-hover:bg-brand-400'
             }`}
             style={{ width: `${progressPercent}%` }}
           />

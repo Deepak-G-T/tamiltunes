@@ -6,7 +6,7 @@ import MainLayout from './components/layout/MainLayout';
 import { Loader2 } from 'lucide-react';
 
 const PageLoader = () => (
-  <div className="flex items-center justify-center min-h-[50vh] text-purple-400">
+  <div className="flex items-center justify-center min-h-[50vh] text-brand-400">
     <Loader2 className="w-8 h-8 animate-spin" />
   </div>
 );

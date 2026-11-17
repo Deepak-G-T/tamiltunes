@@ -1,11 +1,17 @@
 import React, { useState, useEffect } from 'react';
 import { useSearchParams, useOutletContext, useNavigate } from 'react-router-dom';
-import { Search as SearchIcon, X, Loader2, Music, Disc, User, Sparkles, Clock } from 'lucide-react';
+import { Search as SearchIcon, X, Loader2, Music, Disc, User, Clock } from 'lucide-react';
 import SongCard from '../components/cards/SongCard';
 import AlbumCard from '../components/cards/AlbumCard';
 import ArtistCard from '../components/cards/ArtistCard';
 import api from '../services/api';
 import { useAuth } from '../context/AuthContext';
+
+// Tile backgrounds for the Browse-all grid (cycled)
+const TILE_COLORS = [
+  'bg-emerald-700', 'bg-rose-700', 'bg-indigo-700', 'bg-amber-700',
+  'bg-sky-700', 'bg-fuchsia-800', 'bg-teal-700', 'bg-orange-700'
+];
 
 const POPULAR_SEARCHES = [
   'Leo', 'Jailer', 'Master', 'Anirudh', 'AR Rahman', 'Ilaiyaraaja',
@@ -121,14 +127,14 @@ const Search = () => {
       {/* Search Input Bar */}
       <div className="relative max-w-2xl">
         <div className="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none text-zinc-400">
-          <SearchIcon className="w-5 h-5 text-purple-400" />
+          <SearchIcon className="w-5 h-5 text-zinc-300" />
         </div>
         <input
           type="text"
           value={searchTerm}
           onChange={(e) => setSearchTerm(e.target.value)}
           placeholder="Search Tamil songs, movies, singers, music directors, albums..."
-          className="w-full pl-12 pr-10 py-3.5 rounded-full bg-[#18181B] border border-zinc-700/80 text-white placeholder-zinc-500 text-sm focus:outline-none focus:border-purple-500 focus:ring-2 focus:ring-purple-500/20 shadow-lg transition-all"
+          className="w-full pl-12 pr-10 py-3.5 rounded-full bg-surface-4 hover:bg-surface-5 border-2 border-transparent text-white placeholder-zinc-400 text-sm font-medium focus:outline-none focus:border-white transition-colors"
         />
         {searchTerm && (
           <button
@@ -147,10 +153,11 @@ const Search = () => {
             <button
               key={tab}
               onClick={() => setActiveFilter(tab)}
-              className={`px-4 py-1.5 rounded-full text-xs font-semibold capitalize transition-all ${
+              aria-pressed={activeFilter === tab}
+              className={`px-4 py-1.5 rounded-full text-sm font-medium capitalize transition-colors ${
                 activeFilter === tab
-                  ? 'bg-purple-600 text-white shadow-md shadow-purple-600/30'
-                  : 'bg-zinc-800 text-zinc-400 hover:text-white hover:bg-zinc-700'
+                  ? 'bg-white text-black'
+                  : 'bg-white/10 text-white hover:bg-white/20'
               }`}
             >
               {tab}
@@ -162,7 +169,7 @@ const Search = () => {
       {/* Loading state */}
       {loading && (
         <div className="py-16 flex flex-col items-center justify-center text-zinc-400 gap-3">
-          <Loader2 className="w-8 h-8 text-purple-500 animate-spin" />
+          <Loader2 className="w-8 h-8 text-brand-500 animate-spin" />
           <p className="text-xs">Searching Tamil catalog...</p>
         </div>
       )}
@@ -181,8 +188,8 @@ const Search = () => {
           {(activeFilter === 'all' || activeFilter === 'songs') && results.songs?.length > 0 && (
             <div>
               <div className="flex items-center gap-2 mb-3">
-                <Music className="w-4 h-4 text-purple-400" />
-                <h3 className="text-base font-bold text-white">Songs</h3>
+                <Music className="w-4 h-4 text-brand-400" />
+                <h3 className="text-xl font-bold text-white">Songs</h3>
               </div>
               <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-4">
                 {results.songs.map((song) => (
@@ -201,8 +208,8 @@ const Search = () => {
           {(activeFilter === 'all' || activeFilter === 'albums') && results.albums?.length > 0 && (
             <div>
               <div className="flex items-center gap-2 mb-3">
-                <Disc className="w-4 h-4 text-violet-400" />
-                <h3 className="text-base font-bold text-white">Albums</h3>
+                <Disc className="w-4 h-4 text-brand-400" />
+                <h3 className="text-xl font-bold text-white">Albums</h3>
               </div>
               <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-4">
                 {results.albums.map((album) => (
@@ -217,7 +224,7 @@ const Search = () => {
             <div>
               <div className="flex items-center gap-2 mb-3">
                 <User className="w-4 h-4 text-pink-400" />
-                <h3 className="text-base font-bold text-white">Artists</h3>
+                <h3 className="text-xl font-bold text-white">Artists</h3>
               </div>
               <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 gap-4">
                 {results.artists.map((artist) => (
@@ -253,7 +260,7 @@ const Search = () => {
                   <div
                     key={idx}
                     onClick={() => setSearchTerm(item)}
-                    className="flex items-center gap-2 px-3 py-1.5 rounded-full bg-zinc-800/80 hover:bg-zinc-800 border border-zinc-700/60 text-xs text-zinc-300 hover:text-white cursor-pointer transition-colors"
+                    className="flex items-center gap-2 px-3.5 py-1.5 rounded-full bg-white/10 hover:bg-white/20 text-sm text-white cursor-pointer transition-colors"
                   >
                     <span>{item}</span>
                     <button
@@ -269,18 +276,19 @@ const Search = () => {
           )}
 
           <div>
-            <div className="flex items-center gap-2 mb-3 text-xs font-semibold text-zinc-400 uppercase tracking-wider">
-              <Sparkles className="w-3.5 h-3.5 text-purple-400" />
-              <span>Trending Searches</span>
-            </div>
-            <div className="flex flex-wrap gap-2">
+            <h2 className="text-xl font-bold text-white mb-4">Browse all</h2>
+            <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3 md:gap-4">
               {POPULAR_SEARCHES.map((term, idx) => (
                 <button
-                  key={idx}
+                  key={term}
                   onClick={() => setSearchTerm(term)}
-                  className="px-3.5 py-1.5 rounded-full bg-zinc-900 hover:bg-purple-600 hover:text-white border border-zinc-800 text-xs text-zinc-300 transition-all"
+                  className={`relative overflow-hidden aspect-[16/9] md:aspect-[2/1] rounded-lg p-3 md:p-4 text-left text-base md:text-xl font-extrabold text-white leading-tight hover:scale-[1.02] transition-transform focus-visible:ring-2 focus-visible:ring-white focus-visible:outline-none ${TILE_COLORS[idx % TILE_COLORS.length]}`}
                 >
-                  {term}
+                  <span className="relative z-10 line-clamp-2">{term}</span>
+                  <Music
+                    aria-hidden="true"
+                    className="absolute -bottom-2 -right-2 w-16 h-16 md:w-20 md:h-20 text-black/25 rotate-[25deg]"
+                  />
                 </button>
               ))}
             </div>

@@ -20,7 +20,7 @@ import VolumeSlider from './VolumeSlider';
 import VideoSlot from './VideoSlot';
 import VideoModeToggle from './VideoModeToggle';
 
-const MUSIC_COVER_FALLBACK = "data:image/svg+xml;charset=UTF-8,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 300 300'%3E%3Cdefs%3E%3ClinearGradient id='bg' x1='0%25' y1='0%25' x2='100%25' y2='100%25'%3E%3Cstop offset='0%25' stop-color='%233b185f'/%3E%3Cstop offset='50%25' stop-color='%231f1338'/%3E%3Cstop offset='100%25' stop-color='%230f091f'/%3E%3C/linearGradient%3E%3C/defs%3E%3Crect width='300' height='300' rx='16' fill='url(%23bg)'/%3E%3Ccircle cx='150' cy='150' r='60' fill='%23a855f7' opacity='0.2'/%3E%3Cpath d='M135 180V120l50-14v54m-50 0a16 16 0 11-32 0 16 16 0 0132 0zm50-14a16 16 0 11-32 0 16 16 0 0132 0z' stroke='%23c084fc' stroke-width='6' fill='none' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E";
+const MUSIC_COVER_FALLBACK = "data:image/svg+xml;charset=UTF-8,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 300 300'%3E%3Cdefs%3E%3ClinearGradient id='bg' x1='0%25' y1='0%25' x2='100%25' y2='100%25'%3E%3Cstop offset='0%25' stop-color='%23143d24'/%3E%3Cstop offset='50%25' stop-color='%230f2a1a'/%3E%3Cstop offset='100%25' stop-color='%23071a10'/%3E%3C/linearGradient%3E%3C/defs%3E%3Crect width='300' height='300' rx='16' fill='url(%23bg)'/%3E%3Ccircle cx='150' cy='150' r='60' fill='%231db954' opacity='0.2'/%3E%3Cpath d='M135 180V120l50-14v54m-50 0a16 16 0 11-32 0 16 16 0 0132 0zm50-14a16 16 0 11-32 0 16 16 0 0132 0z' stroke='%236ee9a0' stroke-width='6' fill='none' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E";
 
 const FullScreenPlayer = ({ isOpen, onClose, onToggleFavorite, isFavorite }) => {
   const {
@@ -63,11 +63,11 @@ const FullScreenPlayer = ({ isOpen, onClose, onToggleFavorite, isFavorite }) => 
   const content = (
     <div
       style={{ zIndex: 99999 }}
-      className="fixed inset-0 bg-[#09090B] flex flex-col justify-between p-4 sm:p-8 select-none overflow-y-auto animate-in fade-in duration-200"
+      className="fixed inset-0 bg-black bg-gradient-to-b from-brand-900 via-black to-black flex flex-col justify-between p-4 sm:p-8 select-none overflow-y-auto animate-in fade-in duration-200"
     >
       {/* Blurred ambient background effect */}
       <div
-        className="fixed inset-0 opacity-25 filter blur-3xl pointer-events-none scale-125"
+        className="fixed inset-0 opacity-20 filter blur-3xl pointer-events-none scale-125"
         style={{
           backgroundImage: `url(${currentSong.image || MUSIC_COVER_FALLBACK})`,
           backgroundPosition: 'center',
@@ -110,7 +110,7 @@ const FullScreenPlayer = ({ isOpen, onClose, onToggleFavorite, isFavorite }) => 
           <VideoSlot className="w-full aspect-video mb-6 shadow-2xl border border-zinc-800/80" />
         )}
         {activeEngine !== 'youtube' && (
-        <div className="relative w-56 h-56 xs:w-64 xs:h-64 sm:w-80 sm:h-80 rounded-2xl overflow-hidden shadow-2xl border border-zinc-800/80 mb-6 group bg-zinc-900">
+        <div className="relative w-60 h-60 sm:w-80 sm:h-80 rounded-lg overflow-hidden shadow-[0_24px_64px_rgba(0,0,0,0.7)] mb-6 group bg-surface-3">
           <img
             src={currentSong.image || MUSIC_COVER_FALLBACK}
             alt={currentSong.title}
@@ -125,7 +125,7 @@ const FullScreenPlayer = ({ isOpen, onClose, onToggleFavorite, isFavorite }) => 
           />
           {isBuffering && (
             <div className="absolute inset-0 bg-black/40 backdrop-blur-sm flex items-center justify-center">
-              <div className="w-10 h-10 border-4 border-purple-500 border-t-transparent rounded-full animate-spin" />
+              <div className="w-10 h-10 border-4 border-brand-500 border-t-transparent rounded-full animate-spin" />
             </div>
           )}
         </div>
@@ -136,14 +136,14 @@ const FullScreenPlayer = ({ isOpen, onClose, onToggleFavorite, isFavorite }) => 
         {/* Title, Artist, & Favorite */}
         <div className="w-full flex items-center justify-between mb-3 px-1">
           <div className="min-w-0 flex-1 mr-3">
-            <h2 className="text-xl sm:text-2xl font-bold text-white truncate tracking-tight">
+            <h2 className="text-2xl sm:text-3xl font-extrabold text-white truncate tracking-tight">
               {currentSong.title}
             </h2>
             <p className="text-sm font-medium text-zinc-400 truncate mt-1">
               {currentSong.artist || currentSong.singers}
             </p>
             {currentSong.album && (
-              <p className="text-xs text-purple-400/80 truncate mt-0.5">
+              <p className="text-xs text-brand-400/80 truncate mt-0.5">
                 {currentSong.album}
               </p>
             )}
@@ -164,7 +164,7 @@ const FullScreenPlayer = ({ isOpen, onClose, onToggleFavorite, isFavorite }) => 
 
         {/* License Notice / Stream Status Badge */}
         <div className="w-full mb-3 px-1">
-          <div className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-zinc-900/80 border border-zinc-800 text-[11px] text-zinc-400">
+          <div className="flex items-center gap-1.5 text-[11px] text-zinc-500">
             <ShieldCheck className="w-3.5 h-3.5 text-emerald-400 flex-shrink-0" />
             <span className="truncate">
               {currentSong.licenseNotice || '320kbps CD Quality Audio • Direct Tamil Stream'}
@@ -193,8 +193,8 @@ const FullScreenPlayer = ({ isOpen, onClose, onToggleFavorite, isFavorite }) => 
           <button
             onClick={toggleShuffle}
             aria-label={`Shuffle ${isShuffle ? 'On' : 'Off'}`}
-            className={`p-2.5 transition-colors active:scale-90 focus-visible:ring-2 focus-visible:ring-purple-500 focus-visible:outline-none ${
-              isShuffle ? 'text-purple-400' : 'text-zinc-500 hover:text-white'
+            className={`p-2.5 transition-colors active:scale-90 focus-visible:ring-2 focus-visible:ring-brand-500 focus-visible:outline-none ${
+              isShuffle ? 'text-brand-400' : 'text-zinc-500 hover:text-white'
             }`}
           >
             <Shuffle className="w-5 h-5" />
@@ -203,7 +203,7 @@ const FullScreenPlayer = ({ isOpen, onClose, onToggleFavorite, isFavorite }) => 
           <button
             onClick={previousTrack}
             aria-label="Previous track"
-            className="p-2.5 text-zinc-300 hover:text-white active:scale-90 focus-visible:ring-2 focus-visible:ring-purple-500 focus-visible:outline-none transition-all"
+            className="p-2.5 text-zinc-300 hover:text-white active:scale-90 focus-visible:ring-2 focus-visible:ring-brand-500 focus-visible:outline-none transition-all"
           >
             <SkipBack className="w-7 h-7" />
           </button>
@@ -211,7 +211,9 @@ const FullScreenPlayer = ({ isOpen, onClose, onToggleFavorite, isFavorite }) => 
           <button
             onClick={togglePlay}
             aria-label={isPlaying ? 'Pause' : 'Play'}
-            className="w-16 h-16 rounded-full bg-purple-600 hover:bg-purple-500 text-white flex items-center justify-center shadow-lg shadow-purple-600/40 hover:scale-105 active:scale-95 focus-visible:ring-2 focus-visible:ring-purple-400 focus-visible:outline-none transition-all"
+            data-testid="fs-play"
+            aria-label={isPlaying ? 'Pause' : 'Play'}
+            className="w-16 h-16 rounded-full bg-white hover:bg-zinc-100 text-black flex items-center justify-center shadow-lg hover:scale-105 active:scale-95 focus-visible:ring-2 focus-visible:ring-white focus-visible:outline-none transition-all"
           >
             {isPlaying ? <Pause className="w-7 h-7" /> : <Play className="w-7 h-7 ml-1" />}
           </button>
@@ -219,7 +221,7 @@ const FullScreenPlayer = ({ isOpen, onClose, onToggleFavorite, isFavorite }) => 
           <button
             onClick={nextTrack}
             aria-label="Next track"
-            className="p-2.5 text-zinc-300 hover:text-white active:scale-90 focus-visible:ring-2 focus-visible:ring-purple-500 focus-visible:outline-none transition-all"
+            className="p-2.5 text-zinc-300 hover:text-white active:scale-90 focus-visible:ring-2 focus-visible:ring-brand-500 focus-visible:outline-none transition-all"
           >
             <SkipForward className="w-7 h-7" />
           </button>
@@ -227,8 +229,8 @@ const FullScreenPlayer = ({ isOpen, onClose, onToggleFavorite, isFavorite }) => 
           <button
             onClick={toggleRepeat}
             aria-label={`Repeat: ${repeatMode}`}
-            className={`p-2.5 transition-colors active:scale-90 focus-visible:ring-2 focus-visible:ring-purple-500 focus-visible:outline-none ${
-              repeatMode !== 'off' ? 'text-purple-400' : 'text-zinc-500 hover:text-white'
+            className={`p-2.5 transition-colors active:scale-90 focus-visible:ring-2 focus-visible:ring-brand-500 focus-visible:outline-none ${
+              repeatMode !== 'off' ? 'text-brand-400' : 'text-zinc-500 hover:text-white'
             }`}
           >
             {repeatMode === 'one' ? <Repeat1 className="w-5 h-5" /> : <Repeat className="w-5 h-5" />}
