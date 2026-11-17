@@ -8,7 +8,7 @@
     "start": "node src/index.js",
     "build": "prisma generate",
     "dev": "nodemon src/index.js",
-    "test": "node test/api.test.js && node test/stream.test.js",
+    "test": "node test/api.test.js && node test/stream.test.js && node test/config.test.js",
     "seed": "node src/prisma/seed.js",
     "db:baseline": "prisma migrate resolve --applied 20261117000000_init",
     "prisma:generate": "prisma generate",

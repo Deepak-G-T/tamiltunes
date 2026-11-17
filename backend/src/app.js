@@ -4,7 +4,7 @@ import helmet from 'helmet';
 import path from 'path';
 import fs from 'fs';
 import { fileURLToPath } from 'url';
-import { config } from './config/env.js';
+import { config, makeOriginCheck } from './config/env.js';
 import { db } from './prisma/client.js';
 import { musicService } from './services/music/providerManager.js';
 import { apiLimiter } from './middleware/rateLimiter.js';
@@ -22,13 +22,16 @@ const __dirname = path.dirname(__filename);
 
 const app = express();
 
+// Behind Render/Vercel proxies: needed so rate limiting sees the real client IP
+app.set('trust proxy', config.trustProxy);
+
 // Security Middlewares
 app.use(helmet({
   crossOriginResourcePolicy: { policy: 'cross-origin' }
 }));
 
 app.use(cors({
-  origin: config.corsOrigin === '*' ? true : config.corsOrigin.split(','),
+  origin: makeOriginCheck(config),
   credentials: true
 }));
 

@@ -14,7 +14,13 @@ services:
       - key: JWT_SECRET
         generateValue: true
       - key: CORS_ORIGIN
-        value: "*"
+        sync: false # set to the exact Vercel origin(s), comma-separated; "*" is rejected in production
+      - key: VERCEL_TEAM_SLUG
+        sync: false # optional: allows https://<project>-<hash>-<slug>.vercel.app previews
+      - key: MUSIC_PROVIDER
+        value: jiosaavn
+      - key: ENABLE_EXTERNAL_STREAMS
+        value: "false"
       - key: DATABASE_URL
         fromDatabase:
           name: tamiltunes-db
