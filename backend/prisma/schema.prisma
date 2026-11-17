@@ -22,7 +22,8 @@ model User {
   username        String?  @unique
   bio             String?
   location        String?
-  avatar          String?  // small data URL (WebP/JPEG, validated server-side)
+  avatar          String?  // small data URL, validated server-side; served via /users/:username/avatar
+  avatarUpdatedAt DateTime? // non-null = has avatar; also the cache-busting version
   genres          String[] @default([])
   favoriteArtists String[] @default([])
   language        String?
