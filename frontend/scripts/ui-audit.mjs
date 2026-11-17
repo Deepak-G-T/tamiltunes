@@ -54,7 +54,7 @@ window.YT = { PlayerState: { ENDED: 0, PLAYING: 1, PAUSED: 2, BUFFERING: 3, CUED
         if (pv.autoplay) setTimeout(() => this._set(1), 0);
       }
       setInterval(() => { if (window.__yt.playing) window.__yt.time += 0.25; }, 250);
-      setTimeout(() => this._ev.onReady && this._ev.onReady({}), 0);
+      setTimeout(() => this._ev.onReady && this._ev.onReady({ target: this }), 0);
     }
     _set(state) { window.__yt.playing = state === 1; this._ev.onStateChange({ data: state }); }
     loadVideoById(o) { window.__yt.calls.push(['load', o]); window.__yt.time = o.startSeconds || 0; this._set(1); }
@@ -143,16 +143,16 @@ async function runViewport(browser, width, height) {
   check(`[${tag}] starts in audio mode (audio playing, YouTube idle)`, s.audioPlaying && !s.ytPlaying, JSON.stringify(s));
   check(`[${tag}] YouTube container parked offscreen in audio mode`, (await page.locator('[data-testid=yt-player-container]').getAttribute('data-visible')) === 'false');
 
-  // 3. switch to Video: pauses audio, cues at same time, no autoplay, visible >=200x200
+  // 3. switch to Video while PLAYING: audio stops, YouTube starts by itself at the same time, visible >=200x200
   const tBefore = (await state(page)).audioTime;
   await mini.locator('[data-testid=mode-video]').click();
-  await page.waitForTimeout(600);
+  await page.waitForTimeout(700);
   s = await state(page);
   const calls = await page.evaluate(() => window.__yt.calls);
-  // Position is carried either by cueVideoById (player already existed) or by creating the player with start= and autoplay=0
-  const cue = calls.filter((c) => (c[0] === 'cue') || (c[0] === 'init' && !c[1].autoplay)).pop();
-  check(`[${tag}] switch to Video: audio paused, YouTube NOT autoplaying`, !s.audioPlaying && !s.ytPlaying, JSON.stringify(s));
-  check(`[${tag}] switch to Video keeps position (cue startSeconds ~ audio time)`, cue && Math.abs(cue[1].startSeconds - tBefore) <= 1.5, `cue/init=${JSON.stringify(cue)} audioTime=${tBefore}`);
+  // Position is carried by loadVideoById({startSeconds}) or by creating the player with start= and autoplay=1
+  const started = calls.filter((c) => c[0] === 'load' || (c[0] === 'init' && c[1].autoplay)).pop();
+  check(`[${tag}] switch to Video while playing: YouTube plays by itself, audio stops`, s.ytPlaying && !s.audioPlaying, JSON.stringify(s));
+  check(`[${tag}] switch to Video keeps position (start ~ audio time)`, started && Math.abs(started[1].startSeconds - tBefore) <= 1.5, `call=${JSON.stringify(started)} audioTime=${tBefore}`);
   const container = page.locator('[data-testid=yt-player-container]');
   check(`[${tag}] YouTube container visible in video mode`, (await container.getAttribute('data-visible')) === 'true');
   const vb = await box(container);
@@ -160,19 +160,25 @@ async function runViewport(browser, width, height) {
   check(`[${tag}] video surface inside viewport`, vb && vb.x >= 0 && vb.y >= 0 && vb.x + vb.width <= width + 0.5 && vb.y + vb.height <= height + 0.5, JSON.stringify(vb));
   await page.screenshot({ path: path.join(OUT, `video-mode-${tag}.png`) });
 
-  // 4. tap play in video mode -> only YouTube plays
-  await page.locator('button[aria-label="Play"]').first().click();
+  // 4. switch back to Audio while playing: audio plays by itself at the same time, YouTube stops
+  const ytT = (await state(page)).ytTime;
+  await mini.locator('[data-testid=mode-audio]').click();
   await page.waitForTimeout(700);
   s = await state(page);
-  check(`[${tag}] tap play in Video mode: only YouTube plays`, s.ytPlaying && !s.audioPlaying, JSON.stringify(s));
+  check(`[${tag}] switch to Audio while playing: audio plays by itself, YouTube stops`, s.audioPlaying && !s.ytPlaying, JSON.stringify(s));
+  check(`[${tag}] switch to Audio keeps position`, Math.abs(s.audioTime - ytT) <= 2, `audio=${s.audioTime} yt=${ytT}`);
 
-  // 5. back to Audio: YouTube paused, audio paused (needs tap), position carried
-  const ytT = (await state(page)).ytTime;
+  // 5. PAUSED songs stay paused when switching either way
+  await page.locator('button[aria-label="Pause"]').first().click();
+  await page.waitForTimeout(400);
+  await mini.locator('[data-testid=mode-video]').click();
+  await page.waitForTimeout(600);
+  s = await state(page);
+  check(`[${tag}] switch to Video while paused: stays paused`, !s.audioPlaying && !s.ytPlaying, JSON.stringify(s));
   await mini.locator('[data-testid=mode-audio]').click();
   await page.waitForTimeout(600);
   s = await state(page);
-  check(`[${tag}] switch to Audio: nothing plays until tap`, !s.audioPlaying && !s.ytPlaying, JSON.stringify(s));
-  check(`[${tag}] switch to Audio keeps position`, Math.abs(s.audioTime - ytT) <= 1.5, `audio=${s.audioTime} yt=${ytT}`);
+  check(`[${tag}] switch to Audio while paused: stays paused`, !s.audioPlaying && !s.ytPlaying, JSON.stringify(s));
   await page.locator('button[aria-label="Play"]').first().click();
   await page.waitForTimeout(700);
   s = await state(page);
@@ -184,18 +190,19 @@ async function runViewport(browser, width, height) {
   check(`[${tag}] toggle visible in FullScreenPlayer`, await page.locator('[data-testid=video-toggle]').last().isVisible());
   await page.locator('[data-testid=mode-video]').last().click(); // portal is last in DOM
   await page.waitForTimeout(700);
+  s = await state(page);
+  check(`[${tag}] full-screen switch to Video while playing: YouTube plays by itself`, s.ytPlaying && !s.audioPlaying, JSON.stringify(s));
   const fb = await box(page.locator('[data-testid=yt-player-container]'));
   check(`[${tag}] full-screen video surface >= 200x200 and in viewport`, fb && fb.width >= 199.5 && fb.height >= 199.5 && fb.x >= 0 && fb.x + fb.width <= width + 0.5 && fb.y >= 0 && fb.y + fb.height <= height + 0.5, JSON.stringify(fb));
   await page.screenshot({ path: path.join(OUT, `fullscreen-video-${tag}.png`) });
 
-  // 7. error 101 -> fall back to audio + toast, toggle hidden for that song, nothing playing
-  await page.locator('[data-testid=fs-play]').click(); // full-screen play button
-  await page.waitForTimeout(300);
+  // 7. error 101 while the video is PLAYING -> back to audio (keeps playing) + toast, toggle hidden for that song
   await page.evaluate(() => window.__ytFail(101));
   await page.waitForSelector('[data-testid=toast]', { timeout: 3000 });
+  await page.waitForTimeout(500);
   s = await state(page);
   check(`[${tag}] error 101: toast shown`, await page.locator('[data-testid=toast]').isVisible());
-  check(`[${tag}] error 101: fell back to audio, nothing autoplays`, !s.audioPlaying && !s.ytPlaying, JSON.stringify(s));
+  check(`[${tag}] error 101: fell back to audio and keeps playing, YouTube stopped`, s.audioPlaying && !s.ytPlaying, JSON.stringify(s));
   check(`[${tag}] error 101: toggle hidden for the failed video`, (await page.locator('[data-testid=video-toggle], [data-testid=mode-video], [data-testid=mode-audio]').count()) === 0);
   const title = await box(page.locator('[data-testid=toast]'));
   check(`[${tag}] toast fits the viewport`, title && title.x >= 0 && title.x + title.width <= width + 0.5, JSON.stringify(title));
