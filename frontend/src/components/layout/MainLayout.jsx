@@ -76,6 +76,8 @@ const MainLayout = () => {
           }} />
         </main>
 
+        {/* Visible video surface when the YouTube engine is active */}
+
         {/* Mobile Mini Player */}
         <MiniPlayer />
 
