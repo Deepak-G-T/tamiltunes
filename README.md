@@ -330,7 +330,7 @@ audio with a toast.
 
 `videoId` comes from a curated map (`backend/src/services/music/curatedVideos.js`) and, **only if you opt in**, from a
 cached YouTube Data API lookup limited to an allow-list of official channels. `YOUTUBE_API_KEY`,
-`VIDEO_CHANNEL_ALLOWLIST` and `YOUTUBE_DAILY_BUDGET` are all optional; without a key the API is never called. See
+`VIDEO_CHANNEL_ALLOWLIST`, `YOUTUBE_DAILY_BUDGET`, `VIDEO_INDEX_MAX_PAGES` and `VIDEO_SEARCH_FALLBACK` are all optional; without a key the API is never called. With a key and the official channel IDs, the backend indexes those channels' uploads once a day (about 1 quota unit per 50 videos) so most songs can get their official video song, not just the curated ones. See
 `CLAUDE.md` for details.
 
 ## ⚖️ Legal & Compliance Notice

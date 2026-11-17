@@ -37,7 +37,14 @@ export const parseVideoConfig = (env = process.env) => ({
   youtubeDailyBudget:
     env.YOUTUBE_DAILY_BUDGET !== undefined && env.YOUTUBE_DAILY_BUDGET !== '' && Number.isFinite(Number(env.YOUTUBE_DAILY_BUDGET))
       ? Math.max(0, Number(env.YOUTUBE_DAILY_BUDGET))
-      : 5000
+      : 5000,
+  // Pages of 50 uploads to index per allow-listed channel (about 1 quota unit per page). 0 turns the index off.
+  videoIndexMaxPages:
+    env.VIDEO_INDEX_MAX_PAGES !== undefined && env.VIDEO_INDEX_MAX_PAGES !== '' && Number.isFinite(Number(env.VIDEO_INDEX_MAX_PAGES))
+      ? Math.min(40, Math.max(0, Math.floor(Number(env.VIDEO_INDEX_MAX_PAGES))))
+      : 10,
+  // After an index miss, spend ~101 quota units on a per-song search (within the daily budget). false = index only.
+  videoSearchFallback: (env.VIDEO_SEARCH_FALLBACK || 'true').toLowerCase() !== 'false'
 });
 
 export const config = {
