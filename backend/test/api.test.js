@@ -26,6 +26,36 @@ const runTests = async () => {
     }
     console.log(`✓ Health Check (Trimmed to status & uptime): PASSED (uptime: ${rootHealth.uptime}s)`);
 
+    // =========================================================================
+    // 1A. CORS SECURITY SUITE (Origin Whitelist & Evil Origin Rejection)
+    // =========================================================================
+    console.log('--- Testing CORS Whitelist Enforcement ---');
+    // Test: Evil Vercel origin must be rejected (no Access-Control-Allow-Origin header)
+    const evilCorsRes = await fetch(`${BASE}/health`, {
+      headers: { Origin: 'https://evil.vercel.app' }
+    });
+    const evilAllowHeader = evilCorsRes.headers.get('access-control-allow-origin');
+    if (evilAllowHeader !== null && evilAllowHeader !== '') {
+      throw new Error(`CORS Security Failure: https://evil.vercel.app was improperly allowed with header: ${evilAllowHeader}`);
+    }
+
+    // Test: Official production Vercel domain must be accepted
+    const prodCorsRes = await fetch(`${BASE}/health`, {
+      headers: { Origin: 'https://in-five-11.vercel.app' }
+    });
+    if (prodCorsRes.headers.get('access-control-allow-origin') !== 'https://in-five-11.vercel.app') {
+      throw new Error('CORS Failure: https://in-five-11.vercel.app was rejected');
+    }
+
+    // Test: Project Vercel preview domain pattern must be accepted
+    const previewCorsRes = await fetch(`${BASE}/health`, {
+      headers: { Origin: 'https://in-five-11-git-feat.vercel.app' }
+    });
+    if (previewCorsRes.headers.get('access-control-allow-origin') !== 'https://in-five-11-git-feat.vercel.app') {
+      throw new Error('CORS Failure: https://in-five-11-git-feat.vercel.app preview was rejected');
+    }
+    console.log('✓ CORS Whitelist: PASSED (evil.vercel.app rejected, in-five-11 accepted)');
+
     // 2. Music Home feed (including Film Gaana category via mock provider)
     const homeRes = await fetch(`${BASE}/music/home`).then((r) => r.json());
     if (!homeRes.success || !homeRes.data?.trending?.length) throw new Error('Home feed failed');
@@ -114,6 +144,15 @@ const runTests = async () => {
     if (!getPlRes.success || getPlRes.playlist?.songs?.length !== 1) throw new Error('Get playlist failed');
     console.log('✓ Get Playlist by ID: PASSED');
 
+    // 9B. List Playlists Pagination Envelope
+    const listPlRes = await fetch(`${BASE}/playlists?limit=10&offset=0`, {
+      headers: { Authorization: `Bearer ${tokenA}` }
+    }).then((r) => r.json());
+    if (!listPlRes.success || !Array.isArray(listPlRes.items) || listPlRes.total !== 1 || typeof listPlRes.hasMore !== 'boolean') {
+      throw new Error('List playlists pagination envelope { items, total, limit, offset, hasMore } verification failed');
+    }
+    console.log(`✓ List Playlists Pagination Envelope ({ items, total: ${listPlRes.total}, limit: ${listPlRes.limit}, offset: ${listPlRes.offset}, hasMore: ${listPlRes.hasMore} }): PASSED`);
+
     // 10. Favorites
     const favRes = await fetch(`${BASE}/favorites`, {
       method: 'POST',
@@ -132,11 +171,22 @@ const runTests = async () => {
     if (!favRes.success) throw new Error('Add favorite failed');
     console.log('✓ Add Favorite Song: PASSED');
 
-    const listFavRes = await fetch(`${BASE}/favorites`, {
+    const listFavRes = await fetch(`${BASE}/favorites?limit=10&offset=0`, {
       headers: { Authorization: `Bearer ${tokenA}` }
     }).then((r) => r.json());
-    if (!listFavRes.success || listFavRes.favorites?.length !== 1) throw new Error('List favorites failed');
-    console.log('✓ List Favorites: PASSED');
+    if (!listFavRes.success || !Array.isArray(listFavRes.items) || listFavRes.total !== 1 || typeof listFavRes.hasMore !== 'boolean') {
+      throw new Error('List favorites pagination envelope { items, total, limit, offset, hasMore } verification failed');
+    }
+    console.log(`✓ List Favorites Pagination Envelope ({ items, total: ${listFavRes.total}, limit: ${listFavRes.limit}, offset: ${listFavRes.offset}, hasMore: ${listFavRes.hasMore} }): PASSED`);
+
+    // 10B. Favorites IDs Only Endpoint (GET /api/favorites/ids)
+    const favIdsRes = await fetch(`${BASE}/favorites/ids`, {
+      headers: { Authorization: `Bearer ${tokenA}` }
+    }).then((r) => r.json());
+    if (!favIdsRes.success || !Array.isArray(favIdsRes.ids) || !favIdsRes.ids.includes('tt_trending_2') || favIdsRes.total !== 1) {
+      throw new Error('GET /api/favorites/ids failed');
+    }
+    console.log(`✓ Favorites IDs Only Endpoint (GET /api/favorites/ids, up to 5000 IDs): PASSED (returned [${favIdsRes.ids.join(', ')}])`);
 
     // 11. History
     const histRes = await fetch(`${BASE}/history`, {
@@ -156,11 +206,13 @@ const runTests = async () => {
     if (!histRes.success) throw new Error('Record history failed');
     console.log('✓ Record Listening History: PASSED');
 
-    const listHistRes = await fetch(`${BASE}/history`, {
+    const listHistRes = await fetch(`${BASE}/history?limit=10&offset=0`, {
       headers: { Authorization: `Bearer ${tokenA}` }
     }).then((r) => r.json());
-    if (!listHistRes.success || listHistRes.history?.length !== 1) throw new Error('List history failed');
-    console.log('✓ List Listening History: PASSED');
+    if (!listHistRes.success || !Array.isArray(listHistRes.items) || listHistRes.total !== 1 || typeof listHistRes.hasMore !== 'boolean') {
+      throw new Error('List history pagination envelope { items, total, limit, offset, hasMore } verification failed');
+    }
+    console.log(`✓ List Listening History Pagination Envelope ({ items, total: ${listHistRes.total}, limit: ${listHistRes.limit}, offset: ${listHistRes.offset}, hasMore: ${listHistRes.hasMore} }): PASSED`);
 
     // =========================================================================
     // 12. NEW TEST SUITE: Playlist Ownership & Cross-User Authorization
@@ -301,7 +353,23 @@ const runTests = async () => {
     if (emptyPlaylistNameRes.status !== 400) {
       throw new Error(`Expected 400 on empty playlist name, got ${emptyPlaylistNameRes.status}`);
     }
-    console.log('✓ Input Validation Errors (Invalid Email, Short Password, Empty Playlist): PASSED (HTTP 400)');
+
+    // Test D: Zod Advisory Reachability Test (Oversized payload > 1MB)
+    const oversizedPayload = JSON.stringify({
+      name: 'Adversarial Tester',
+      email: 'oversized@example.com',
+      password: 'password123',
+      junkData: 'A'.repeat(1024 * 1024 + 50) // > 1MB
+    });
+    const oversizedRes = await fetch(`${BASE}/auth/register`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: oversizedPayload
+    });
+    if (oversizedRes.status !== 413) {
+      throw new Error(`Expected 413 Payload Too Large for >1MB payload, got ${oversizedRes.status}`);
+    }
+    console.log('✓ Input Validation & Zod Advisory Reachability: PASSED (Invalid Email/Password 400, >1MB Payload 413 before Zod)');
 
     // =========================================================================
     // 15. NEW TEST SUITE: Table-Driven Tamil Filter Test (20 Sample Tracks)
