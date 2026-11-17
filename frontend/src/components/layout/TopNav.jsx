@@ -29,7 +29,7 @@ const TopNav = ({ onToggleMobileSidebar }) => {
   }, []);
 
   return (
-    <header className="h-16 bg-black/80 backdrop-blur-md sticky top-0 z-30 px-4 md:px-8 flex items-center justify-between border-b border-zinc-800/40">
+    <header className="h-16 bg-transparent sticky top-0 z-30 px-4 md:px-6 flex items-center justify-between">
       {/* Left controls: Back / Forward & Mobile menu */}
       <div className="flex items-center gap-2">
         <button
@@ -43,14 +43,14 @@ const TopNav = ({ onToggleMobileSidebar }) => {
           <button
             onClick={() => navigate(-1)}
             title="Go back"
-            className="w-8 h-8 rounded-full bg-zinc-900 border border-zinc-800 flex items-center justify-center text-zinc-300 hover:text-white hover:bg-zinc-800 transition-colors"
+            className="w-8 h-8 rounded-full bg-black/60 flex items-center justify-center text-zinc-300 hover:text-white transition-colors"
           >
             <ChevronLeft className="w-4 h-4" />
           </button>
           <button
             onClick={() => navigate(1)}
             title="Go forward"
-            className="w-8 h-8 rounded-full bg-zinc-900 border border-zinc-800 flex items-center justify-center text-zinc-300 hover:text-white hover:bg-zinc-800 transition-colors"
+            className="w-8 h-8 rounded-full bg-black/60 flex items-center justify-center text-zinc-300 hover:text-white transition-colors"
           >
             <ChevronRight className="w-4 h-4" />
           </button>
@@ -63,7 +63,7 @@ const TopNav = ({ onToggleMobileSidebar }) => {
           <div className="relative" ref={dropdownRef}>
             <button
               onClick={() => setDropdownOpen(!dropdownOpen)}
-              className="flex items-center gap-2.5 p-1.5 pr-3 rounded-full bg-zinc-900 hover:bg-zinc-800 border border-zinc-800 transition-colors"
+              className="flex items-center gap-2.5 p-1 pr-3 rounded-full bg-black/60 hover:bg-surface-3 transition-colors"
             >
               <div className="w-7 h-7 rounded-full bg-gradient-to-tr from-brand-600 to-brand-500 flex items-center justify-center text-xs font-bold text-white shadow-sm">
                 {user?.name ? user.name[0].toUpperCase() : 'U'}
@@ -118,13 +118,13 @@ const TopNav = ({ onToggleMobileSidebar }) => {
           <div className="flex items-center gap-2">
             <button
               onClick={() => navigate('/login')}
-              className="px-4 py-1.5 text-xs font-semibold text-zinc-300 hover:text-white transition-colors"
+              className="px-4 py-2 text-sm font-bold text-zinc-300 hover:text-white hover:scale-105 transition-all"
             >
               Log In
             </button>
             <button
               onClick={() => navigate('/signup')}
-              className="px-4 py-1.5 text-xs font-semibold text-black bg-brand-500 hover:bg-brand-400 rounded-full shadow-md shadow-brand-600/30 transition-all hover:scale-105"
+              className="px-6 py-2 text-sm font-bold text-black bg-white hover:bg-zinc-100 rounded-full transition-all hover:scale-105"
             >
               Sign Up
             </button>

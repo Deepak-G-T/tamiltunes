@@ -25,9 +25,10 @@ const MainLayout = () => {
   }, []);
 
   return (
-    <div className="flex h-screen w-screen bg-black text-white overflow-hidden">
+    <div className="flex flex-col h-screen w-screen bg-black text-white overflow-hidden">
+      <div className="flex flex-1 min-h-0 md:p-2 md:gap-2">
       {/* Desktop Sidebar */}
-      <div className="hidden md:flex flex-shrink-0 h-full">
+      <div className="hidden md:flex flex-shrink-0 h-full w-[280px] lg:w-[320px]">
         <Sidebar onOpenCreatePlaylist={() => setCreatePlaylistOpen(true)} />
       </div>
 
@@ -38,7 +39,7 @@ const MainLayout = () => {
             className="fixed inset-0 bg-black/60 backdrop-blur-sm"
             onClick={() => setMobileSidebarOpen(false)}
           />
-          <div className="relative w-64 h-full bg-surface-1 z-10 shadow-2xl animate-in slide-in-from-left duration-200">
+          <div className="relative w-72 h-full bg-black p-2 z-10 shadow-2xl animate-in slide-in-from-left duration-200">
             <Sidebar
               onOpenCreatePlaylist={() => {
                 setMobileSidebarOpen(false);
@@ -50,7 +51,9 @@ const MainLayout = () => {
       )}
 
       {/* Main Content Area */}
-      <div className="flex-1 flex flex-col min-w-0 h-full overflow-hidden">
+      <div className="relative flex-1 flex flex-col min-w-0 h-full overflow-hidden md:rounded-panel bg-surface-1">
+        {/* Soft green wash behind the page header, like a cover-colour gradient */}
+        <div aria-hidden="true" className="pointer-events-none absolute inset-x-0 top-0 h-72 bg-gradient-to-b from-brand-900/40 via-surface-1/60 to-transparent" />
         {/* Top Navbar */}
         <TopNav onToggleMobileSidebar={() => setMobileSidebarOpen(true)} />
 
@@ -69,7 +72,7 @@ const MainLayout = () => {
         )}
 
         {/* Dynamic page content container */}
-        <main className="flex-1 overflow-y-auto px-4 md:px-8 py-6 pb-36 md:pb-28">
+        <main className="relative flex-1 overflow-y-auto px-4 md:px-6 py-4 pb-36 md:pb-6">
           <Outlet context={{
             onOpenAddToPlaylist: (song) => setAddToPlaylistSong(song),
             onOpenCreatePlaylist: () => setCreatePlaylistOpen(true)
@@ -84,9 +87,11 @@ const MainLayout = () => {
         {/* Mobile Bottom Navigation */}
         <MobileNav />
 
-        {/* Shared Audio Player Engine (Desktop bar + Mobile FullScreen Modal + Queue Drawer) */}
-        <MusicPlayer />
       </div>
+      </div>
+
+      {/* Shared Audio Player Engine (full-width desktop bar + Mobile FullScreen Modal + Queue Drawer) */}
+      <MusicPlayer />
 
       {/* Modals */}
       <CreatePlaylistModal
