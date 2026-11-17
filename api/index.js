@@ -9,7 +9,8 @@ export default async function handler(req, res) {
       await initDb();
       isDbInitialized = true;
     } catch (err) {
-      console.warn('Vercel serverless DB init warning:', err.message);
+      console.error('Vercel serverless DB init failed:', err.message);
+      return res.status(503).json({ success: false, message: 'Service unavailable' });
     }
   }
   return app(req, res);

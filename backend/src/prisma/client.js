@@ -211,11 +211,16 @@ export const initDb = async () => {
       console.log('Connected to PostgreSQL via Prisma (tables verified)');
       return prismaInstance;
     } catch (err) {
-      console.warn('PostgreSQL connection check failed, using local development store:', err.message);
       isPostgresAvailable = false;
+      if (config.isProd) {
+        // Never serve production traffic from a volatile in-memory store
+        throw new Error(`PostgreSQL connection check failed: ${err.message}`);
+      }
+      console.warn('PostgreSQL connection check failed, using local development store:', err.message);
       return fallbackDb;
     }
   }
+  if (config.isProd) throw new Error('Prisma client unavailable in production');
   return fallbackDb;
 };
 
@@ -224,6 +229,9 @@ export const db = new Proxy({}, {
   get(target, prop) {
     if (isPostgresAvailable && prismaInstance) {
       return prismaInstance[prop];
+    }
+    if (config.isProd) {
+      throw new Error('Database not initialized; refusing in-memory fallback in production');
     }
     return fallbackDb[prop];
   }
