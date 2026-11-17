@@ -188,7 +188,43 @@ input[type="range"]:active::-moz-range-thumb {
   .lift:hover { transform: translateY(-3px); }
 }
 
+/* mobile motion */
+@keyframes slide-up { from { opacity: 0; transform: translateY(28px); } to { opacity: 1; transform: none; } }
+.slide-up { animation: slide-up 0.4s cubic-bezier(0.2, 0.8, 0.2, 1) both; }
+
+@keyframes fade-up { from { opacity: 0; transform: translateY(14px); } to { opacity: 1; transform: none; } }
+.stagger > * { animation: fade-up 0.45s ease-out both; }
+.stagger > *:nth-child(1) { animation-delay: 0.02s; }
+.stagger > *:nth-child(2) { animation-delay: 0.07s; }
+.stagger > *:nth-child(3) { animation-delay: 0.12s; }
+.stagger > *:nth-child(4) { animation-delay: 0.17s; }
+.stagger > *:nth-child(5) { animation-delay: 0.22s; }
+.stagger > *:nth-child(6) { animation-delay: 0.27s; }
+.stagger > *:nth-child(n + 7) { animation-delay: 0.32s; }
+
+@keyframes shimmer { from { background-position: 200% 0; } to { background-position: -200% 0; } }
+.shimmer {
+  background: linear-gradient(90deg, rgb(255 255 255 / 0.05) 25%, rgb(255 255 255 / 0.13) 50%, rgb(255 255 255 / 0.05) 75%);
+  background-size: 200% 100%;
+  animation: shimmer 1.5s linear infinite;
+}
+
+@keyframes art-in { from { opacity: 0; transform: scale(0.9); } to { opacity: 1; transform: none; } }
+.art-in { animation: art-in 0.42s cubic-bezier(0.2, 0.8, 0.2, 1) both; }
+
+@keyframes breathe { 0%, 100% { opacity: 0.55; transform: scale(1); } 50% { opacity: 0.95; transform: scale(1.07); } }
+.breathe { animation: breathe 4s ease-in-out infinite; }
+
+@keyframes nav-pop { 0% { transform: scale(1); } 40% { transform: scale(1.25) translateY(-2px); } 100% { transform: scale(1); } }
+.nav-pop { animation: nav-pop 0.35s ease-out; }
+
+/* press feedback on touch */
+.press { transition: transform 0.12s ease; }
+.press:active { transform: scale(0.96); }
+
 @media (prefers-reduced-motion: reduce) {
+  .slide-up, .stagger > *, .shimmer, .art-in, .breathe, .nav-pop { animation: none !important; }
+  .press:active { transform: none; }
   .eq-bar, .vinyl-spin, .page-in { animation: none !important; }
   .lift:hover { transform: none; }
   .cover-wash, .cover-glow { transition: none; }

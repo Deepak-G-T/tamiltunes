@@ -22,7 +22,7 @@ const QuickPickCard = ({ song, playlist }) => {
           else playSong(song, playlist);
         }
       }}
-      className="group relative flex items-center gap-3 rounded-md overflow-hidden bg-white/10 hover:bg-white/20 transition-colors duration-200 cursor-pointer select-none pr-2 focus-visible:ring-2 focus-visible:ring-brand-400 focus-visible:outline-none"
+      className="group relative flex items-center gap-3 rounded-md overflow-hidden bg-white/10 hover:bg-white/20 transition-colors duration-200 cursor-pointer select-none press pr-2 focus-visible:ring-2 focus-visible:ring-brand-400 focus-visible:outline-none"
     >
       <img
         src={song.image || MUSIC_COVER_FALLBACK}

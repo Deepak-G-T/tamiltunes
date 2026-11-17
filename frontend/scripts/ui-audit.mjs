@@ -94,14 +94,7 @@ const state = (page) =>
 
 const box = async (loc) => (await loc.boundingBox());
 
-async function runViewport(browser, width, height) {
-  const tag = `${width}x${height}`;
-  const ctx = await browser.newContext({ viewport: { width, height }, deviceScaleFactor: 1, isMobile: true, hasTouch: true });
-  const page = await ctx.newPage();
-  const errors = [];
-  page.on('pageerror', (e) => errors.push(e.message));
-
-  let bothPlaying = false;
+async function setupRoutes(page) {
   await page.route('**/api/music/home', (r) => r.fulfill({ json: { success: true, data: FEED } }));
   await page.route('**/api/**', (r) => (r.request().url().includes('/music/home') ? r.fallback() : r.fulfill({ json: { success: true } })));
   await page.route('https://www.youtube.com/iframe_api', (r) => r.fulfill({ contentType: 'application/javascript', body: YT_STUB }));
@@ -116,6 +109,17 @@ async function runViewport(browser, width, height) {
     return r.fulfill({ status: 200, contentType: 'audio/wav', body: wav, headers: { 'Accept-Ranges': 'bytes' } });
   });
   await page.route('https://images.unsplash.com/**', (r) => r.abort());
+}
+
+async function runViewport(browser, width, height) {
+  const tag = `${width}x${height}`;
+  const ctx = await browser.newContext({ viewport: { width, height }, deviceScaleFactor: 1, isMobile: true, hasTouch: true });
+  const page = await ctx.newPage();
+  const errors = [];
+  page.on('pageerror', (e) => errors.push(e.message));
+
+  let bothPlaying = false;
+  await setupRoutes(page);
 
   await page.goto(`http://127.0.0.1:${PORT}/`);
   await page.waitForSelector('text=Plain Audio Song');
@@ -214,6 +218,83 @@ async function runViewport(browser, width, height) {
   await ctx.close();
 }
 
+// Real touch swipe (touchStart -> touchMove steps -> touchEnd), fast enough to count as a swipe
+async function swipe(page, from, to, ms = 160) {
+  const cdp = await page.context().newCDPSession(page);
+  const steps = 6;
+  await cdp.send('Input.dispatchTouchEvent', { type: 'touchStart', touchPoints: [{ x: from.x, y: from.y }] });
+  for (let i = 1; i <= steps; i++) {
+    await cdp.send('Input.dispatchTouchEvent', {
+      type: 'touchMove',
+      touchPoints: [{ x: from.x + ((to.x - from.x) * i) / steps, y: from.y + ((to.y - from.y) * i) / steps }]
+    });
+    await page.waitForTimeout(ms / steps);
+  }
+  await cdp.send('Input.dispatchTouchEvent', { type: 'touchEnd', touchPoints: [] });
+  await cdp.detach();
+}
+const center = async (loc) => {
+  const b = await loc.boundingBox();
+  return { x: b.x + b.width / 2, y: b.y + b.height / 2, w: b.width, h: b.height };
+};
+
+async function runGestures(browser, width, height) {
+  const tag = `${width}x${height}`;
+  const ctx = await browser.newContext({ viewport: { width, height }, deviceScaleFactor: 1, isMobile: true, hasTouch: true });
+  const page = await ctx.newPage();
+  const errors = [];
+  page.on('pageerror', (e) => errors.push(e.message));
+  await setupRoutes(page);
+  await page.goto(`http://127.0.0.1:${PORT}/`);
+  await page.waitForSelector('text=Plain Audio Song');
+
+  await page.getByText('Badass (Leo)').first().click();
+  await page.waitForFunction(() => { const a = window.__tamiltunes_audio; return a && !a.paused && a.currentTime > 0.3; }, null, { timeout: 8000 });
+  const mini = page.locator('[aria-label="Open now playing full screen"]');
+  const titleOf = async () => (await page.locator('h2').last().innerText().catch(() => '')).trim();
+
+  // mini player: swipe UP opens the full-screen player
+  const mc = await center(mini);
+  await swipe(page, { x: mc.x, y: mc.y }, { x: mc.x, y: mc.y - 140 });
+  await page.waitForSelector('[aria-label="Close now playing"]', { timeout: 3000 }).catch(() => {});
+  check(`[${tag}] swipe up on the mini player opens the full-screen player`, (await page.locator('[aria-label="Close now playing"]').count()) === 1);
+
+  // a plain TAP on the artwork changes nothing
+  const art = page.locator('[data-testid=fs-artwork]');
+  check(`[${tag}] artwork has the swipe hook`, (await art.count()) === 1);
+  const before = await titleOf();
+  const ac = await center(art);
+  await page.touchscreen.tap(ac.x, ac.y);
+  await page.waitForTimeout(300);
+  check(`[${tag}] tapping the artwork changes nothing`, (await titleOf()) === before && (await page.locator('[aria-label="Close now playing"]').count()) === 1, `title=${await titleOf()}`);
+
+  // swipe LEFT on the artwork = next song, RIGHT = previous
+  await swipe(page, { x: ac.x + 60, y: ac.y }, { x: ac.x - 80, y: ac.y });
+  await page.waitForTimeout(500);
+  const afterNext = await titleOf();
+  check(`[${tag}] swipe left on the artwork plays the next song`, afterNext !== before && afterNext.length > 0, `${before} -> ${afterNext}`);
+  const ac2 = await center(art);
+  await swipe(page, { x: ac2.x - 60, y: ac2.y }, { x: ac2.x + 80, y: ac2.y });
+  await page.waitForTimeout(500);
+  check(`[${tag}] swipe right on the artwork goes back`, (await titleOf()) === before, `now=${await titleOf()}`);
+
+  // a horizontal drag that starts on the progress slider must NOT change the song
+  const slider = page.locator('input[title="Seek playback"]:visible').first();
+  const sc = await center(slider);
+  await swipe(page, { x: sc.x + 40, y: sc.y }, { x: sc.x - 90, y: sc.y });
+  await page.waitForTimeout(300);
+  check(`[${tag}] dragging the slider does not change the song`, (await titleOf()) === before, `now=${await titleOf()}`);
+
+  // swipe DOWN on the artwork closes the player
+  const ac3 = await center(art);
+  await swipe(page, { x: ac3.x, y: ac3.y - 40 }, { x: ac3.x, y: ac3.y + 150 });
+  await page.waitForTimeout(500);
+  check(`[${tag}] swipe down on the artwork closes the player`, (await page.locator('[aria-label="Close now playing"]').count()) === 0);
+
+  check(`[${tag}] no uncaught page errors during gestures`, errors.length === 0, errors.join(' | '));
+  await ctx.close();
+}
+
 let server;
 let browser;
 try {
@@ -222,7 +303,10 @@ try {
     ...(process.env.CHROMIUM_PATH ? { executablePath: process.env.CHROMIUM_PATH } : {}),
     args: ['--autoplay-policy=no-user-gesture-required']
   });
-  for (const [w, h] of [[360, 640], [390, 844]]) await runViewport(browser, w, h);
+  for (const [w, h] of [[360, 640], [390, 844]]) {
+    await runViewport(browser, w, h);
+    await runGestures(browser, w, h);
+  }
 } catch (err) {
   console.error("UI audit crashed:", String(err.message).split("\n").slice(0,12).join("\n"));
   results.push({ name: 'audit run', ok: false, detail: String(err) });

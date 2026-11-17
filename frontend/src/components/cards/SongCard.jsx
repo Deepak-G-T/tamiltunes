@@ -23,7 +23,7 @@ const SongCard = ({ song, playlist, onAddToPlaylist, onToggleFavorite, isFavorit
       onClick={() => {
         if (!isCurrent) playSong(song, playlist);
       }}
-      className="group relative bg-surface-2 hover:bg-surface-4 p-3 md:p-4 rounded-card transition-colors duration-300 cursor-pointer select-none lift"
+      className="group relative bg-surface-2 hover:bg-surface-4 p-3 md:p-4 rounded-card transition-colors duration-300 cursor-pointer select-none press lift"
     >
       {/* Artwork */}
       <div className="relative aspect-square w-full rounded-md overflow-hidden mb-3 md:mb-4 bg-surface-3 shadow-[0_8px_24px_rgba(0,0,0,0.5)]">
