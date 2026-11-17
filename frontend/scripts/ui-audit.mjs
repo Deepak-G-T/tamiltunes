@@ -291,11 +291,52 @@ async function runGestures(browser, width, height) {
   await page.waitForTimeout(300);
   check(`[${tag}] dragging the slider does not change the song`, (await titleOf()) === before, `now=${await titleOf()}`);
 
+  // scrub bubble: shows the time ONLY while a finger is on the progress bar, and seeking works
+  const seekBefore = await page.evaluate(() => window.__tamiltunes_audio.currentTime);
+  const sc2 = await center(slider);
+  const cdp = await page.context().newCDPSession(page);
+  await cdp.send('Input.dispatchTouchEvent', { type: 'touchStart', touchPoints: [{ x: sc2.x - sc2.w / 2 + 20, y: sc2.y }] });
+  await page.waitForTimeout(120);
+  await cdp.send('Input.dispatchTouchEvent', { type: 'touchMove', touchPoints: [{ x: sc2.x + sc2.w / 4, y: sc2.y }] });
+  await page.waitForTimeout(150);
+  check(`[${tag}] time bubble shows while scrubbing`, await page.locator('[data-testid=scrub-time]').isVisible());
+  await cdp.send('Input.dispatchTouchEvent', { type: 'touchEnd', touchPoints: [] });
+  await cdp.detach();
+  await page.waitForTimeout(200);
+  check(`[${tag}] time bubble disappears after scrubbing`, (await page.locator('[data-testid=scrub-time]').count()) === 0);
+  const seekAfter = await page.evaluate(() => window.__tamiltunes_audio.currentTime);
+  check(`[${tag}] scrubbing moved the playback position`, Math.abs(seekAfter - seekBefore) > 0.5, `before=${seekBefore} after=${seekAfter}`);
+  check(`[${tag}] scrubbing did not change the song`, (await titleOf()) === before, `now=${await titleOf()}`);
+
+  // up next: on tall phones it shows the following song, tapping it plays it, and it is hidden on the last song.
+  // On short screens (<= 700px tall) it is hidden on purpose so the controls stay on screen.
+  const upNext = page.locator('[data-testid=up-next]');
+  if (height <= 700) {
+    check(`[${tag}] up-next card is hidden on a short screen (controls stay on screen)`, !(await upNext.isVisible()));
+    const ctl = await center(page.locator('[data-testid=fs-play]'));
+    check(`[${tag}] transport controls fit inside the short screen`, ctl.y + ctl.h / 2 <= height, `controls bottom=${ctl.y + ctl.h / 2} of ${height}`);
+  } else {
+    check(`[${tag}] up-next card shows the following song`, (await upNext.count()) === 1 && /Plain Audio Song/.test(await upNext.innerText()), await upNext.innerText().catch(() => 'none'));
+    await upNext.click();
+    await page.waitForTimeout(500);
+    check(`[${tag}] tapping up-next plays that song`, (await titleOf()) === 'Plain Audio Song', `now=${await titleOf()}`);
+    check(`[${tag}] up-next is hidden on the last song`, (await page.locator('[data-testid=up-next]').count()) === 0);
+  }
+
   // swipe DOWN on the artwork closes the player
   const ac3 = await center(art);
   await swipe(page, { x: ac3.x, y: ac3.y - 40 }, { x: ac3.x, y: ac3.y + 150 });
   await page.waitForTimeout(500);
   check(`[${tag}] swipe down on the artwork closes the player`, (await page.locator('[aria-label="Close now playing"]').count()) === 0);
+
+  // "Add to playlist" button closes the full-screen layer (the dialog sits below it)
+  await mini.click({ position: { x: 20, y: 10 } });
+  await page.waitForSelector('[aria-label="Close now playing"]', { timeout: 3000 });
+  const addBtn = page.locator('button[aria-label="Add to playlist"]').last();
+  check(`[${tag}] "Add to playlist" button is shown in the full-screen player`, await addBtn.isVisible());
+  await addBtn.click();
+  await page.waitForTimeout(400);
+  check(`[${tag}] "Add to playlist" closes the full-screen player`, (await page.locator('[aria-label="Close now playing"]').count()) === 0);
 
   check(`[${tag}] no uncaught page errors during gestures`, errors.length === 0, errors.join(' | '));
   await ctx.close();

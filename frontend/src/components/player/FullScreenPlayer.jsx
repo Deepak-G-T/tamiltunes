@@ -1,6 +1,8 @@
 import React, { useEffect } from 'react';
 import { createPortal } from 'react-dom';
 import {
+  ListPlus,
+  Share2,
   ChevronDown,
   Play,
   Pause,
@@ -20,10 +22,11 @@ import VideoSlot from './VideoSlot';
 import VideoModeToggle from './VideoModeToggle';
 import { useSwipe } from '../../lib/swipe';
 import { haptic } from '../../lib/haptics';
+import { getUpNext } from '../../lib/upNext';
 
 const MUSIC_COVER_FALLBACK = "data:image/svg+xml;charset=UTF-8,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 300 300'%3E%3Cdefs%3E%3ClinearGradient id='bg' x1='0%25' y1='0%25' x2='100%25' y2='100%25'%3E%3Cstop offset='0%25' stop-color='%23143d24'/%3E%3Cstop offset='50%25' stop-color='%230f2a1a'/%3E%3Cstop offset='100%25' stop-color='%23071a10'/%3E%3C/linearGradient%3E%3C/defs%3E%3Crect width='300' height='300' rx='16' fill='url(%23bg)'/%3E%3Ccircle cx='150' cy='150' r='60' fill='%231db954' opacity='0.2'/%3E%3Cpath d='M135 180V120l50-14v54m-50 0a16 16 0 11-32 0 16 16 0 0132 0zm50-14a16 16 0 11-32 0 16 16 0 0132 0z' stroke='%236ee9a0' stroke-width='6' fill='none' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E";
 
-const FullScreenPlayer = ({ isOpen, onClose, onToggleFavorite, isFavorite }) => {
+const FullScreenPlayer = ({ isOpen, onClose, onToggleFavorite, isFavorite, onAddToPlaylist }) => {
   const {
     currentSong,
     isPlaying,
@@ -44,7 +47,9 @@ const FullScreenPlayer = ({ isOpen, onClose, onToggleFavorite, isFavorite }) => 
     repeatMode,
     toggleRepeat,
     setIsQueueOpen,
-    activeEngine
+    activeEngine,
+    queue,
+    queueIndex
   } = useAudio();
 
   // Lock body scroll when full screen player is open on mobile
@@ -81,6 +86,22 @@ const FullScreenPlayer = ({ isOpen, onClose, onToggleFavorite, isFavorite }) => 
       onClose();
     }
   });
+
+  const upNext = getUpNext(queue, queueIndex, { isShuffle, repeatMode });
+  const canShare = typeof navigator !== 'undefined' && typeof navigator.share === 'function';
+
+  const shareSong = async () => {
+    haptic(10);
+    try {
+      await navigator.share({
+        title: currentSong.title,
+        text: `${currentSong.title} – ${currentSong.artist || currentSong.singers || ''}`.trim(),
+        url: window.location.origin
+      });
+    } catch {
+      /* cancelled by the user: nothing to do */
+    }
+  };
 
   if (!isOpen || !currentSong) return null;
 
@@ -144,7 +165,7 @@ const FullScreenPlayer = ({ isOpen, onClose, onToggleFavorite, isFavorite }) => 
         {activeEngine !== 'youtube' && (
         <div
           key={currentSong.id}
-          className="relative w-[min(70vw,20rem)] h-[min(70vw,20rem)] mb-6 art-in"
+          className="relative w-[min(70vw,20rem,34svh)] h-[min(70vw,20rem,34svh)] mb-5 art-in"
           data-testid="fs-artwork"
           style={{ touchAction: 'none' }}
           onTouchStart={artSwipe.onTouchStart}
@@ -293,6 +314,66 @@ const FullScreenPlayer = ({ isOpen, onClose, onToggleFavorite, isFavorite }) => 
             {repeatMode === 'one' ? <Repeat1 className="w-5 h-5" /> : <Repeat className="w-5 h-5" />}
           </button>
         </div>
+
+        {/* Quick actions */}
+        {(onAddToPlaylist || canShare) && (
+          <div className="flex items-center justify-center gap-8 mb-3 text-zinc-300">
+            {onAddToPlaylist && (
+              <button
+                onClick={() => {
+                  haptic(10);
+                  onClose(); // the playlist dialog sits below this full-screen layer
+                  onAddToPlaylist(currentSong);
+                }}
+                aria-label="Add to playlist"
+                className="flex flex-col items-center gap-1 text-[11px] hover:text-white active:scale-90 transition-transform"
+              >
+                <ListPlus className="w-6 h-6" />
+                <span className="[@media(max-height:700px)]:hidden">Playlist</span>
+              </button>
+            )}
+            {canShare && (
+              <button
+                onClick={shareSong}
+                aria-label="Share song"
+                className="flex flex-col items-center gap-1 text-[11px] hover:text-white active:scale-90 transition-transform"
+              >
+                <Share2 className="w-6 h-6" />
+                <span className="[@media(max-height:700px)]:hidden">Share</span>
+              </button>
+            )}
+          </div>
+        )}
+
+        {/* Up next */}
+        {upNext && (
+          <button
+            onClick={() => {
+              haptic(10);
+              nextTrack();
+            }}
+            aria-label={`Up next: ${upNext.title}`}
+            data-testid="up-next"
+            className="w-full flex items-center gap-3 p-2 mb-3 rounded-lg bg-white/10 hover:bg-white/15 active:scale-[0.98] transition text-left [@media(max-height:700px)]:hidden"
+          >
+            <img
+              src={upNext.image || MUSIC_COVER_FALLBACK}
+              alt=""
+              referrerPolicy="no-referrer"
+              onError={(e) => {
+                e.currentTarget.onerror = null;
+                e.currentTarget.src = MUSIC_COVER_FALLBACK;
+              }}
+              className="w-10 h-10 rounded object-cover flex-shrink-0 bg-surface-3"
+            />
+            <span className="min-w-0 flex-1">
+              <span className="block text-[10px] uppercase tracking-wider font-bold text-accent-300">Up next</span>
+              <span className="block text-sm font-semibold text-white truncate">{upNext.title}</span>
+              <span className="block text-xs text-zinc-400 truncate">{upNext.artist || upNext.singers}</span>
+            </span>
+            <SkipForward className="w-5 h-5 text-zinc-400 flex-shrink-0" />
+          </button>
+        )}
 
         {/* Volume */}
         <div className="hidden sm:flex justify-center pb-2">
