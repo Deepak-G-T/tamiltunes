@@ -232,3 +232,6 @@ input[type="range"]:active::-moz-range-thumb {
   .lift:hover { transform: none; }
   .cover-wash, .cover-glow { transition: none; }
 }
+
+.no-scrollbar { scrollbar-width: none; }
+.no-scrollbar::-webkit-scrollbar { display: none; }

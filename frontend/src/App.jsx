@@ -23,6 +23,7 @@ const History = lazy(() => import('./pages/History'));
 const Login = lazy(() => import('./pages/Login'));
 const Signup = lazy(() => import('./pages/Signup'));
 const Profile = lazy(() => import('./pages/Profile'));
+const UserProfile = lazy(() => import('./pages/UserProfile'));
 
 function App() {
   return (
@@ -43,6 +44,7 @@ function App() {
                 <Route path="login" element={<Login />} />
                 <Route path="signup" element={<Signup />} />
                 <Route path="profile" element={<Profile />} />
+                <Route path="u/:username" element={<UserProfile />} />
                 <Route path="*" element={<Navigate to="/" replace />} />
               </Route>
             </Routes>

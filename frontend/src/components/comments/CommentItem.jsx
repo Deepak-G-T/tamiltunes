@@ -118,22 +118,24 @@ const CommentItem = ({ comment, viewer, actions, onSeek, onNavigate, replies, re
           <Avatar user={author} size={isReply ? 28 : 36} />
         )}
         <div className="flex-1 min-w-0">
-          <div className="flex items-center flex-wrap gap-x-2 gap-y-0.5 text-xs">
-            <Name {...nameProps} className="font-bold text-white hover:underline truncate max-w-[10rem]">{author.name}</Name>
-            {profilePath && <span className="text-zinc-500 truncate max-w-[8rem]">@{author.username}</span>}
-            {author.role === 'artist' && (
-              <span className="inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded-full bg-accent-500/15 text-accent-300 font-bold text-[10px]"><BadgeCheck className="w-3 h-3" /> Artist</span>
-            )}
-            {comment.isPinned && (
-              <span className="inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded-full bg-brand-500/15 text-brand-300 font-bold text-[10px]"><Pin className="w-3 h-3" /> Pinned</span>
-            )}
-            <span className="text-zinc-500">{pending ? 'Posting…' : timeAgo(comment.createdAt)}{comment.editedAt && !pending ? ' · edited' : ''}</span>
+          <div className="flex items-start gap-2 text-xs">
+            <div className="flex items-center flex-wrap gap-x-2 gap-y-0.5 min-w-0 flex-1">
+              <Name {...nameProps} className="font-bold text-white hover:underline truncate max-w-[10rem]">{author.name}</Name>
+              {profilePath && <span className="text-zinc-500 truncate max-w-[8rem]">@{author.username}</span>}
+              {author.role === 'artist' && (
+                <span className="inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded-full bg-accent-500/15 text-accent-300 font-bold text-[10px]"><BadgeCheck className="w-3 h-3" /> Artist</span>
+              )}
+              {comment.isPinned && (
+                <span className="inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded-full bg-brand-500/15 text-brand-300 font-bold text-[10px]"><Pin className="w-3 h-3" /> Pinned</span>
+              )}
+              <span className="text-zinc-500">{pending ? 'Posting…' : timeAgo(comment.createdAt)}{comment.editedAt && !pending ? ' · edited' : ''}</span>
+            </div>
             {viewer && !pending && (
-              <span className="ml-auto">
+              <div className="flex-shrink-0 -mt-1.5 -mr-1.5">
                 <Menu comment={comment} isOwn={isOwn} canDelete={isOwn || viewer.role === 'admin'} canPin={isMod}
                   onEdit={() => setEditing(true)} onDelete={() => actions.remove(comment.id)}
                   onPin={() => actions.togglePin(comment.id)} onReport={(r) => actions.report(comment.id, r)} />
-              </span>
+              </div>
             )}
           </div>
 
