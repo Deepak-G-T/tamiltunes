@@ -146,6 +146,37 @@ console.log('✓ non-embeddable / non-public / missing status rejected');
   console.log('✓ curated map matching, unverified Hukum candidate not served');
 }
 
+// 9. title matching tolerates real JioSaavn formats but rejects other recordings
+{
+  const v = createVideoLookup({ cfg: cfgWith({ youtubeApiKey: '' }) });
+  const hit = (title, artist) => v.peek({ id: 'saavn_x', title, artist, singers: artist });
+  const should = [
+    ['Hukum - Thalaivar Alappara (From "Jailer")', 'Anirudh Ravichander, Super Subu', '1F3hm6MfR1k'],
+    ['Aalaporan Thamizhan (From "Mersal")', 'A.R. Rahman', 'xsbLtHql4g8'], // one-typo spelling
+    ['Arabic Kuthu - Halamithi Habibo (From "Beast")', 'Anirudh Ravichander, Jonita Gandhi', 'KUN5Uf9mObQ'],
+    ['Kaavaalaa - Kaavaalaa (From "Jailer")', 'Shilpa Rao, Anirudh Ravichander', 'RVLNBVK8auM'],
+    ['Kavaalaa (From "Jailer")', 'Anirudh Ravichander', 'RVLNBVK8auM'],
+    ['Why This Kolaveri Di - The Soup of Love', 'Dhanush, Anirudh Ravichander', 'YR12Z8f1Dh8'],
+    ['Vaathi Coming (From "Master")', 'Anirudh Ravichander, Gana Balachandar', 'fRD_3vJagxk'],
+    ['Rowdy Baby (From "Maari 2")', 'Dhanush, Dhee', 'x6Q7c9RyMzk']
+  ];
+  for (const [t, a, id] of should) assert.equal(hit(t, a), id, `should match: ${t}`);
+
+  const shouldNot = [
+    ['Badass (Remix)', 'Anirudh Ravichander'], // junk word inside brackets
+    ['Badass Remix (From "Leo")', 'Anirudh Ravichander'],
+    ['Hukum Lofi Flip', 'Anirudh Ravichander'],
+    ['Naa Ready (Cover)', 'Anirudh Ravichander'],
+    ['Vaathi Coming - Live', 'Anirudh Ravichander'],
+    ['Badass Lover', 'Anirudh Ravichander'], // different song sharing a first word
+    ['Hukumath', 'Anirudh Ravichander'],
+    ['Maa Ready', 'Anirudh Ravichander'], // fuzzy match is not allowed on short titles
+    ['Badass (From "Leo")', 'Some Random Band'] // right title, wrong artist
+  ];
+  for (const [t, a] of shouldNot) assert.equal(hit(t, a), undefined, `should NOT match: ${t}`);
+  console.log('✓ title matching: JioSaavn variants match, remixes/covers/lookalikes rejected');
+}
+
 // ---- HTTP level: home/search/song carry videoId, existing fields unchanged ----
 await initDb();
 musicService.setProvider('mock');
