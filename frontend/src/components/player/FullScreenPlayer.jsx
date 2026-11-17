@@ -1,6 +1,8 @@
 import React, { useEffect } from 'react';
 import { createPortal } from 'react-dom';
 import {
+  ListPlus,
+  Share2,
   ChevronDown,
   Play,
   Pause,
@@ -11,7 +13,6 @@ import {
   Repeat1,
   ListMusic,
   Heart,
-  ShieldCheck,
   Disc
 } from 'lucide-react';
 import { useAudio } from '../../context/AudioContext';
@@ -21,10 +22,11 @@ import VideoSlot from './VideoSlot';
 import VideoModeToggle from './VideoModeToggle';
 import { useSwipe } from '../../lib/swipe';
 import { haptic } from '../../lib/haptics';
+import { getUpNext } from '../../lib/upNext';
 
 const MUSIC_COVER_FALLBACK = "data:image/svg+xml;charset=UTF-8,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 300 300'%3E%3Cdefs%3E%3ClinearGradient id='bg' x1='0%25' y1='0%25' x2='100%25' y2='100%25'%3E%3Cstop offset='0%25' stop-color='%23143d24'/%3E%3Cstop offset='50%25' stop-color='%230f2a1a'/%3E%3Cstop offset='100%25' stop-color='%23071a10'/%3E%3C/linearGradient%3E%3C/defs%3E%3Crect width='300' height='300' rx='16' fill='url(%23bg)'/%3E%3Ccircle cx='150' cy='150' r='60' fill='%231db954' opacity='0.2'/%3E%3Cpath d='M135 180V120l50-14v54m-50 0a16 16 0 11-32 0 16 16 0 0132 0zm50-14a16 16 0 11-32 0 16 16 0 0132 0z' stroke='%236ee9a0' stroke-width='6' fill='none' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E";
 
-const FullScreenPlayer = ({ isOpen, onClose, onToggleFavorite, isFavorite }) => {
+const FullScreenPlayer = ({ isOpen, onClose, onToggleFavorite, isFavorite, onAddToPlaylist }) => {
   const {
     currentSong,
     isPlaying,
@@ -45,7 +47,9 @@ const FullScreenPlayer = ({ isOpen, onClose, onToggleFavorite, isFavorite }) => 
     repeatMode,
     toggleRepeat,
     setIsQueueOpen,
-    activeEngine
+    activeEngine,
+    queue,
+    queueIndex
   } = useAudio();
 
   // Lock body scroll when full screen player is open on mobile
@@ -82,6 +86,22 @@ const FullScreenPlayer = ({ isOpen, onClose, onToggleFavorite, isFavorite }) => 
       onClose();
     }
   });
+
+  const upNext = getUpNext(queue, queueIndex, { isShuffle, repeatMode });
+  const canShare = typeof navigator !== 'undefined' && typeof navigator.share === 'function';
+
+  const shareSong = async () => {
+    haptic(10);
+    try {
+      await navigator.share({
+        title: currentSong.title,
+        text: `${currentSong.title} – ${currentSong.artist || currentSong.singers || ''}`.trim(),
+        url: window.location.origin
+      });
+    } catch {
+      /* cancelled by the user: nothing to do */
+    }
+  };
 
   if (!isOpen || !currentSong) return null;
 
@@ -145,7 +165,7 @@ const FullScreenPlayer = ({ isOpen, onClose, onToggleFavorite, isFavorite }) => 
         {activeEngine !== 'youtube' && (
         <div
           key={currentSong.id}
-          className="relative w-60 h-60 sm:w-80 sm:h-80 mb-6 art-in"
+          className="relative w-[min(70vw,20rem,34svh)] h-[min(70vw,20rem,34svh)] mb-5 art-in"
           data-testid="fs-artwork"
           style={{ touchAction: 'none' }}
           onTouchStart={artSwipe.onTouchStart}
@@ -183,50 +203,50 @@ const FullScreenPlayer = ({ isOpen, onClose, onToggleFavorite, isFavorite }) => 
         <VideoModeToggle className="mb-4" />
 
         {/* Title, Artist, & Favorite */}
-        <div className="w-full flex items-center justify-between mb-3 px-1">
+        <div className="w-full flex items-start justify-between mb-3 px-1">
           <div className="min-w-0 flex-1 mr-3">
-            <h2 className="text-2xl sm:text-3xl font-extrabold text-white truncate tracking-tight">
+            <h2 className="text-2xl sm:text-3xl font-extrabold text-white line-clamp-2 tracking-tight leading-tight">
               {currentSong.title}
             </h2>
-            <p className="text-sm font-medium text-zinc-400 truncate mt-1">
+            <p className="text-sm font-medium text-zinc-300 line-clamp-2 mt-1">
               {currentSong.artist || currentSong.singers}
             </p>
             {currentSong.album && (
-              <p className="text-xs text-brand-400/80 truncate mt-0.5">
-                {currentSong.album}
-              </p>
+              <span className="inline-flex max-w-full mt-2 px-2.5 py-0.5 rounded-full bg-brand-500/15 text-brand-300 text-xs font-semibold">
+                <span className="truncate">{currentSong.album}</span>
+              </span>
             )}
           </div>
           {onToggleFavorite && (
             <button
-              onClick={() => onToggleFavorite(currentSong)}
-              className="p-3 rounded-full hover:bg-zinc-800/60 active:scale-90 transition-transform"
+              onClick={() => {
+                haptic(12);
+                onToggleFavorite(currentSong);
+              }}
+              aria-label={isFavorite ? 'Remove from favourites' : 'Add to favourites'}
+              aria-pressed={!!isFavorite}
+              className="p-3 -mt-1 rounded-full hover:bg-white/10 active:scale-90 transition-transform"
             >
               <Heart
-                className={`w-6 h-6 transition-colors ${
-                  isFavorite ? 'fill-rose-500 text-rose-500' : 'text-zinc-400 hover:text-white'
+                key={isFavorite ? 'on' : 'off'}
+                className={`w-7 h-7 transition-colors ${
+                  isFavorite ? 'fill-brand-500 text-brand-500 heart-pop' : 'text-zinc-300 hover:text-white'
                 }`}
               />
             </button>
           )}
         </div>
 
-        {/* License Notice / Stream Status Badge */}
-        <div className="w-full mb-3 px-1">
-          <div className="flex items-center gap-1.5 text-[11px] text-zinc-500">
-            <ShieldCheck className="w-3.5 h-3.5 text-emerald-400 flex-shrink-0" />
-            <span className="truncate">
-              {currentSong.licenseNotice || '320kbps CD Quality Audio • Direct Tamil Stream'}
-            </span>
+        {/* Playback error (the stream/licence provider text that used to be here was removed) */}
+        {playbackError && (
+          <div className="w-full mb-3 px-1" role="status">
+            <p className="text-xs text-amber-300 bg-amber-500/10 rounded-lg px-3 py-2">{playbackError}</p>
           </div>
-          {playbackError && (
-            <p className="text-xs text-amber-400 mt-1 px-1">{playbackError}</p>
-          )}
-        </div>
+        )}
       </div>
 
       {/* Bottom Controls */}
-      <div className="relative z-10 max-w-sm sm:max-w-md mx-auto w-full pb-2">
+      <div className="relative z-10 max-w-sm sm:max-w-md mx-auto w-full pb-[max(0.5rem,env(safe-area-inset-bottom))]">
         {/* Scrubber */}
         <div className="mb-5">
           <ProgressBar
@@ -295,8 +315,68 @@ const FullScreenPlayer = ({ isOpen, onClose, onToggleFavorite, isFavorite }) => 
           </button>
         </div>
 
+        {/* Quick actions */}
+        {(onAddToPlaylist || canShare) && (
+          <div className="flex items-center justify-center gap-8 mb-3 text-zinc-300">
+            {onAddToPlaylist && (
+              <button
+                onClick={() => {
+                  haptic(10);
+                  onClose(); // the playlist dialog sits below this full-screen layer
+                  onAddToPlaylist(currentSong);
+                }}
+                aria-label="Add to playlist"
+                className="flex flex-col items-center gap-1 text-[11px] hover:text-white active:scale-90 transition-transform"
+              >
+                <ListPlus className="w-6 h-6" />
+                <span className="[@media(max-height:700px)]:hidden">Playlist</span>
+              </button>
+            )}
+            {canShare && (
+              <button
+                onClick={shareSong}
+                aria-label="Share song"
+                className="flex flex-col items-center gap-1 text-[11px] hover:text-white active:scale-90 transition-transform"
+              >
+                <Share2 className="w-6 h-6" />
+                <span className="[@media(max-height:700px)]:hidden">Share</span>
+              </button>
+            )}
+          </div>
+        )}
+
+        {/* Up next */}
+        {upNext && (
+          <button
+            onClick={() => {
+              haptic(10);
+              nextTrack();
+            }}
+            aria-label={`Up next: ${upNext.title}`}
+            data-testid="up-next"
+            className="w-full flex items-center gap-3 p-2 mb-3 rounded-lg bg-white/10 hover:bg-white/15 active:scale-[0.98] transition text-left [@media(max-height:700px)]:hidden"
+          >
+            <img
+              src={upNext.image || MUSIC_COVER_FALLBACK}
+              alt=""
+              referrerPolicy="no-referrer"
+              onError={(e) => {
+                e.currentTarget.onerror = null;
+                e.currentTarget.src = MUSIC_COVER_FALLBACK;
+              }}
+              className="w-10 h-10 rounded object-cover flex-shrink-0 bg-surface-3"
+            />
+            <span className="min-w-0 flex-1">
+              <span className="block text-[10px] uppercase tracking-wider font-bold text-accent-300">Up next</span>
+              <span className="block text-sm font-semibold text-white truncate">{upNext.title}</span>
+              <span className="block text-xs text-zinc-400 truncate">{upNext.artist || upNext.singers}</span>
+            </span>
+            <SkipForward className="w-5 h-5 text-zinc-400 flex-shrink-0" />
+          </button>
+        )}
+
         {/* Volume */}
-        <div className="flex justify-center pb-2">
+        <div className="hidden sm:flex justify-center pb-2">
           <VolumeSlider
             volume={volume}
             isMuted={isMuted}

@@ -94,7 +94,7 @@ const MainLayout = () => {
       </div>
 
       {/* Shared Audio Player Engine (full-width desktop bar + Mobile FullScreen Modal + Queue Drawer) */}
-      <MusicPlayer />
+      <MusicPlayer onAddToPlaylist={(song) => setAddToPlaylistSong(song)} />
 
       {/* Modals */}
       <CreatePlaylistModal
