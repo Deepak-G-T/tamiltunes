@@ -1,6 +1,8 @@
 import React, { useState, useEffect } from 'react';
 import { useParams, useNavigate, useOutletContext } from 'react-router-dom';
 import { Play, Pause, Disc, Clock, Heart, PlusCircle, ArrowLeft, Loader2, Music2 } from 'lucide-react';
+import CoverImage from '../components/common/CoverImage';
+import Equalizer from '../components/common/Equalizer';
 import { useAudio } from '../context/AudioContext';
 import useCoverColor from '../hooks/useCoverColor';
 import { useAuth } from '../context/AuthContext';
@@ -103,16 +105,7 @@ const AlbumDetail = () => {
       {/* Album Header */}
       <div style={{ '--cover-rgb': coverRgb }} className="flex flex-col md:flex-row items-center md:items-end gap-6 cover-wash-strong -mx-4 md:-mx-6 -mt-4 px-4 md:px-6 pt-10 pb-6">
         <div className="w-44 h-44 sm:w-52 sm:h-52 rounded-md overflow-hidden shadow-[0_16px_48px_rgba(0,0,0,0.6)] flex-shrink-0 bg-zinc-800">
-          <img
-            src={album.image || 'https://images.unsplash.com/photo-1514525253161-7a46d19cd819?w=500&auto=format&fit=crop&q=80'}
-            alt={album.name || album.title}
-            loading="lazy"
-            onError={(e) => {
-              e.currentTarget.onerror = null;
-              e.currentTarget.src = 'https://images.unsplash.com/photo-1514525253161-7a46d19cd819?w=500&auto=format&fit=crop&q=80';
-            }}
-            className="w-full h-full object-cover"
-          />
+          <CoverImage src={album.image} alt={album.name || album.title} className="w-full h-full object-cover" />
         </div>
 
         <div className="flex-1 text-center md:text-left space-y-2">
@@ -173,7 +166,7 @@ const AlbumDetail = () => {
               }`}
             >
               <div className="col-span-1 text-xs text-zinc-500 group-hover:hidden">
-                {idx + 1}
+                {isThisSong && isPlaying ? <Equalizer /> : idx + 1}
               </div>
               <div className="col-span-1 hidden group-hover:block">
                 <Play className="w-4 h-4 text-brand-400 fill-brand-400" />

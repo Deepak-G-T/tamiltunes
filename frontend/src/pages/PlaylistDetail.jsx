@@ -11,6 +11,8 @@ import {
   Loader2,
   X
 } from 'lucide-react';
+import CoverImage from '../components/common/CoverImage';
+import Equalizer from '../components/common/Equalizer';
 import { useAudio } from '../context/AudioContext';
 import useCoverColor from '../hooks/useCoverColor';
 import { useAuth } from '../context/AuthContext';
@@ -269,19 +271,14 @@ const PlaylistDetail = () => {
                 }`}
               >
                 <div className="col-span-1 text-xs text-zinc-500 group-hover:hidden">
-                  {idx + 1}
+                  {isThisSong && isPlaying ? <Equalizer /> : idx + 1}
                 </div>
                 <div className="col-span-1 hidden group-hover:block">
                   <Play className="w-4 h-4 text-brand-400 fill-brand-400" />
                 </div>
 
                 <div className="col-span-6 sm:col-span-7 min-w-0 pr-2 flex items-center gap-3">
-                  <img
-                    src={song.image || 'https://images.unsplash.com/photo-1511671782779-c97d3d27a1d4?w=80&auto=format&fit=crop&q=80'}
-                    alt={song.title}
-                    loading="lazy"
-                    className="w-9 h-9 rounded object-cover flex-shrink-0"
-                  />
+                  <CoverImage src={song.image} alt="" className="w-9 h-9 rounded object-cover flex-shrink-0" />
                   <div className="min-w-0">
                     <p className={`text-sm font-semibold truncate ${isThisSong ? 'text-brand-400' : 'text-white'}`}>
                       {song.title}

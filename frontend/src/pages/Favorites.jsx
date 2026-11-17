@@ -1,6 +1,8 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Heart, Play, Pause, Trash2, Clock, Loader2, Music2 } from 'lucide-react';
+import CoverImage from '../components/common/CoverImage';
+import Equalizer from '../components/common/Equalizer';
 import { useAudio } from '../context/AudioContext';
 import { useAuth } from '../context/AuthContext';
 import api from '../services/api';
@@ -125,14 +127,15 @@ const Favorites = () => {
   return (
     <div className="space-y-8 animate-in fade-in duration-300">
       {/* Header */}
-      <div className="flex flex-col md:flex-row items-center md:items-end gap-6 bg-gradient-to-b from-rose-950/40 via-brand-950/30 to-zinc-900/40 p-6 rounded-2xl border border-zinc-800/60 shadow-xl">
-        <div className="w-40 h-40 sm:w-48 sm:h-48 rounded-md overflow-hidden shadow-[0_16px_48px_rgba(0,0,0,0.6)] flex-shrink-0 bg-gradient-to-tr from-rose-600 to-brand-600 flex items-center justify-center">
+      <div className="cover-wash-strong -mx-4 md:-mx-6 -mt-4 px-4 md:px-6 pt-10 pb-6 flex flex-col md:flex-row items-center md:items-end gap-6">
+        <div className="w-40 h-40 sm:w-48 sm:h-48 rounded-md overflow-hidden shadow-[0_16px_48px_rgba(0,0,0,0.6)] flex-shrink-0 bg-gradient-to-br from-brand-700 to-brand-300 flex items-center justify-center">
           <Heart className="w-20 h-20 text-white fill-white" />
         </div>
 
         <div className="flex-1 text-center md:text-left space-y-2">
-          <span className="text-[11px] font-bold uppercase tracking-widest text-rose-400">
-            Personal Collection
+          <span className="text-xs font-bold text-white">
+            Playlist
+            <span lang="ta" className="ml-2 font-semibold text-accent-300">· பிடித்த பாடல்கள்</span>
           </span>
           <h1 className="text-3xl sm:text-5xl font-black text-white tracking-tight">
             Favourite Songs
@@ -185,19 +188,14 @@ const Favorites = () => {
                 }`}
               >
                 <div className="col-span-1 text-xs text-zinc-500 group-hover:hidden">
-                  {idx + 1}
+                  {isThisSong && isPlaying ? <Equalizer /> : idx + 1}
                 </div>
                 <div className="col-span-1 hidden group-hover:block">
                   <Play className="w-4 h-4 text-brand-400 fill-brand-400" />
                 </div>
 
                 <div className="col-span-6 sm:col-span-7 min-w-0 pr-2 flex items-center gap-3">
-                  <img
-                    src={song.image || 'https://images.unsplash.com/photo-1511671782779-c97d3d27a1d4?w=80&auto=format&fit=crop&q=80'}
-                    alt={song.title}
-                    loading="lazy"
-                    className="w-9 h-9 rounded object-cover flex-shrink-0"
-                  />
+                  <CoverImage src={song.image} alt="" className="w-9 h-9 rounded object-cover flex-shrink-0" />
                   <div className="min-w-0">
                     <p className={`text-sm font-semibold truncate ${isThisSong ? 'text-brand-400' : 'text-white'}`}>
                       {song.title}

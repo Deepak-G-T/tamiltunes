@@ -1,6 +1,9 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { History as HistoryIcon, Play, Trash2, Clock, Loader2, Music } from 'lucide-react';
+import CoverImage from '../components/common/CoverImage';
+import Equalizer from '../components/common/Equalizer';
+import { groupByDay } from '../lib/groupByDay';
 import { useAudio } from '../context/AudioContext';
 import { useAuth } from '../context/AuthContext';
 import api from '../services/api';
@@ -20,7 +23,7 @@ const formatTimeAgo = (dateStr) => {
 };
 
 const History = () => {
-  const { currentSong, playSong } = useAudio();
+  const { currentSong, isPlaying, playSong } = useAudio();
   const { isAuthenticated } = useAuth();
   const navigate = useNavigate();
 
@@ -125,19 +128,22 @@ const History = () => {
 
   return (
     <div className="space-y-6 animate-in fade-in duration-300">
-      <div className="flex items-center justify-between pb-3 border-b border-white/10">
-        <div className="flex items-center gap-2.5">
-          <HistoryIcon className="w-6 h-6 text-sky-400" />
-          <h1 className="text-2xl font-bold text-white tracking-tight">Listening History</h1>
+      <div className="cover-wash-strong -mx-4 md:-mx-6 -mt-4 px-4 md:px-6 pt-10 pb-5 flex items-end justify-between gap-3">
+        <div className="min-w-0">
+          <div className="flex items-center gap-2.5">
+            <HistoryIcon className="w-7 h-7 text-brand-400" />
+            <h1 className="text-3xl md:text-5xl font-black text-white tracking-tight">Listening History</h1>
+          </div>
+          <p lang="ta" className="text-sm font-semibold text-accent-400 mt-1">கேட்ட பாடல்கள்</p>
         </div>
 
         {historyList.length > 0 && (
           <button
             onClick={handleClearHistory}
-            className="px-3 py-1.5 rounded-lg bg-zinc-800 hover:bg-rose-950 text-zinc-400 hover:text-rose-400 text-xs font-semibold flex items-center gap-1.5 transition-colors"
+            className="px-3 py-1.5 rounded-full bg-white/10 hover:bg-rose-950 text-zinc-300 hover:text-rose-300 text-xs font-semibold flex items-center gap-1.5 transition-colors flex-shrink-0"
           >
             <Trash2 className="w-3.5 h-3.5" />
-            <span>Clear History</span>
+            <span>Clear</span>
           </button>
         )}
       </div>
@@ -148,7 +154,10 @@ const History = () => {
         </div>
       ) : (
         <div className="space-y-1">
-          {historyList.map((item, idx) => {
+          {groupByDay(historyList).map((group) => (
+            <section key={group.label} className="space-y-1 pb-3" aria-label={group.label}>
+              <h2 className="text-sm font-bold text-zinc-300 px-1 pt-2 pb-1">{group.label}</h2>
+              {group.items.map(({ item, index: idx }) => {
             const song = item.song || item;
             const isThisSong = currentSong?.id === (song.id || item.songId);
 
@@ -156,27 +165,25 @@ const History = () => {
               <div
                 key={item.id || idx}
                 onClick={() => playSong(song, songsList)}
-                className={`flex items-center justify-between p-3 rounded-xl hover:bg-zinc-800/40 cursor-pointer group transition-colors ${
-                  isThisSong ? 'bg-brand-500/10 border border-brand-500/20' : ''
+                className={`press flex items-center justify-between p-2.5 rounded-lg hover:bg-white/10 cursor-pointer group transition-colors ${
+                  isThisSong ? 'bg-white/10' : ''
                 }`}
               >
                 <div className="flex items-center gap-3 min-w-0 flex-1">
                   <div className="relative w-11 h-11 rounded-lg overflow-hidden flex-shrink-0 bg-zinc-800">
-                    <img
-                      src={song.image || 'https://images.unsplash.com/photo-1511671782779-c97d3d27a1d4?w=100&auto=format&fit=crop&q=80'}
-                      alt={song.title}
-                      loading="lazy"
-                      className="w-full h-full object-cover"
-                    />
+                    <CoverImage src={song.image} alt="" className="w-full h-full object-cover" />
                     <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 flex items-center justify-center transition-opacity">
                       <Play className="w-4 h-4 text-white fill-white" />
                     </div>
                   </div>
 
                   <div className="min-w-0 flex-1">
-                    <h4 className={`text-sm font-semibold truncate ${isThisSong ? 'text-brand-400' : 'text-white'}`}>
-                      {song.title}
-                    </h4>
+                    <div className="flex items-center gap-1.5 min-w-0">
+                      {isThisSong && isPlaying && <Equalizer />}
+                      <h4 className={`text-sm font-semibold truncate ${isThisSong ? 'text-brand-400' : 'text-white'}`}>
+                        {song.title}
+                      </h4>
+                    </div>
                     <p className="text-xs text-zinc-400 truncate mt-0.5">
                       {song.artist || song.singers}
                     </p>
@@ -189,6 +196,8 @@ const History = () => {
               </div>
             );
           })}
+            </section>
+          ))}
         </div>
       )}
 

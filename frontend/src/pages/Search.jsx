@@ -1,18 +1,13 @@
 import React, { useState, useEffect } from 'react';
 import { useSearchParams, useOutletContext, useNavigate } from 'react-router-dom';
 import { Search as SearchIcon, X, Loader2, Music, Disc, User, Clock, ListMusic } from 'lucide-react';
+import { tileColor } from '../lib/tileColors';
 import SongCard from '../components/cards/SongCard';
 import AlbumCard from '../components/cards/AlbumCard';
 import ArtistCard from '../components/cards/ArtistCard';
 import PlaylistResultCard from '../components/cards/PlaylistResultCard';
 import api from '../services/api';
 import { useAuth } from '../context/AuthContext';
-
-// Tile backgrounds for the Browse-all grid (cycled)
-const TILE_COLORS = [
-  'bg-emerald-700', 'bg-rose-700', 'bg-indigo-700', 'bg-amber-700',
-  'bg-sky-700', 'bg-fuchsia-800', 'bg-teal-700', 'bg-orange-700'
-];
 
 const POPULAR_SEARCHES = [
   'Leo', 'Jailer', 'Master', 'Anirudh', 'AR Rahman', 'Ilaiyaraaja',
@@ -300,7 +295,7 @@ const Search = () => {
                 <button
                   key={term}
                   onClick={() => setSearchTerm(term)}
-                  className={`relative overflow-hidden aspect-[16/9] md:aspect-[2/1] rounded-lg p-3 md:p-4 text-left text-base md:text-xl font-extrabold text-white leading-tight hover:scale-[1.02] transition-transform focus-visible:ring-2 focus-visible:ring-white focus-visible:outline-none ${TILE_COLORS[idx % TILE_COLORS.length]}`}
+                  className={`relative overflow-hidden aspect-[16/9] md:aspect-[2/1] rounded-lg p-3 md:p-4 text-left text-base md:text-xl font-extrabold text-white leading-tight hover:scale-[1.02] transition-transform focus-visible:ring-2 focus-visible:ring-white focus-visible:outline-none ${tileColor(idx)}`}
                 >
                   <span className="relative z-10 line-clamp-2">{term}</span>
                   <Music
