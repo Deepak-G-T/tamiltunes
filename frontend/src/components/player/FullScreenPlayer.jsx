@@ -19,6 +19,8 @@ import ProgressBar from './ProgressBar';
 import VolumeSlider from './VolumeSlider';
 import VideoSlot from './VideoSlot';
 import VideoModeToggle from './VideoModeToggle';
+import { useSwipe } from '../../lib/swipe';
+import { haptic } from '../../lib/haptics';
 
 const MUSIC_COVER_FALLBACK = "data:image/svg+xml;charset=UTF-8,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 300 300'%3E%3Cdefs%3E%3ClinearGradient id='bg' x1='0%25' y1='0%25' x2='100%25' y2='100%25'%3E%3Cstop offset='0%25' stop-color='%23143d24'/%3E%3Cstop offset='50%25' stop-color='%230f2a1a'/%3E%3Cstop offset='100%25' stop-color='%23071a10'/%3E%3C/linearGradient%3E%3C/defs%3E%3Crect width='300' height='300' rx='16' fill='url(%23bg)'/%3E%3Ccircle cx='150' cy='150' r='60' fill='%231db954' opacity='0.2'/%3E%3Cpath d='M135 180V120l50-14v54m-50 0a16 16 0 11-32 0 16 16 0 0132 0zm50-14a16 16 0 11-32 0 16 16 0 0132 0z' stroke='%236ee9a0' stroke-width='6' fill='none' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E";
 
@@ -58,6 +60,29 @@ const FullScreenPlayer = ({ isOpen, onClose, onToggleFavorite, isFavorite }) => 
     };
   }, [isOpen]);
 
+  // Swipe down (artwork or top bar) closes; swipe left/right on the artwork = next/previous song.
+  // Never attached to the sliders or buttons, so they keep working normally.
+  const artSwipe = useSwipe({
+    onSwipeDown: () => {
+      haptic(10);
+      onClose();
+    },
+    onSwipeLeft: () => {
+      haptic(10);
+      nextTrack();
+    },
+    onSwipeRight: () => {
+      haptic(10);
+      previousTrack();
+    }
+  });
+  const topSwipe = useSwipe({
+    onSwipeDown: () => {
+      haptic(10);
+      onClose();
+    }
+  });
+
   if (!isOpen || !currentSong) return null;
 
   const content = (
@@ -79,7 +104,12 @@ const FullScreenPlayer = ({ isOpen, onClose, onToggleFavorite, isFavorite }) => 
       />
 
       {/* Top Bar with Down Chevron to close */}
-      <div className="relative z-10 flex items-center justify-between pb-2">
+      <div
+        className="relative z-10 flex items-center justify-between pb-2"
+        onTouchStart={topSwipe.onTouchStart}
+        onTouchEnd={topSwipe.onTouchEnd}
+        onTouchCancel={topSwipe.onTouchCancel}
+      >
         <button
           onClick={onClose}
           aria-label="Close now playing"
@@ -113,12 +143,20 @@ const FullScreenPlayer = ({ isOpen, onClose, onToggleFavorite, isFavorite }) => 
           <VideoSlot className="w-full aspect-video mb-6 shadow-2xl border border-zinc-800/80" />
         )}
         {activeEngine !== 'youtube' && (
-        <div className="relative w-60 h-60 sm:w-80 sm:h-80 mb-6" data-testid="fs-artwork">
-          <div aria-hidden="true" className="cover-glow absolute -inset-10 pointer-events-none" />
+        <div
+          key={currentSong.id}
+          className="relative w-60 h-60 sm:w-80 sm:h-80 mb-6 art-in"
+          data-testid="fs-artwork"
+          style={{ touchAction: 'none' }}
+          onTouchStart={artSwipe.onTouchStart}
+          onTouchEnd={artSwipe.onTouchEnd}
+          onTouchCancel={artSwipe.onTouchCancel}
+        >
+          <div aria-hidden="true" className={`cover-glow absolute -inset-10 pointer-events-none ${isPlaying ? 'breathe' : ''}`} />
           <div
             aria-hidden="true"
             data-testid="vinyl"
-            className={`vinyl absolute top-1/2 -translate-y-1/2 right-[-13%] w-[92%] h-[92%] rounded-full shadow-[0_12px_32px_rgba(0,0,0,0.6)] ${isPlaying ? 'vinyl-spin' : ''}`}
+            className={`vinyl absolute top-1/2 -translate-y-1/2 right-[-16%] w-[92%] h-[92%] rounded-full shadow-[0_12px_32px_rgba(0,0,0,0.6)] ${isPlaying ? 'vinyl-spin' : ''}`}
           />
           <div className="relative w-full h-full rounded-lg overflow-hidden shadow-[0_24px_64px_rgba(0,0,0,0.7)] group bg-surface-3">
           <img
@@ -212,7 +250,10 @@ const FullScreenPlayer = ({ isOpen, onClose, onToggleFavorite, isFavorite }) => 
           </button>
 
           <button
-            onClick={previousTrack}
+            onClick={() => {
+              haptic(10);
+              previousTrack();
+            }}
             aria-label="Previous track"
             className="p-2.5 text-zinc-300 hover:text-white active:scale-90 focus-visible:ring-2 focus-visible:ring-brand-500 focus-visible:outline-none transition-all"
           >
@@ -220,7 +261,10 @@ const FullScreenPlayer = ({ isOpen, onClose, onToggleFavorite, isFavorite }) => 
           </button>
 
           <button
-            onClick={togglePlay}
+            onClick={() => {
+              haptic(12);
+              togglePlay();
+            }}
             aria-label={isPlaying ? 'Pause' : 'Play'}
             data-testid="fs-play"
             aria-label={isPlaying ? 'Pause' : 'Play'}
@@ -230,7 +274,10 @@ const FullScreenPlayer = ({ isOpen, onClose, onToggleFavorite, isFavorite }) => 
           </button>
 
           <button
-            onClick={nextTrack}
+            onClick={() => {
+              haptic(10);
+              nextTrack();
+            }}
             aria-label="Next track"
             className="p-2.5 text-zinc-300 hover:text-white active:scale-90 focus-visible:ring-2 focus-visible:ring-brand-500 focus-visible:outline-none transition-all"
           >

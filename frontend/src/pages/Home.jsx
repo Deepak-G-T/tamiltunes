@@ -163,10 +163,10 @@ const Home = () => {
 
       {/* Quick picks: compact tiles that play on tap */}
       {activeTab === 'all' && (loading || quickPicks.length > 0) && (
-        <section aria-label="Quick picks" className="grid grid-cols-2 lg:grid-cols-3 gap-2 md:gap-3">
+        <section aria-label="Quick picks" className="grid grid-cols-2 lg:grid-cols-3 gap-2 md:gap-3 stagger">
           {loading
             ? Array.from({ length: 6 }, (_, i) => (
-                <div key={i} className="h-12 md:h-14 rounded-md bg-white/10 animate-pulse" />
+                <div key={i} className="h-12 md:h-14 rounded-md shimmer" />
               ))
             : quickPicks.map((song) => <QuickPickCard key={song.id} song={song} playlist={homeData.trending} />)}
         </section>

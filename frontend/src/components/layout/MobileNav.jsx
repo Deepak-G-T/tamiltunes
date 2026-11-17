@@ -1,32 +1,37 @@
 import React from 'react';
 import { NavLink } from 'react-router-dom';
 import { Home, Compass, Search, Library } from 'lucide-react';
+import { haptic } from '../../lib/haptics';
+
+const ITEMS = [
+  { to: '/', end: true, label: 'Home', Icon: Home },
+  { to: '/explore', label: 'Explore', Icon: Compass },
+  { to: '/search', label: 'Search', Icon: Search },
+  { to: '/favorites', label: 'Library', Icon: Library }
+];
 
 const MobileNav = () => {
-  // Active = white, inactive = grey (no coloured pills)
+  // Active = white with a green bar above the icon; inactive = grey
   const linkClass = ({ isActive }) =>
-    `flex flex-col items-center justify-center flex-1 py-1 gap-0.5 transition-colors ${
+    `relative press flex flex-col items-center justify-center flex-1 py-1 gap-0.5 transition-colors ${
       isActive ? 'text-white font-semibold' : 'text-zinc-400 hover:text-zinc-200'
     }`;
 
   return (
     <nav className="md:hidden fixed bottom-0 left-0 right-0 h-16 bg-gradient-to-t from-black via-black/95 to-black/80 backdrop-blur-lg z-40 flex items-center justify-around px-2 pb-safe">
-      <NavLink to="/" end className={linkClass}>
-        <Home className="w-6 h-6" />
-        <span className="text-[10px]">Home</span>
-      </NavLink>
-      <NavLink to="/explore" className={linkClass}>
-        <Compass className="w-6 h-6" />
-        <span className="text-[10px]">Explore</span>
-      </NavLink>
-      <NavLink to="/search" className={linkClass}>
-        <Search className="w-6 h-6" />
-        <span className="text-[10px]">Search</span>
-      </NavLink>
-      <NavLink to="/favorites" className={linkClass}>
-        <Library className="w-6 h-6" />
-        <span className="text-[10px]">Library</span>
-      </NavLink>
+      {ITEMS.map(({ to, end, label, Icon }) => (
+        <NavLink key={to} to={to} end={end} className={linkClass} onClick={() => haptic(8)}>
+          {({ isActive }) => (
+            <>
+              {isActive && (
+                <span aria-hidden="true" className="nav-pop absolute -top-0.5 h-[3px] w-8 rounded-full bg-brand-400" />
+              )}
+              <Icon className={`w-6 h-6 ${isActive ? 'nav-pop' : ''}`} />
+              <span className="text-[10px]">{label}</span>
+            </>
+          )}
+        </NavLink>
+      ))}
     </nav>
   );
 };

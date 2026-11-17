@@ -9,7 +9,7 @@ const ArtistCard = ({ artist }) => {
   return (
     <div
       onClick={() => navigate(`/artist/${artist.id || encodeURIComponent(artist.name)}`)}
-      className="group relative bg-surface-2 hover:bg-surface-4 p-3 md:p-4 rounded-card transition-colors duration-300 cursor-pointer select-none"
+      className="group relative bg-surface-2 hover:bg-surface-4 p-3 md:p-4 rounded-card transition-colors duration-300 cursor-pointer select-none press"
     >
       <div className="relative aspect-square w-full rounded-full overflow-hidden mb-3 md:mb-4 bg-surface-3 shadow-[0_8px_24px_rgba(0,0,0,0.5)]">
         <img
