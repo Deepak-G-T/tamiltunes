@@ -118,7 +118,7 @@ export const isOfficialFilmRelease = (song) => {
 
   // Positive Signal 4: Traditional Tamil devotional scripture / prayers
   const isTraditionalDevotional =
-    /\b(kavasam|kavacham|agaval|thiruppugazh|thevaram|thiruvasagam|abirami\s+andhadhi)\b/i.test(combined);
+    /\b(kavasam|kavacham|agaval|thiru[p]+ugazh|thevaram|thiruvasagam|abirami\s+andhadhi)\b/i.test(combined);
   if (isTraditionalDevotional && (lang === 'tamil' || !lang)) {
     return true;
   }
