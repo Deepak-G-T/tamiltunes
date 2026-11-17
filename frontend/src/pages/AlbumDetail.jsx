@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { useParams, useNavigate, useOutletContext } from 'react-router-dom';
 import { Play, Pause, Disc, Clock, Heart, PlusCircle, ArrowLeft, Loader2, Music2 } from 'lucide-react';
 import { useAudio } from '../context/AudioContext';
+import useCoverColor from '../hooks/useCoverColor';
 import { useAuth } from '../context/AuthContext';
 import api from '../services/api';
 
@@ -20,6 +21,7 @@ const AlbumDetail = () => {
   const { isAuthenticated } = useAuth();
 
   const [album, setAlbum] = useState(null);
+  const coverRgb = useCoverColor(album?.image, album?.id); // hook must stay above the early returns
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
 
@@ -99,7 +101,7 @@ const AlbumDetail = () => {
       </button>
 
       {/* Album Header */}
-      <div className="flex flex-col md:flex-row items-center md:items-end gap-6 pt-2 pb-2">
+      <div style={{ '--cover-rgb': coverRgb }} className="flex flex-col md:flex-row items-center md:items-end gap-6 cover-wash-strong -mx-4 md:-mx-6 -mt-4 px-4 md:px-6 pt-10 pb-6">
         <div className="w-44 h-44 sm:w-52 sm:h-52 rounded-md overflow-hidden shadow-[0_16px_48px_rgba(0,0,0,0.6)] flex-shrink-0 bg-zinc-800">
           <img
             src={album.image || 'https://images.unsplash.com/photo-1514525253161-7a46d19cd819?w=500&auto=format&fit=crop&q=80'}

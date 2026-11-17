@@ -12,6 +12,7 @@ import {
   X
 } from 'lucide-react';
 import { useAudio } from '../context/AudioContext';
+import useCoverColor from '../hooks/useCoverColor';
 import { useAuth } from '../context/AuthContext';
 import api from '../services/api';
 
@@ -29,6 +30,7 @@ const PlaylistDetail = () => {
   const { isAuthenticated } = useAuth();
 
   const [playlist, setPlaylist] = useState(null);
+  const coverRgb = useCoverColor(playlist?.songs?.[0]?.song?.image || playlist?.image, playlist?.id);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
 
@@ -151,7 +153,7 @@ const PlaylistDetail = () => {
       </button>
 
       {/* Playlist Header */}
-      <div className="flex flex-col md:flex-row items-center md:items-end gap-6 pt-2 pb-2">
+      <div style={{ '--cover-rgb': coverRgb }} className="flex flex-col md:flex-row items-center md:items-end gap-6 cover-wash-strong -mx-4 md:-mx-6 -mt-4 px-4 md:px-6 pt-10 pb-6">
         <div className="w-44 h-44 sm:w-52 sm:h-52 rounded-md overflow-hidden shadow-[0_16px_48px_rgba(0,0,0,0.6)] flex-shrink-0 bg-gradient-to-tr from-brand-800 to-brand-900 flex items-center justify-center">
           <ListMusic className="w-20 h-20 text-brand-300/80" />
         </div>

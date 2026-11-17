@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { useParams, useNavigate, useOutletContext } from 'react-router-dom';
 import { Play, Pause, Heart, ArrowLeft, Loader2, Music2, Disc } from 'lucide-react';
 import { useAudio } from '../context/AudioContext';
+import useCoverColor from '../hooks/useCoverColor';
 import { useAuth } from '../context/AuthContext';
 import SongCard from '../components/cards/SongCard';
 import AlbumCard from '../components/cards/AlbumCard';
@@ -15,6 +16,7 @@ const ArtistDetail = () => {
   const { isAuthenticated } = useAuth();
 
   const [artist, setArtist] = useState(null);
+  const coverRgb = useCoverColor(artist?.image, artist?.id || artist?.name);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
 
@@ -87,7 +89,7 @@ const ArtistDetail = () => {
       </button>
 
       {/* Artist Hero Header */}
-      <div className="relative rounded-2xl overflow-hidden bg-gradient-to-r from-brand-950/60 to-zinc-900 border border-zinc-800 p-6 md:p-8 flex flex-col sm:flex-row items-center gap-6 shadow-2xl">
+      <div style={{ '--cover-rgb': coverRgb }} className="relative overflow-hidden flex flex-col sm:flex-row items-center gap-6 cover-wash-strong -mx-4 md:-mx-6 -mt-4 px-4 md:px-6 pt-10 pb-6">
         <div className="w-36 h-36 sm:w-44 sm:h-44 rounded-full overflow-hidden shadow-2xl border-2 border-brand-500/30 flex-shrink-0 bg-zinc-800">
           <img
             src={artist.image || 'https://images.unsplash.com/photo-1511671782779-c97d3d27a1d4?w=500&auto=format&fit=crop&q=80'}

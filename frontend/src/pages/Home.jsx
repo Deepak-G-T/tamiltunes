@@ -5,6 +5,7 @@ import AlbumCard from '../components/cards/AlbumCard';
 import ArtistCard from '../components/cards/ArtistCard';
 import QuickPickCard from '../components/cards/QuickPickCard';
 import Shelf from '../components/common/Shelf';
+import FeaturedHero from '../components/cards/FeaturedHero';
 import { useAuth } from '../context/AuthContext';
 import api from '../services/api';
 
@@ -22,9 +23,9 @@ const CATEGORIES = [
 
 const greeting = () => {
   const h = new Date().getHours();
-  if (h < 12) return 'Good morning';
-  if (h < 17) return 'Good afternoon';
-  return 'Good evening';
+  if (h < 12) return { en: 'Good morning', ta: 'காலை வணக்கம்' };
+  if (h < 17) return { en: 'Good afternoon', ta: 'மதிய வணக்கம்' };
+  return { en: 'Good evening', ta: 'மாலை வணக்கம்' };
 };
 
 const Home = () => {
@@ -127,6 +128,7 @@ const Home = () => {
   );
 
   const show = (...tabs) => activeTab === 'all' || tabs.includes(activeTab);
+  const featured = (homeData.trending || [])[0];
   const quickPicks = (homeData.trending || []).slice(0, 6);
   const ganaList = homeData.gana?.length > 0 ? homeData.gana : homeData.folk;
 
@@ -134,7 +136,10 @@ const Home = () => {
     <div className="space-y-8 md:space-y-10 animate-in fade-in duration-300">
       {/* Greeting + category pills */}
       <div className="space-y-4">
-        <h1 className="text-2xl md:text-3xl font-extrabold text-white tracking-tight">{greeting()}</h1>
+        <div>
+          <h1 className="text-2xl md:text-3xl font-extrabold text-white tracking-tight">{greeting().en}</h1>
+          <p lang="ta" className="text-sm md:text-base font-semibold text-accent-400">{greeting().ta}</p>
+        </div>
         <div className="flex items-center gap-2 overflow-x-auto pb-1 scrollbar-none">
           {CATEGORIES.map((cat) => (
             <button
@@ -153,6 +158,9 @@ const Home = () => {
         </div>
       </div>
 
+      {/* Featured today: big artwork card with the first trending song */}
+      {activeTab === 'all' && !loading && featured && <FeaturedHero song={featured} playlist={homeData.trending} />}
+
       {/* Quick picks: compact tiles that play on tap */}
       {activeTab === 'all' && (loading || quickPicks.length > 0) && (
         <section aria-label="Quick picks" className="grid grid-cols-2 lg:grid-cols-3 gap-2 md:gap-3">
@@ -165,13 +173,13 @@ const Home = () => {
       )}
 
       {show('trending') && (
-        <Shelf title="Trending Tamil songs" loading={loading} onShowAll={() => navigate('/search?q=Tamil')}>
+        <Shelf title="Trending Tamil songs" subtitle="இன்றைய பிரபலப் பாடல்கள்" loading={loading} onShowAll={() => navigate('/search?q=Tamil')}>
           {homeData.trending?.slice(0, 12).map((song) => songCard(song, homeData.trending))}
         </Shelf>
       )}
 
       {activeTab === 'all' && (
-        <Shelf title="Popular albums" loading={loading}>
+        <Shelf title="Popular albums" subtitle="பிரபல ஆல்பங்கள்" loading={loading}>
           {(homeData.albums || homeData.popularAlbums)?.slice(0, 12).map((album) => (
             <AlbumCard key={album.id} album={album} />
           ))}
@@ -179,7 +187,7 @@ const Home = () => {
       )}
 
       {activeTab === 'all' && (
-        <Shelf title="Iconic composers & singers" loading={loading}>
+        <Shelf title="Iconic composers & singers" subtitle="இசையமைப்பாளர்கள் & பாடகர்கள்" loading={loading}>
           {(homeData.artists || homeData.popularArtists)?.map((artist) => (
             <ArtistCard key={artist.id || artist.name} artist={artist} />
           ))}
@@ -187,31 +195,31 @@ const Home = () => {
       )}
 
       {show('90s') && (
-        <Shelf title="90s golden era hits" loading={loading}>
+        <Shelf title="90s golden era hits" subtitle="90களின் பொற்காலப் பாடல்கள்" loading={loading}>
           {homeData.nineties?.slice(0, 12).map((song) => songCard(song, homeData.nineties))}
         </Shelf>
       )}
 
       {show('2000s') && (
-        <Shelf title="2000s nostalgic hits" loading={loading}>
+        <Shelf title="2000s nostalgic hits" subtitle="2000களின் நினைவுப் பாடல்கள்" loading={loading}>
           {homeData.twoThousands?.slice(0, 12).map((song) => songCard(song, homeData.twoThousands))}
         </Shelf>
       )}
 
       {show('melodies', 'love') && (
-        <Shelf title="Heartfelt melodies & love songs" loading={loading}>
+        <Shelf title="Heartfelt melodies & love songs" subtitle="மனம் நெகிழும் மெலடிகள்" loading={loading}>
           {homeData.melodies?.slice(0, 12).map((song) => songCard(song, homeData.melodies))}
         </Shelf>
       )}
 
       {show('gana') && (
-        <Shelf title="Authentic film gaana hits" loading={loading}>
+        <Shelf title="Authentic film gaana hits" subtitle="கானா பாடல்கள்" loading={loading}>
           {ganaList?.slice(0, 12).map((song) => songCard(song, homeData.gana || homeData.folk))}
         </Shelf>
       )}
 
       {show('folk') && (
-        <Shelf title="Folk & kuthu beats" loading={loading}>
+        <Shelf title="Folk & kuthu beats" subtitle="நாட்டுப்புறம் & குத்து" loading={loading}>
           {homeData.folk?.slice(0, 12).map((song) => songCard(song, homeData.folk))}
         </Shelf>
       )}

@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Outlet } from 'react-router-dom';
+import { Outlet, useLocation } from 'react-router-dom';
 import { RefreshCw } from 'lucide-react';
 import Sidebar from './Sidebar';
 import TopNav from './TopNav';
@@ -10,6 +10,7 @@ import CreatePlaylistModal from '../modals/CreatePlaylistModal';
 import AddToPlaylistModal from '../modals/AddToPlaylistModal';
 
 const MainLayout = () => {
+  const location = useLocation();
   const [mobileSidebarOpen, setMobileSidebarOpen] = useState(false);
   const [createPlaylistOpen, setCreatePlaylistOpen] = useState(false);
   const [addToPlaylistSong, setAddToPlaylistSong] = useState(null);
@@ -53,7 +54,7 @@ const MainLayout = () => {
       {/* Main Content Area */}
       <div className="relative flex-1 flex flex-col min-w-0 h-full overflow-hidden md:rounded-panel bg-surface-1">
         {/* Soft green wash behind the page header, like a cover-colour gradient */}
-        <div aria-hidden="true" className="pointer-events-none absolute inset-x-0 top-0 h-72 bg-gradient-to-b from-brand-900/40 via-surface-1/60 to-transparent" />
+        <div aria-hidden="true" className="pointer-events-none absolute inset-x-0 top-0 h-80 cover-wash" />
         {/* Top Navbar */}
         <TopNav onToggleMobileSidebar={() => setMobileSidebarOpen(true)} />
 
@@ -73,10 +74,12 @@ const MainLayout = () => {
 
         {/* Dynamic page content container */}
         <main className="relative flex-1 overflow-y-auto px-4 md:px-6 py-4 pb-36 md:pb-6">
-          <Outlet context={{
-            onOpenAddToPlaylist: (song) => setAddToPlaylistSong(song),
-            onOpenCreatePlaylist: () => setCreatePlaylistOpen(true)
-          }} />
+          <div key={location.pathname} className="page-in">
+            <Outlet context={{
+              onOpenAddToPlaylist: (song) => setAddToPlaylistSong(song),
+              onOpenCreatePlaylist: () => setCreatePlaylistOpen(true)
+            }} />
+          </div>
         </main>
 
         {/* Visible video surface when the YouTube engine is active */}
