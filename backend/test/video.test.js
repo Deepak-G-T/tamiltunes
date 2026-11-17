@@ -133,14 +133,18 @@ console.log('✓ non-embeddable / non-public / missing status rejected');
   const v = createVideoLookup({ cfg: cfgWith({ youtubeApiKey: '' }) });
   assert.equal(v.peek({ id: 'x', title: 'Badass (From "Leo")', artist: 'Anirudh Ravichander' }), 'IqwIOlhfCak');
   assert.equal(v.peek({ id: 'x', title: 'Badass', artist: 'Some Random Band' }), undefined, 'title alone is not enough');
-  assert.equal(v.peek({ id: 'x', title: 'Hukum - Thalaivar Alappara', artist: 'Anirudh' }), '1F3hm6MfR1k');
-  assert.ok(CURATED_VIDEOS.some((e) => e.videoId === '1F3HM635S0k' && e.candidate), 'conflicting candidate kept');
-  assert.ok(!CURATED_VIDEOS.some((e) => e.videoId === '1F3HM635S0k' && !e.candidate), 'old id never served');
-  assert.equal(CURATED_VIDEOS.length, 10); // 9 owner ids + 1 extra Hukum candidate
+  assert.equal(v.peek({ id: 'x', title: 'Hukum - Thalaivar Alappara', artist: 'Anirudh' }), 'gB2zKZxESTg');
+  // lyric-video ids and older conflicting ids stay in the file as candidates but are never served
+  for (const lyricId of ['1F3hm6MfR1k', '1F3HM635S0k', 'RVLNBVK8auM', 'szvt1vD0Uug', 'fRD_3vJagxk', 'xsbLtHql4g8']) {
+    assert.ok(CURATED_VIDEOS.some((e) => e.videoId === lyricId && e.candidate), `candidate kept: ${lyricId}`);
+    assert.ok(!CURATED_VIDEOS.some((e) => e.videoId === lyricId && !e.candidate), `never served: ${lyricId}`);
+  }
+  assert.equal(CURATED_VIDEOS.filter((e) => !e.candidate).length, 9, '9 songs served');
+  assert.equal(CURATED_VIDEOS.filter((e) => e.candidate).length, 6, '6 candidates kept, not served');
   assert.ok(CURATED_VIDEOS.every((e) => /embeddability unverified/.test(e.status)));
   const input = Object.freeze({ id: 'x', title: 'Naa Ready', artist: 'Vijay' });
   const [out] = v.attach([input]);
-  assert.equal(out.videoId, 'szvt1vD0Uug');
+  assert.equal(out.videoId, '5Qk6Xc2ZVkI');
   assert.equal(input.videoId, undefined);
   assert.equal(normalizeTitle('Kaavaalaa (From "Jailer")'), 'kaavaalaa');
   console.log('✓ curated map matching, unverified Hukum candidate not served');
@@ -151,13 +155,13 @@ console.log('✓ non-embeddable / non-public / missing status rejected');
   const v = createVideoLookup({ cfg: cfgWith({ youtubeApiKey: '' }) });
   const hit = (title, artist) => v.peek({ id: 'saavn_x', title, artist, singers: artist });
   const should = [
-    ['Hukum - Thalaivar Alappara (From "Jailer")', 'Anirudh Ravichander, Super Subu', '1F3hm6MfR1k'],
-    ['Aalaporan Thamizhan (From "Mersal")', 'A.R. Rahman', 'xsbLtHql4g8'], // one-typo spelling
+    ['Hukum - Thalaivar Alappara (From "Jailer")', 'Anirudh Ravichander, Super Subu', 'gB2zKZxESTg'],
+    ['Aalaporan Thamizhan (From "Mersal")', 'A.R. Rahman', 'UN7HgzJsFZA'], // one-typo spelling
     ['Arabic Kuthu - Halamithi Habibo (From "Beast")', 'Anirudh Ravichander, Jonita Gandhi', 'KUN5Uf9mObQ'],
-    ['Kaavaalaa - Kaavaalaa (From "Jailer")', 'Shilpa Rao, Anirudh Ravichander', 'RVLNBVK8auM'],
-    ['Kavaalaa (From "Jailer")', 'Anirudh Ravichander', 'RVLNBVK8auM'],
+    ['Kaavaalaa - Kaavaalaa (From "Jailer")', 'Shilpa Rao, Anirudh Ravichander', 'lM8h5Mm6ODo'],
+    ['Kavaalaa (From "Jailer")', 'Anirudh Ravichander', 'lM8h5Mm6ODo'],
     ['Why This Kolaveri Di - The Soup of Love', 'Dhanush, Anirudh Ravichander', 'YR12Z8f1Dh8'],
-    ['Vaathi Coming (From "Master")', 'Anirudh Ravichander, Gana Balachandar', 'fRD_3vJagxk'],
+    ['Vaathi Coming (From "Master")', 'Anirudh Ravichander, Gana Balachandar', 'nIYZ4nbWq7w'],
     ['Rowdy Baby (From "Maari 2")', 'Dhanush, Dhee', 'x6Q7c9RyMzk']
   ];
   for (const [t, a, id] of should) assert.equal(hit(t, a), id, `should match: ${t}`);
