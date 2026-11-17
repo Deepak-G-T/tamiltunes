@@ -175,10 +175,23 @@ const runTests = async () => {
     if (!addSongRes.success) throw new Error('Add song failed');
     console.log('✓ Add Song to Playlist: PASSED');
 
-    // 9. Get Playlist by ID
-    const getPlRes = await fetch(`${BASE}/playlists/${playlistId}`).then((r) => r.json());
+    // 9. Get Playlist by ID: private by default (owner only), public once toggled
+    const anonPl = await fetch(`${BASE}/playlists/${playlistId}`);
+    if (anonPl.status !== 404) throw new Error('Private playlist leaked to anonymous request');
+    const getPlRes = await fetch(`${BASE}/playlists/${playlistId}`, {
+      headers: { Authorization: `Bearer ${tokenA}` }
+    }).then((r) => r.json());
     if (!getPlRes.success || getPlRes.playlist?.songs?.length !== 1) throw new Error('Get playlist failed');
-    console.log('✓ Get Playlist by ID: PASSED');
+    if (getPlRes.playlist.user) throw new Error('Playlist response must not embed the owner user row');
+    const makePublic = await fetch(`${BASE}/playlists/${playlistId}`, {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${tokenA}` },
+      body: JSON.stringify({ name: getPlRes.playlist.name, isPublic: true })
+    }).then((r) => r.json());
+    if (!makePublic.success || makePublic.playlist.isPublic !== true) throw new Error('Making playlist public failed');
+    const anonPublic = await fetch(`${BASE}/playlists/${playlistId}`).then((r) => r.json());
+    if (!anonPublic.success) throw new Error('Public playlist should be readable without login');
+    console.log('✓ Get Playlist by ID (private by default, public when toggled, no owner row leaked): PASSED');
 
     // 9B. List Playlists Pagination Envelope
     const listPlRes = await fetch(`${BASE}/playlists?limit=10&offset=0`, {

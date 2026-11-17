@@ -3,6 +3,7 @@ import jwt from 'jsonwebtoken';
 import { z } from 'zod';
 import { db } from '../prisma/client.js';
 import { config } from '../config/env.js';
+import { suggestUsername } from '../community/username.js';
 
 export const registerSchema = z.object({
   name: z.string().min(2, 'Name must be at least 2 characters'),
@@ -39,13 +40,20 @@ export const register = async (req, res, next) => {
     const salt = await bcrypt.genSalt(12);
     const hashedPassword = await bcrypt.hash(password, salt);
 
-    const user = await db.user.create({
-      data: {
-        name,
-        email: email.toLowerCase(),
-        password: hashedPassword
-      }
+    // Unique default username (users can change it later); retry once on the rare collision.
+    const makeData = () => ({
+      name,
+      email: email.toLowerCase(),
+      password: hashedPassword,
+      username: suggestUsername(name, `_${Math.random().toString(36).slice(2, 8)}`)
     });
+    let user;
+    try {
+      user = await db.user.create({ data: makeData() });
+    } catch (e) {
+      if (e?.code !== 'P2002') throw e;
+      user = await db.user.create({ data: makeData() });
+    }
 
     const token = generateToken(user.id);
 
@@ -55,7 +63,8 @@ export const register = async (req, res, next) => {
       user: {
         id: user.id,
         name: user.name,
-        email: user.email
+        email: user.email,
+        username: user.username ?? null
       }
     });
   } catch (err) {
@@ -94,7 +103,8 @@ export const login = async (req, res, next) => {
       user: {
         id: user.id,
         name: user.name,
-        email: user.email
+        email: user.email,
+        username: user.username ?? null
       }
     });
   } catch (err) {

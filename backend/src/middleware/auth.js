@@ -29,7 +29,9 @@ export const requireAuth = async (req, res, next) => {
     req.user = {
       id: user.id,
       email: user.email,
-      name: user.name
+      name: user.name,
+      username: user.username ?? null,
+      role: user.role || 'user'
     };
 
     next();
@@ -49,7 +51,7 @@ export const optionalAuth = async (req, res, next) => {
       const decoded = jwt.verify(token, config.jwtSecret);
       const user = await db.user.findUnique({ where: { id: decoded.userId } });
       if (user) {
-        req.user = { id: user.id, email: user.email, name: user.name };
+        req.user = { id: user.id, email: user.email, name: user.name, username: user.username ?? null, role: user.role || 'user' };
       }
     }
   } catch (err) {

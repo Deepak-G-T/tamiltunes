@@ -67,10 +67,14 @@ class InMemoryDb {
   playlist = {
     count: async ({ where } = {}) => {
       if (!where || !where.userId) return this.playlists.size;
-      return Array.from(this.playlists.values()).filter((p) => p.userId === where.userId).length;
+      return Array.from(this.playlists.values()).filter(
+        (p) => p.userId === where.userId && (where.isPublic === undefined || Boolean(p.isPublic) === where.isPublic)
+      ).length;
     },
     findMany: async ({ where, include, orderBy, take, skip }) => {
-      let list = Array.from(this.playlists.values()).filter((p) => p.userId === where.userId);
+      let list = Array.from(this.playlists.values()).filter(
+        (p) => p.userId === where.userId && (where.isPublic === undefined || Boolean(p.isPublic) === where.isPublic)
+      );
       const start = skip || 0;
       const end = take !== undefined ? start + take : undefined;
       list = list.slice(start, end);
@@ -296,3 +300,7 @@ export const db = new Proxy({}, {
 export const closeDb = async () => {
   if (prismaInstance && isPostgresAvailable) await prismaInstance.$disconnect();
 };
+
+/** True when queries go to real PostgreSQL (false = dev in-memory store). */
+export const usingPostgres = () => Boolean(isPostgresAvailable && prismaInstance);
+export const getPrismaClient = () => prismaInstance;
