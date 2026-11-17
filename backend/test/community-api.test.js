@@ -26,8 +26,9 @@ const SONG = `song_${tag}`;
 
 try {
   const [A, B, F, E, ART, ADM] = await Promise.all(['a', 'b', 'f', 'e', 'art', 'adm'].map(signup));
-  db.users.get(ART.id).role = 'artist';
-  db.users.get(ADM.id).role = 'admin';
+  // Roles can only be set in the database (not via the API); works on both Prisma and the in-memory store
+  await db.user.update({ where: { id: ART.id }, data: { role: 'artist' } });
+  await db.user.update({ where: { id: ADM.id }, data: { role: 'admin' } });
   assert.match(A.username, /^[a-z][a-z0-9_]{2,19}$/, 'signup assigns a default username');
 
   // ---------- comment CRUD ----------
@@ -189,6 +190,8 @@ try {
   assert.equal((await call('GET', `/playlists/${pl1.json.playlist.id}`, { token: B.token })).status, 404);
 
   // history is private unless opted in
+  // listening_history has a foreign key to songs, so the song must exist on real PostgreSQL
+  await db.song.upsert({ where: { id: 'h1' }, create: { id: 'h1', title: 'History song', artist: 'Tester' }, update: {} });
   await db.listeningHistory.create({ data: { userId: A.id, songId: 'h1' } });
   assert.equal((await call('GET', '/users/aarav_music/history', { token: B.token })).status, 403);
   assert.equal((await call('GET', '/users/aarav_music/history', { token: A.token })).status, 200);
