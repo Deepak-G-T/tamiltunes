@@ -24,7 +24,7 @@ const SPAM_PATTERNS = [
   /slowed\s*(?:and|n|&|\+)?\s*reverb(?:ed)?/i,
   /speed\s*up/i,
   /\b(dj\s+)?remix\b/i,
-  /\b(remake|mashup|trap\s*mix|trap\s*remix|club\s*mix)\b/i,
+  /\b(remake|mashup|trap\s*mix|trap\s*remix|club\s*mix|chill\s*trap|lo-?fi|flip)\b/i,
   /ringtone/i,
   /bgm\s+cut/i,
   /trending\s+version/i,
@@ -120,7 +120,7 @@ export const isOfficialFilmRelease = (song) => {
   // Reject obvious spam audio formats and amateur remix variants
   if (
     SPAM_PATTERNS.some((pattern) => pattern.test(combined)) ||
-    /\b(remix|remake|mashup)\b/i.test(song.title || '')
+    /\b(remix|remake|mashup|chill\s*trap|lo-?fi|flip)\b/i.test(song.title || '')
   ) {
     return false;
   }

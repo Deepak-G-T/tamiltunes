@@ -88,8 +88,8 @@ export const inspectFilterDecision = (song) => {
   }
 
   // 2. Spam & Meme audio patterns and remix variants
-  const SPAM_REGEX = /whatsapp\s+status|status\s+video|status\s+la\s+potu|bass\s+boosted|karaoke|slowed\s*(?:and|n|&|\+)?\s*reverb(?:ed)?|speed\s*up|\b(dj\s+)?remix\b|\b(remake|mashup|trap\s*mix|trap\s*remix|club\s*mix)\b|ringtone|bgm\s+cut|trending\s+version|salem\s+gana|trending\s+gana|gana\s+surya|gana\s+suriya|gana\s+velu/i;
-  if (SPAM_REGEX.test(combined) || /\b(remix|remake|mashup)\b/i.test(song.title || '')) {
+  const SPAM_REGEX = /whatsapp\s+status|status\s+video|status\s+la\s+potu|bass\s+boosted|karaoke|slowed\s*(?:and|n|&|\+)?\s*reverb(?:ed)?|speed\s*up|\b(dj\s+)?remix\b|\b(remake|mashup|trap\s*mix|trap\s*remix|club\s*mix|chill\s*trap|lo-?fi|flip)\b|ringtone|bgm\s+cut|trending\s+version|salem\s+gana|trending\s+gana|gana\s+surya|gana\s+suriya|gana\s+velu/i;
+  if (SPAM_REGEX.test(combined) || /\b(remix|remake|mashup|chill\s*trap|lo-?fi|flip)\b/i.test(song.title || '')) {
     return { pass: false, reason: 'REJECT_SPAM_PATTERN', language: lang || 'tamil' };
   }
 
