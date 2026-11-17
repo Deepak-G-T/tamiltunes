@@ -8,7 +8,7 @@ export const TEST_QUERIES = [
   { category: 'Old Songs', query: 'viswanathan ramamoorthy old tamil' },
   { category: 'Old Songs', query: 'ilaiyaraaja 80s hits' },
   { category: 'Old Songs', query: 'spb 80s tamil melodies' },
-  { category: 'Old Songs', query: 'vaali kannadasan lyrics' },
+  { category: 'Old Songs', query: 'kannadasan hits' },
   { category: 'Old Songs', query: 'k.j. yesudas tamil evergreen' },
   { category: 'Old Songs', query: 'm.s. viswanathan melodies' },
 
@@ -61,7 +61,7 @@ export const TEST_QUERIES = [
 
   // 8. Spam & Meme Audio
   { category: 'Spam/Meme', query: 'whatsapp status tamil' },
-  { category: 'Spam/Meme', query: 'bass boosted tamil' },
+  { category: 'Spam/Meme', query: 'tamil dj remix' },
   { category: 'Spam/Meme', query: 'slowed reverb tamil' },
   { category: 'Spam/Meme', query: 'salem gana velu' },
   { category: 'Spam/Meme', query: 'trending gana surya' }
@@ -140,10 +140,20 @@ export const inspectFilterDecision = (song) => {
     'arivu', 'therukural', 't.m. soundararajan', 'tm soundararajan', 'soundararajan',
     'kannadasan', 'vaali', 'm.s. viswanathan', 'viswanathan', 'ramamoorthy',
     'l.r. eswari', 'lr eswari', 'sirpy', 'veeramanidaasan', 'veeramani daasan',
-    'k.b. sundarambal', 'mahanadhi shobana', 't.l. maharajan', 'p. susheela'
+    'k.b. sundarambal', 'mahanadhi shobana', 't.l. maharajan', 'p. susheela',
+    'soolamangalam', 'bombay sisters', 'm.s. subbulakshmi', 'subbulakshmi',
+    'sirkazhi', 'sivachidambaram', 'vani jayaram', 'veeramani', 'murugadas',
+    'srinivas', 'ravi basrur', 'ghibran', 'ananya bhat'
   ];
   if (RECOGNIZED_TAMIL_ARTISTS.some((a) => combined.includes(a))) {
     return { pass: true, reason: 'PASS_RECOGNIZED_ARTIST', language: lang || 'tamil' };
+  }
+
+  // 7. Traditional Tamil devotional scripture / prayers
+  const isTraditionalDevotional =
+    /\b(kavasam|kavacham|agaval|thiruppugazh|thevaram|thiruvasagam|abirami\s+andhadhi)\b/i.test(combined);
+  if (isTraditionalDevotional && (lang === 'tamil' || !lang)) {
+    return { pass: true, reason: 'PASS_DEVOTIONAL_SCRIPTURE', language: lang || 'tamil' };
   }
 
   return { pass: false, reason: 'REJECT_NO_OFFICIAL_SIGNALS', language: lang || 'unknown' };

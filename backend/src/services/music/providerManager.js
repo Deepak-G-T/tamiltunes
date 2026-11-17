@@ -50,7 +50,10 @@ const RECOGNIZED_TAMIL_ARTISTS = [
   'arivu', 'therukural', 't.m. soundararajan', 'tm soundararajan', 'soundararajan',
   'kannadasan', 'vaali', 'm.s. viswanathan', 'viswanathan', 'ramamoorthy',
   'l.r. eswari', 'lr eswari', 'sirpy', 'veeramanidaasan', 'veeramani daasan',
-  'k.b. sundarambal', 'mahanadhi shobana', 't.l. maharajan', 'p. susheela'
+  'k.b. sundarambal', 'mahanadhi shobana', 't.l. maharajan', 'p. susheela',
+  'soolamangalam', 'bombay sisters', 'm.s. subbulakshmi', 'subbulakshmi',
+  'sirkazhi', 'sivachidambaram', 'vani jayaram', 'veeramani', 'murugadas',
+  'srinivas', 'ravi basrur', 'ghibran', 'ananya bhat'
 ];
 
 /**
@@ -107,9 +110,16 @@ export const isOfficialFilmRelease = (song) => {
     return true;
   }
 
-  // Positive Signal 3: Check if track features a recognized Tamil music director/singer
+  // Positive Signal 3: Check if track features a recognized Tamil music director/singer/lyricist
   const hasRecognizedArtist = RECOGNIZED_TAMIL_ARTISTS.some((a) => combined.includes(a));
   if (hasRecognizedArtist) {
+    return true;
+  }
+
+  // Positive Signal 4: Traditional Tamil devotional scripture / prayers
+  const isTraditionalDevotional =
+    /\b(kavasam|kavacham|agaval|thiruppugazh|thevaram|thiruvasagam|abirami\s+andhadhi)\b/i.test(combined);
+  if (isTraditionalDevotional && (lang === 'tamil' || !lang)) {
     return true;
   }
 
