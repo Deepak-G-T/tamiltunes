@@ -153,9 +153,9 @@ const MusicPlayer = () => {
               {currentSong.artist || currentSong.singers || 'Tamil Artist'}
             </p>
             {playbackError ? (
-              <p className="text-[10px] text-amber-400 flex items-center gap-1 truncate mt-0.5">
+              <p className="text-[10px] text-amber-400 flex items-center gap-1 truncate mt-0.5" title={playbackError}>
                 <AlertCircle className="w-3 h-3 flex-shrink-0" />
-                <span>Audio stream restricted</span>
+                <span className="truncate">{playbackError}</span>
               </p>
             ) : (
               <span className="text-[10px] text-zinc-400 flex items-center gap-1">

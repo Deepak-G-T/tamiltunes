@@ -1,6 +1,12 @@
 import React, { createContext, useContext, useState, useRef, useEffect, useCallback } from 'react';
 import api from '../services/api';
 import YouTubePlayer from '../components/player/YouTubePlayer';
+import {
+  getNextTrackIndex,
+  getPreviousTrackAction,
+  reorderQueue,
+  calculateNewQueueIndexAfterRemoval
+} from '../utils/queueLogic';
 
 const AudioContext = createContext();
 
@@ -26,7 +32,9 @@ export const AudioProvider = ({ children }) => {
   const [isShuffle, setIsShuffle] = useState(false);
   const [repeatMode, setRepeatMode] = useState('off'); // 'off' | 'all' | 'one'
 
-  // Adaptive streaming fallback tracking for HTML5 audio
+  // Race condition & adaptive streaming refs
+  const playPromiseRef = useRef(null);
+  const playRequestIdRef = useRef(0);
   const activeCandidatesRef = useRef([]);
   const candidateIndexRef = useRef(0);
   const currentSongRef = useRef(null);
@@ -36,9 +44,29 @@ export const AudioProvider = ({ children }) => {
   const [isQueueOpen, setIsQueueOpen] = useState(false);
   const [historyRecordedSongId, setHistoryRecordedSongId] = useState(null);
 
+  // Identifies whether song plays via YouTube IFrame engine
   const isYouTubeSong = useCallback((song) => {
     if (!song) return false;
-    return song.source === 'youtube' || !!song.videoId || !!song.youtubeId;
+    return (
+      song.source === 'youtube' ||
+      song.provider === 'youtube' ||
+      !!song.videoId ||
+      !!song.youtubeId ||
+      (typeof song.streamUrl === 'string' &&
+        (song.streamUrl.includes('youtube.com') || song.streamUrl.includes('youtu.be') || song.streamUrl.includes('youtube-nocookie.com')))
+    );
+  }, []);
+
+  // Helper to extract video ID if missing from song object
+  const getYouTubeVideoId = useCallback((song) => {
+    if (!song) return null;
+    if (song.videoId) return song.videoId;
+    if (song.youtubeId) return song.youtubeId;
+    if (typeof song.streamUrl === 'string') {
+      const match = song.streamUrl.match(/(?:embed\/|v=|vi=|\/v\/|youtu\.be\/|\/embed\/)([a-zA-Z0-9_-]{11})/);
+      if (match && match[1]) return match[1];
+    }
+    return null;
   }, []);
 
   // Build candidate audio URLs for HTML5 engine
@@ -84,7 +112,69 @@ export const AudioProvider = ({ children }) => {
     }
   }, [historyRecordedSongId]);
 
-  // Initialize HTML5 audio element events
+  // Safely play HTML5 audio guarded against rapid next/prev race conditions
+  const safeAudioPlay = async (audio, requestId) => {
+    try {
+      const playPromise = audio.play();
+      playPromiseRef.current = playPromise;
+      await playPromise;
+
+      if (requestId === playRequestIdRef.current) {
+        setIsPlaying(true);
+        setIsBuffering(false);
+        setPlaybackError(null);
+      }
+    } catch (err) {
+      if (err.name === 'AbortError' || requestId !== playRequestIdRef.current) {
+        // Play was safely aborted by a newer track selection
+        return;
+      }
+      throw err;
+    }
+  };
+
+  // Attempt to refresh expired stream URL by searching the catalog once
+  const handleExpiredStream = async (song) => {
+    if (!song || song._hasRetriedFreshFetch) {
+      setPlaybackError('Stream unavailable or expired. Skipping to next track...');
+      setTimeout(() => {
+        nextTrack();
+      }, 1500);
+      return;
+    }
+
+    song._hasRetriedFreshFetch = true;
+    try {
+      const searchQuery = `${song.title} ${song.artist || song.singers || ''}`.trim();
+      const { data } = await api.get(`/music/search?q=${encodeURIComponent(searchQuery)}`);
+      const foundSongs = data.songs || (Array.isArray(data) ? data : []);
+      const matched = foundSongs.find((s) => s.title?.toLowerCase() === song.title?.toLowerCase()) || foundSongs[0];
+
+      if (matched && matched.streamUrl && matched.streamUrl !== song.streamUrl) {
+        const audio = audioRef.current;
+        song.streamUrl = matched.streamUrl;
+        const candidates = buildCandidateUrls(matched);
+        activeCandidatesRef.current = candidates;
+        candidateIndexRef.current = 0;
+
+        const resolvedUrl = new URL(candidates[0], window.location.origin).href;
+        audio.src = resolvedUrl;
+        audio.load();
+        setIsBuffering(true);
+        await safeAudioPlay(audio, playRequestIdRef.current);
+        return;
+      }
+    } catch (e) {
+      console.warn('Refetching expired stream failed:', e.message);
+    }
+
+    setPlaybackError('Stream expired. Skipping to next track...');
+    setTimeout(() => {
+      nextTrack();
+    }, 1500);
+  };
+
+  // Initialize HTML5 audio element events with thorough cleanup
   useEffect(() => {
     const audio = audioRef.current;
     audio.volume = volume;
@@ -128,6 +218,7 @@ export const AudioProvider = ({ children }) => {
       if (isYouTubeSong(currentSongRef.current)) return;
       console.warn('Playback error encountered on source:', audio.src);
 
+      // Try next audio candidate if available
       if (candidateIndexRef.current < activeCandidatesRef.current.length - 1) {
         candidateIndexRef.current += 1;
         const nextUrl = activeCandidatesRef.current[candidateIndexRef.current];
@@ -136,9 +227,7 @@ export const AudioProvider = ({ children }) => {
           audio.src = resolvedUrl;
           audio.load();
           setIsBuffering(true);
-          await audio.play();
-          setIsPlaying(true);
-          setPlaybackError(null);
+          await safeAudioPlay(audio, playRequestIdRef.current);
           return;
         } catch (err) {
           console.warn('Fallback stream attempt failed:', err.message);
@@ -148,7 +237,7 @@ export const AudioProvider = ({ children }) => {
       setIsBuffering(false);
       setIsPlaying(false);
       if (currentSongRef.current) {
-        setPlaybackError('Stream unavailable. Please try another track.');
+        await handleExpiredStream(currentSongRef.current);
       }
     };
 
@@ -193,6 +282,9 @@ export const AudioProvider = ({ children }) => {
   const playSong = async (song, newQueue = null) => {
     if (!song) return;
 
+    // Increment request ID to invalidate in-flight play attempts
+    const requestId = ++playRequestIdRef.current;
+
     setPlaybackError(null);
     setCurrentSong(song);
     currentSongRef.current = song;
@@ -216,12 +308,12 @@ export const AudioProvider = ({ children }) => {
       audio.removeAttribute('src');
       audio.load();
 
-      const vid = song.videoId || song.youtubeId;
+      const vid = getYouTubeVideoId(song);
       setDuration(song.duration || 0);
       setIsBuffering(true);
       setIsPlaying(true);
 
-      if (ytPlayerRef.current) {
+      if (ytPlayerRef.current && vid) {
         ytPlayerRef.current.loadVideo(vid, true);
         ytPlayerRef.current.setVolume(isMuted ? 0 : volume);
       }
@@ -244,11 +336,11 @@ export const AudioProvider = ({ children }) => {
           audio.load();
         }
         setIsBuffering(true);
-        await audio.play();
-        setIsPlaying(true);
-        setPlaybackError(null);
+        await safeAudioPlay(audio, requestId);
       } catch (err) {
         console.warn('Primary stream error, trying fallback:', err.message);
+        if (requestId !== playRequestIdRef.current) return;
+
         if (candidates.length > 1) {
           candidateIndexRef.current = 1;
           try {
@@ -256,9 +348,14 @@ export const AudioProvider = ({ children }) => {
             audio.src = fallbackResolved;
             audio.load();
             setIsBuffering(true);
-            await audio.play();
-            setIsPlaying(true);
-          } catch (e2) {}
+            await safeAudioPlay(audio, requestId);
+          } catch (e2) {
+            if (requestId === playRequestIdRef.current) {
+              await handleExpiredStream(song);
+            }
+          }
+        } else {
+          await handleExpiredStream(song);
         }
       }
     }
@@ -282,10 +379,10 @@ export const AudioProvider = ({ children }) => {
         audio.pause();
         setIsPlaying(false);
       } else {
+        const requestId = ++playRequestIdRef.current;
         try {
           setIsBuffering(true);
-          await audio.play();
-          setIsPlaying(true);
+          await safeAudioPlay(audio, requestId);
         } catch (err) {
           console.error('Failed to resume audio:', err);
           setIsBuffering(false);
@@ -308,11 +405,11 @@ export const AudioProvider = ({ children }) => {
       ytPlayerRef.current?.play();
       setIsPlaying(true);
     } else {
+      const requestId = ++playRequestIdRef.current;
       try {
-        await audioRef.current.play();
-        setIsPlaying(true);
+        await safeAudioPlay(audioRef.current, requestId);
       } catch (err) {
-        console.error(err);
+        console.error('Resume failed:', err);
       }
     }
   };
@@ -356,25 +453,14 @@ export const AudioProvider = ({ children }) => {
   const nextTrack = () => {
     if (queue.length === 0) return;
 
-    if (repeatMode === 'one') {
-      seek(0);
-      resume();
-      return;
-    }
+    const nextIndex = getNextTrackIndex(queueIndex, queue.length, {
+      isShuffle,
+      repeatMode
+    });
 
-    let nextIndex;
-    if (isShuffle) {
-      nextIndex = Math.floor(Math.random() * queue.length);
-    } else {
-      nextIndex = queueIndex + 1;
-      if (nextIndex >= queue.length) {
-        if (repeatMode === 'all') {
-          nextIndex = 0;
-        } else {
-          pause();
-          return;
-        }
-      }
+    if (nextIndex === -1) {
+      pause();
+      return;
     }
 
     setQueueIndex(nextIndex);
@@ -384,18 +470,20 @@ export const AudioProvider = ({ children }) => {
   const previousTrack = () => {
     if (queue.length === 0) return;
 
-    if (currentTime > 3) {
+    const { action, index } = getPreviousTrackAction(queueIndex, queue.length, currentTime, {
+      restartThreshold: 3
+    });
+
+    if (action === 'restart') {
       seek(0);
+      resume();
       return;
     }
 
-    let prevIndex = queueIndex - 1;
-    if (prevIndex < 0) {
-      prevIndex = queue.length - 1;
+    if (index >= 0) {
+      setQueueIndex(index);
+      playSong(queue[index]);
     }
-
-    setQueueIndex(prevIndex);
-    playSong(queue[prevIndex]);
   };
 
   const toggleShuffle = () => setIsShuffle((prev) => !prev);
@@ -413,12 +501,33 @@ export const AudioProvider = ({ children }) => {
     setQueue((prev) => [...prev, song]);
   };
 
-  const removeFromQueue = (index) => {
-    setQueue((prev) => prev.filter((_, idx) => idx !== index));
-    if (index === queueIndex) {
-      nextTrack();
-    } else if (index < queueIndex) {
+  const moveInQueue = (fromIndex, toIndex) => {
+    setQueue((prev) => {
+      const nextQ = reorderQueue(prev, fromIndex, toIndex);
+      return nextQ;
+    });
+    // Adjust queueIndex if the currently playing song moved
+    if (fromIndex === queueIndex) {
+      setQueueIndex(toIndex);
+    } else if (fromIndex < queueIndex && toIndex >= queueIndex) {
       setQueueIndex((prev) => prev - 1);
+    } else if (fromIndex > queueIndex && toIndex <= queueIndex) {
+      setQueueIndex((prev) => prev + 1);
+    }
+  };
+
+  const removeFromQueue = (index) => {
+    const nextQ = queue.filter((_, idx) => idx !== index);
+    const newIdx = calculateNewQueueIndexAfterRemoval(index, queueIndex, nextQ.length);
+    setQueue(nextQ);
+    setQueueIndex(newIdx);
+
+    if (index === queueIndex) {
+      if (newIdx >= 0 && nextQ[newIdx]) {
+        playSong(nextQ[newIdx]);
+      } else {
+        pause();
+      }
     }
   };
 
@@ -451,7 +560,19 @@ export const AudioProvider = ({ children }) => {
     } catch (e) {
       console.warn('MediaSession handler warning:', e);
     }
-  }, [currentSong, queueIndex, queue]);
+
+    return () => {
+      if ('mediaSession' in navigator) {
+        try {
+          navigator.mediaSession.setActionHandler('play', null);
+          navigator.mediaSession.setActionHandler('pause', null);
+          navigator.mediaSession.setActionHandler('previoustrack', null);
+          navigator.mediaSession.setActionHandler('nexttrack', null);
+          navigator.mediaSession.setActionHandler('seekto', null);
+        } catch (e) {}
+      }
+    };
+  }, [currentSong, queueIndex, queue, isShuffle, repeatMode, currentTime]);
 
   // Sync playback state to MediaSession
   useEffect(() => {
@@ -503,6 +624,7 @@ export const AudioProvider = ({ children }) => {
         toggleShuffle,
         toggleRepeat,
         addToQueue,
+        moveInQueue,
         removeFromQueue,
         clearQueue,
         setIsFullScreen,
@@ -510,7 +632,7 @@ export const AudioProvider = ({ children }) => {
         setPlaybackError
       }}
     >
-      {/* YouTube IFrame Engine (visible when playing YouTube source, min 200x200) */}
+      {/* YouTube IFrame Engine (visible floating player, min 200x200) */}
       <YouTubePlayer
         ref={ytPlayerRef}
         visible={isYouTubeSong(currentSong)}
@@ -543,10 +665,21 @@ export const AudioProvider = ({ children }) => {
             checkRecordHistory(currentSongRef.current, cur);
           }
         }}
-        onError={() => {
+        onError={(e) => {
           if (isYouTubeSong(currentSongRef.current)) {
-            setPlaybackError('YouTube stream failed to play. Skipping to next...');
-            setTimeout(() => nextTrack(), 1500);
+            const errCode = e?.data;
+            let msg = 'YouTube playback failed. Auto-skipping to next track...';
+            if (errCode === 101 || errCode === 150) {
+              msg = 'Playback restricted by video owner (Error 101/150). Auto-skipping to next track...';
+            } else if (errCode === 100) {
+              msg = 'YouTube video not found. Auto-skipping to next track...';
+            } else if (errCode === 2) {
+              msg = 'Invalid video ID parameter. Auto-skipping to next track...';
+            }
+            setPlaybackError(msg);
+            setTimeout(() => {
+              nextTrack();
+            }, 1500);
           }
         }}
       />

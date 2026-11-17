@@ -1,8 +1,8 @@
-import React, { useEffect, useRef, useImperativeHandle, forwardRef } from 'react';
+import React, { useEffect, useState, useRef, useImperativeHandle, forwardRef } from 'react';
 
 /**
  * YouTubePlayer Component
- * Uses the official YouTube IFrame Player API (hidden offscreen iframe)
+ * Uses the official YouTube IFrame Player API (visible floating player, min 200x200)
  * Implements the exact same playback interface as HTML5 audio engine:
  * play, pause, seek, setVolume, mute, unMute, onTimeUpdate, onEnded, onPlaying, onPause, onBuffering.
  */
@@ -18,6 +18,15 @@ const YouTubePlayer = forwardRef(({
   const playerRef = useRef(null);
   const isReadyRef = useRef(false);
   const progressTimerRef = useRef(null);
+
+  // Responsive mobile check for non-overlapping bottom position
+  const [isMobile, setIsMobile] = useState(() => typeof window !== 'undefined' && window.innerWidth < 768);
+
+  useEffect(() => {
+    const handleResize = () => setIsMobile(window.innerWidth < 768);
+    window.addEventListener('resize', handleResize);
+    return () => window.removeEventListener('resize', handleResize);
+  }, []);
 
   // Load YouTube IFrame API script once
   useEffect(() => {
@@ -58,7 +67,7 @@ const YouTubePlayer = forwardRef(({
     try {
       playerRef.current = new window.YT.Player('yt-player-iframe', {
         height: '200',
-        width: '200',
+        width: '240',
         playerVars: {
           autoplay: 0,
           controls: 1,
@@ -89,7 +98,7 @@ const YouTubePlayer = forwardRef(({
             }
           },
           onError: (e) => {
-            console.warn('YouTube IFrame Player error:', e.data);
+            console.warn('YouTube IFrame Player error:', e?.data);
             if (onError) onError(e);
           }
         }
@@ -184,12 +193,16 @@ const YouTubePlayer = forwardRef(({
     }
   }));
 
+  // On mobile: sits at bottom 136px (above 64px mini-player + 56px bottom nav + 16px buffer)
+  // On desktop: sits at bottom 96px (above 80px player bar + 16px buffer)
+  const computedBottom = visible ? (isMobile ? '136px' : '96px') : '-400px';
+
   return (
     <div
       id="yt-player-container"
       style={{
         position: 'fixed',
-        bottom: visible ? '88px' : '-300px',
+        bottom: computedBottom,
         right: '16px',
         width: '240px',
         height: '200px',
