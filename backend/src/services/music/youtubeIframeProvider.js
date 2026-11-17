@@ -192,21 +192,80 @@ export class YouTubeIframeProvider extends MusicProvider {
   }
 
   async getHomeFeed() {
+    const trending = YOUTUBE_TAMIL_COLLECTION.filter((s) => s.category === 'trending');
+    const gana = YOUTUBE_TAMIL_COLLECTION.filter((s) => s.category === 'gana');
+    const latest = YOUTUBE_TAMIL_COLLECTION.slice(0, 4);
+    const melodies = YOUTUBE_TAMIL_COLLECTION.filter((s) => s.id === 'yt_aalaporaan_thamizhan' || s.id === 'yt_kaavaalaa');
+    const nineties = YOUTUBE_TAMIL_COLLECTION.filter((s) => s.id === 'yt_aalaporaan_thamizhan');
+    const twoThousands = YOUTUBE_TAMIL_COLLECTION.filter((s) => s.id === 'yt_kolaveri_di');
+    const love = YOUTUBE_TAMIL_COLLECTION.filter((s) => s.id === 'yt_kaavaalaa' || s.id === 'yt_rowdy_baby');
+    const sad = YOUTUBE_TAMIL_COLLECTION.filter((s) => s.id === 'yt_kolaveri_di');
+    const folk = YOUTUBE_TAMIL_COLLECTION.filter((s) => s.id === 'yt_rowdy_baby' || s.id === 'yt_arabic_kuthu');
+    const instrumental = YOUTUBE_TAMIL_COLLECTION.slice(0, 2);
+
     return {
-      trending: YOUTUBE_TAMIL_COLLECTION.filter((s) => s.category === 'trending'),
-      gana: YOUTUBE_TAMIL_COLLECTION.filter((s) => s.category === 'gana'),
-      latest: YOUTUBE_TAMIL_COLLECTION.slice(0, 4),
-      melodies: [],
-      nineties: [],
-      twoThousands: [],
-      love: [],
-      sad: [],
-      folk: [],
-      instrumental: [],
-      popularAlbums: [],
-      popularArtists: [],
-      albums: [],
-      artists: []
+      trending,
+      latest,
+      gana,
+      melodies,
+      nineties,
+      twoThousands,
+      love,
+      sad,
+      folk,
+      instrumental,
+      popularAlbums: [
+        {
+          id: 'yt_album_leo',
+          name: 'Leo',
+          title: 'Leo',
+          artist: 'Anirudh Ravichander',
+          music: 'Anirudh Ravichander',
+          year: '2023',
+          image: 'https://c.saavncdn.com/415/Leo-Original-Motion-Picture-Soundtrack-English-2023-20231019170311-500x500.jpg',
+          songs: YOUTUBE_TAMIL_COLLECTION.filter((s) => s.album === 'Leo')
+        },
+        {
+          id: 'yt_album_jailer',
+          name: 'Jailer',
+          title: 'Jailer',
+          artist: 'Anirudh Ravichander',
+          music: 'Anirudh Ravichander',
+          year: '2023',
+          image: 'https://c.saavncdn.com/187/Jailer-Tamil-2023-20230728081443-500x500.jpg',
+          songs: YOUTUBE_TAMIL_COLLECTION.filter((s) => s.album === 'Jailer')
+        }
+      ],
+      popularArtists: [
+        {
+          id: 'yt_artist_anirudh',
+          name: 'Anirudh Ravichander',
+          role: 'Music Director & Singer',
+          image: 'https://c.saavncdn.com/artists/Anirudh_Ravichander_003_20260121134149_500x500.jpg',
+          topSongs: YOUTUBE_TAMIL_COLLECTION.filter((s) => s.artist.includes('Anirudh'))
+        }
+      ],
+      albums: [
+        {
+          id: 'yt_album_leo',
+          name: 'Leo',
+          title: 'Leo',
+          artist: 'Anirudh Ravichander',
+          music: 'Anirudh Ravichander',
+          year: '2023',
+          image: 'https://c.saavncdn.com/415/Leo-Original-Motion-Picture-Soundtrack-English-2023-20231019170311-500x500.jpg',
+          songs: YOUTUBE_TAMIL_COLLECTION.filter((s) => s.album === 'Leo')
+        }
+      ],
+      artists: [
+        {
+          id: 'yt_artist_anirudh',
+          name: 'Anirudh Ravichander',
+          role: 'Music Director & Singer',
+          image: 'https://c.saavncdn.com/artists/Anirudh_Ravichander_003_20260121134149_500x500.jpg',
+          topSongs: YOUTUBE_TAMIL_COLLECTION.filter((s) => s.artist.includes('Anirudh'))
+        }
+      ]
     };
   }
 }

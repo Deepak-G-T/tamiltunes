@@ -425,6 +425,72 @@ const runTests = async () => {
     console.log('✓ Input Validation & Zod Advisory Reachability: PASSED (Invalid Email/Password 400, >1MB Payload 413, Deeply Nested <1MB 400)');
 
     // =========================================================================
+    // 14B. YOUTUBE PROVIDER HOME FEED INTEGRITY & VIDEOID ENFORCEMENT
+    // =========================================================================
+    console.log('--- Testing YouTube Provider Home Feed videoId Completeness ---');
+    musicService.setProvider('youtube');
+    musicCache.clear();
+
+    const ytHomeRes = await fetch(`${BASE}/music/home`).then((r) => r.json());
+    if (!ytHomeRes.success || !ytHomeRes.data) {
+      throw new Error('Failed to retrieve home feed with MUSIC_PROVIDER=youtube');
+    }
+
+    const shelvesToCheck = [
+      'trending',
+      'latest',
+      'gana',
+      'melodies',
+      'nineties',
+      'twoThousands',
+      'love',
+      'sad',
+      'folk',
+      'instrumental'
+    ];
+
+    let totalSongsVerified = 0;
+    for (const shelf of shelvesToCheck) {
+      const songs = ytHomeRes.data[shelf] || [];
+      for (const song of songs) {
+        if (!song.videoId || typeof song.videoId !== 'string' || song.videoId.trim() === '') {
+          throw new Error(`YouTube home-feed song "${song.title}" in shelf "${shelf}" is missing videoId!`);
+        }
+        if (song.source !== 'youtube') {
+          throw new Error(`YouTube home-feed song "${song.title}" in shelf "${shelf}" has invalid source: ${song.source}`);
+        }
+        if (song.provider !== 'youtube') {
+          throw new Error(`YouTube home-feed song "${song.title}" in shelf "${shelf}" has invalid provider: ${song.provider}`);
+        }
+        totalSongsVerified++;
+      }
+    }
+    console.log(`✓ YouTube Provider Home Feed: PASSED (${totalSongsVerified} songs verified across shelves, 100% contain videoId/source/provider)`);
+
+    // =========================================================================
+    // 14C. GET /api/music/song/:id RECOVERY ENDPOINT TESTS
+    // =========================================================================
+    console.log('--- Testing GET /api/music/song/:id Endpoint ---');
+    const songSuccessRes = await fetch(`${BASE}/music/song/yt_badass_leo`).then((r) => r.json());
+    if (!songSuccessRes.success || songSuccessRes.data?.id !== 'yt_badass_leo' || !songSuccessRes.data?.videoId) {
+      throw new Error(`Expected GET /api/music/song/yt_badass_leo to return song with videoId, got ${JSON.stringify(songSuccessRes)}`);
+    }
+
+    const songNotFoundRes = await fetch(`${BASE}/music/song/non_existent_id_9999`);
+    if (songNotFoundRes.status !== 404) {
+      throw new Error(`Expected 404 for non-existent song, got ${songNotFoundRes.status}`);
+    }
+    const songNotFoundJson = await songNotFoundRes.json();
+    if (songNotFoundJson.success !== false) {
+      throw new Error(`Expected success: false for non-existent song, got ${JSON.stringify(songNotFoundJson)}`);
+    }
+    console.log('✓ GET /api/music/song/:id Recovery Endpoint: PASSED (200 on valid ID, 404 on missing ID)');
+
+    // Reset back to mock provider for remaining tests
+    musicService.setProvider('mock');
+    musicCache.clear();
+
+    // =========================================================================
     // 15. NEW TEST SUITE: Table-Driven Tamil Filter Test (20 Sample Tracks)
     // =========================================================================
     console.log('--- Testing Tamil Filter with 20 Sample Tracks (Table-Driven) ---');

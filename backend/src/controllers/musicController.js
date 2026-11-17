@@ -34,6 +34,27 @@ export const searchMusic = async (req, res, next) => {
   }
 };
 
+export const getSongById = async (req, res, next) => {
+  try {
+    const { id } = req.params;
+    const song = await musicService.getSong(id);
+
+    if (!song) {
+      return res.status(404).json({
+        success: false,
+        message: 'Song not found'
+      });
+    }
+
+    res.json({
+      success: true,
+      data: song
+    });
+  } catch (err) {
+    next(err);
+  }
+};
+
 export const getAlbumById = async (req, res, next) => {
   try {
     const { id } = req.params;

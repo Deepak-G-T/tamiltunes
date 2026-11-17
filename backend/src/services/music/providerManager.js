@@ -231,6 +231,12 @@ export class MusicProviderManager {
     const cached = musicCache.get(cacheKey);
     if (cached) return cached;
 
+    if (this.providerName === 'youtube') {
+      const ytData = await this.providers.youtube.searchTracks(query, options);
+      musicCache.set(cacheKey, ytData, 600);
+      return ytData;
+    }
+
     let result = { songs: [], albums: [], artists: [] };
 
     // 1. Query active provider
@@ -302,6 +308,14 @@ export class MusicProviderManager {
     const cached = musicCache.get(cacheKey);
     if (cached) return cached;
 
+    if (this.providerName === 'youtube' || (typeof id === 'string' && id.startsWith('yt_'))) {
+      const ytSong = await this.providers.youtube.getSong(id);
+      if (ytSong) {
+        musicCache.set(cacheKey, ytSong, 600);
+        return ytSong;
+      }
+    }
+
     // Check curated tracks
     const curated = CURATED_TAMIL_SONGS.find((s) => s.id === id);
     if (curated) {
@@ -353,6 +367,12 @@ export class MusicProviderManager {
     const cached = musicCache.get(cacheKey);
     if (cached) {
       return cached;
+    }
+
+    if (this.providerName === 'youtube') {
+      const ytFeed = await this.providers.youtube.getHomeFeed();
+      musicCache.set(cacheKey, ytFeed, 600);
+      return ytFeed;
     }
 
     // Base curated authentic tracks
