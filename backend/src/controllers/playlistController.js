@@ -3,13 +3,18 @@ import { db } from '../prisma/client.js';
 
 export const createPlaylistSchema = z.object({
   name: z.string().min(1, 'Playlist name is required').max(100),
-  description: z.string().optional()
+  description: z.string().optional(),
+  isPublic: z.boolean().optional()
 });
 
 export const updatePlaylistSchema = z.object({
   name: z.string().min(1, 'Playlist name is required').max(100),
-  description: z.string().optional()
+  description: z.string().optional(),
+  isPublic: z.boolean().optional()
 });
+
+// Drop undefined keys so partial updates never overwrite stored values (the in-memory store spreads them)
+const defined = (obj) => Object.fromEntries(Object.entries(obj).filter(([, v]) => v !== undefined));
 
 export const addSongSchema = z.object({
   songId: z.string().min(1),
@@ -59,14 +64,15 @@ export const getPlaylists = async (req, res, next) => {
 
 export const createPlaylist = async (req, res, next) => {
   try {
-    const { name, description } = req.body;
+    const { name, description, isPublic } = req.body;
 
     const playlist = await db.playlist.create({
-      data: {
+      data: defined({
         name,
         description,
+        isPublic: isPublic ?? false,
         userId: req.user.id
-      }
+      })
     });
 
     res.status(201).json({
@@ -92,16 +98,19 @@ export const getPlaylistById = async (req, res, next) => {
       }
     });
 
-    if (!playlist) {
+    // Private playlists are visible to their owner only. 404 (not 403) so existence is not leaked.
+    if (!playlist || (!playlist.isPublic && playlist.userId !== req.user?.id)) {
       return res.status(404).json({
         success: false,
         message: 'Playlist not found'
       });
     }
 
+    // Never return the owner's user row (in-memory store attaches it, including the password hash)
+    const { user: _owner, ...safe } = playlist;
     res.json({
       success: true,
-      playlist
+      playlist: safe
     });
   } catch (err) {
     next(err);
@@ -111,7 +120,7 @@ export const getPlaylistById = async (req, res, next) => {
 export const updatePlaylist = async (req, res, next) => {
   try {
     const { id } = req.params;
-    const { name, description } = req.body;
+    const { name, description, isPublic } = req.body;
 
     const existing = await db.playlist.findUnique({ where: { id } });
     if (!existing) {
@@ -124,7 +133,7 @@ export const updatePlaylist = async (req, res, next) => {
 
     const updated = await db.playlist.update({
       where: { id },
-      data: { name, description }
+      data: defined({ name, description, isPublic })
     });
 
     res.json({

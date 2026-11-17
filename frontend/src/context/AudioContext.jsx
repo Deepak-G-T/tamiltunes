@@ -805,6 +805,7 @@ export const AudioProvider = ({ children }) => {
   return (
     <AudioContext.Provider
       value={{
+        showToast,
         audioInstance: audioRef.current,
         currentSong,
         isPlaying,

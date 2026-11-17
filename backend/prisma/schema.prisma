@@ -18,9 +18,27 @@ model User {
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
+  // Profile (all optional; username is backfilled by the migration)
+  username        String?  @unique
+  bio             String?
+  location        String?
+  avatar          String?  // small data URL, validated server-side; served via /users/:username/avatar
+  avatarUpdatedAt DateTime? // non-null = has avatar; also the cache-busting version
+  genres          String[] @default([])
+  favoriteArtists String[] @default([])
+  language        String?
+  isPublicProfile Boolean  @default(true)
+  showHistory     Boolean  @default(false)
+  role            String   @default("user") // user | artist | admin
+
   playlists        Playlist[]
   favorites        Favorite[]
   listeningHistory ListeningHistory[]
+  comments         Comment[]
+  commentLikes     CommentLike[]
+  reports          Report[]
+  followers        Follow[]  @relation("Followed")
+  following        Follow[]  @relation("Follower")
 
   @@map("users")
 }
@@ -70,6 +88,7 @@ model Playlist {
   name        String
   description String?
   userId      String
+  isPublic    Boolean  @default(false)
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
 
@@ -123,4 +142,72 @@ model ListeningHistory {
   @@index([userId, playedAt(sort: Desc)])
   @@index([userId, createdAt(sort: Desc)])
   @@map("listening_history")
+}
+
+// Comments reference songs by plain id (no FK): a song row only exists once
+// someone favourites / plays / saves it.
+model Comment {
+  id            String   @id @default(uuid())
+  songId        String
+  userId        String
+  parentId      String?
+  body          String
+  timestampSec  Int?
+  isPinned      Boolean  @default(false)
+  likeCount     Int      @default(0)
+  likedByArtist Boolean  @default(false)
+  editedAt      DateTime?
+  createdAt     DateTime @default(now())
+
+  user    User          @relation(fields: [userId], references: [id], onDelete: Cascade)
+  parent  Comment?      @relation("Replies", fields: [parentId], references: [id], onDelete: Cascade)
+  replies Comment[]     @relation("Replies")
+  likes   CommentLike[]
+  reports Report[]
+
+  @@index([songId, createdAt(sort: Desc)])
+  @@index([songId, likeCount(sort: Desc)])
+  @@index([parentId])
+  @@index([userId, createdAt(sort: Desc)])
+  @@map("comments")
+}
+
+model CommentLike {
+  commentId String
+  userId    String
+  createdAt DateTime @default(now())
+
+  comment Comment @relation(fields: [commentId], references: [id], onDelete: Cascade)
+  user    User    @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@id([commentId, userId])
+  @@index([userId])
+  @@map("comment_likes")
+}
+
+model Follow {
+  followerId String
+  followedId String
+  createdAt  DateTime @default(now())
+
+  follower User @relation("Follower", fields: [followerId], references: [id], onDelete: Cascade)
+  followed User @relation("Followed", fields: [followedId], references: [id], onDelete: Cascade)
+
+  @@id([followerId, followedId])
+  @@index([followedId, createdAt(sort: Desc)])
+  @@map("follows")
+}
+
+model Report {
+  id         String   @id @default(uuid())
+  commentId  String
+  reporterId String
+  reason     String
+  createdAt  DateTime @default(now())
+
+  comment  Comment @relation(fields: [commentId], references: [id], onDelete: Cascade)
+  reporter User    @relation(fields: [reporterId], references: [id], onDelete: Cascade)
+
+  @@unique([commentId, reporterId])
+  @@map("reports")
 }

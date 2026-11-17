@@ -1,4 +1,4 @@
-import React, { useEffect } from 'react';
+import React, { useEffect, useState } from 'react';
 import { createPortal } from 'react-dom';
 import {
   ListPlus,
@@ -13,20 +13,22 @@ import {
   Repeat1,
   ListMusic,
   Heart,
-  Disc
+  Disc,
+  MessageCircle
 } from 'lucide-react';
 import { useAudio } from '../../context/AudioContext';
 import ProgressBar from './ProgressBar';
 import VolumeSlider from './VolumeSlider';
 import VideoSlot from './VideoSlot';
 import VideoModeToggle from './VideoModeToggle';
+import CommentsPanel from '../comments/CommentsPanel';
 import { useSwipe } from '../../lib/swipe';
 import { haptic } from '../../lib/haptics';
 import { getUpNext } from '../../lib/upNext';
 
 const MUSIC_COVER_FALLBACK = "data:image/svg+xml;charset=UTF-8,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 300 300'%3E%3Cdefs%3E%3ClinearGradient id='bg' x1='0%25' y1='0%25' x2='100%25' y2='100%25'%3E%3Cstop offset='0%25' stop-color='%23143d24'/%3E%3Cstop offset='50%25' stop-color='%230f2a1a'/%3E%3Cstop offset='100%25' stop-color='%23071a10'/%3E%3C/linearGradient%3E%3C/defs%3E%3Crect width='300' height='300' rx='16' fill='url(%23bg)'/%3E%3Ccircle cx='150' cy='150' r='60' fill='%231db954' opacity='0.2'/%3E%3Cpath d='M135 180V120l50-14v54m-50 0a16 16 0 11-32 0 16 16 0 0132 0zm50-14a16 16 0 11-32 0 16 16 0 0132 0z' stroke='%236ee9a0' stroke-width='6' fill='none' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E";
 
-const FullScreenPlayer = ({ isOpen, onClose, onToggleFavorite, isFavorite, onAddToPlaylist }) => {
+const FullScreenPlayer = ({ isOpen, onClose: onCloseProp, onToggleFavorite, isFavorite, onAddToPlaylist }) => {
   const {
     currentSong,
     isPlaying,
@@ -51,6 +53,10 @@ const FullScreenPlayer = ({ isOpen, onClose, onToggleFavorite, isFavorite, onAdd
     queue,
     queueIndex
   } = useAudio();
+
+  const [commentsOpen, setCommentsOpen] = useState(false);
+  // Every way of closing the player also closes the comments sheet
+  const onClose = () => { setCommentsOpen(false); onCloseProp(); };
 
   // Lock body scroll when full screen player is open on mobile
   useEffect(() => {
@@ -316,8 +322,20 @@ const FullScreenPlayer = ({ isOpen, onClose, onToggleFavorite, isFavorite, onAdd
         </div>
 
         {/* Quick actions */}
-        {(onAddToPlaylist || canShare) && (
+        {(
           <div className="flex items-center justify-center gap-8 mb-3 text-zinc-300">
+            <button
+              onClick={() => {
+                haptic(10);
+                setCommentsOpen(true);
+              }}
+              aria-label="Open comments"
+              data-testid="open-comments"
+              className="flex flex-col items-center gap-1 text-[11px] hover:text-white active:scale-90 transition-transform"
+            >
+              <MessageCircle className="w-6 h-6" />
+              <span className="[@media(max-height:700px)]:hidden">Comments</span>
+            </button>
             {onAddToPlaylist && (
               <button
                 onClick={() => {
@@ -388,7 +406,19 @@ const FullScreenPlayer = ({ isOpen, onClose, onToggleFavorite, isFavorite, onAdd
     </div>
   );
 
-  return typeof document !== 'undefined' ? createPortal(content, document.body) : content;
+  const withComments = (
+    <>
+      {content}
+      <CommentsPanel
+        open={commentsOpen}
+        onClose={() => setCommentsOpen(false)}
+        onNavigate={onClose}
+        song={currentSong}
+      />
+    </>
+  );
+
+  return typeof document !== 'undefined' ? createPortal(withComments, document.body) : withComments;
 };
 
 export default FullScreenPlayer;

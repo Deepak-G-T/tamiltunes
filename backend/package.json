@@ -8,13 +8,15 @@
     "start": "node src/index.js",
     "build": "prisma generate",
     "dev": "nodemon src/index.js",
-    "test": "node test/api.test.js && node test/golden.test.js && node test/stream.test.js && node test/config.test.js && node test/video.test.js",
+    "test": "node test/api.test.js && node test/golden.test.js && node test/stream.test.js && node test/config.test.js && node test/video.test.js && node test/community.test.js && node test/community-api.test.js",
     "test:golden": "node test/golden.test.js",
     "seed": "node src/prisma/seed.js",
+    "seed:community": "node src/prisma/seedCommunity.js",
     "db:baseline": "prisma migrate resolve --applied 20261117000000_init",
     "prisma:generate": "prisma generate",
     "prisma:migrate": "prisma migrate dev",
     "prisma:deploy": "prisma migrate deploy",
+    "migrate": "prisma migrate deploy",
     "prisma:push": "prisma db push"
   },
   "keywords": [

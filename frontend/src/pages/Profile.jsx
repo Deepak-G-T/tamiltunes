@@ -1,109 +1,41 @@
-import React, { useState, useEffect } from 'react';
-import { useNavigate } from 'react-router-dom';
-import { User, Mail, ShieldCheck, ListMusic, Heart, History, LogOut } from 'lucide-react';
+import React, { useEffect, useState, useCallback } from 'react';
+import { Navigate } from 'react-router-dom';
+import { Loader2 } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
-import api from '../services/api';
+import { profileApi } from '../lib/communityApi';
+import ProfileView from '../components/profile/ProfileView';
+import { ErrorState } from '../components/common/StateViews';
+import { Skeleton } from '../components/common/Skeleton';
 
+/** /profile: the signed-in user's own, editable profile. Guests are sent to sign in. */
 const Profile = () => {
-  const { user, isAuthenticated, logout } = useAuth();
-  const navigate = useNavigate();
+  const { isAuthenticated, isLoading } = useAuth();
+  const [profile, setProfile] = useState(null);
+  const [error, setError] = useState('');
 
-  const [stats, setStats] = useState({ playlists: 0, favorites: 0, history: 0 });
-
-  useEffect(() => {
-    if (!isAuthenticated) {
-      navigate('/login');
-      return;
+  const load = useCallback(async () => {
+    setError('');
+    try {
+      setProfile((await profileApi.me()).profile);
+    } catch (e) {
+      setError(e.message);
     }
+  }, []);
 
-    Promise.all([
-      api.get('/playlists').catch((err) => ({ data: { items: [], playlists: [], total: 0 } })),
-      api.get('/favorites').catch((err) => ({ data: { items: [], favorites: [], total: 0 } })),
-      api.get('/history').catch((err) => ({ data: { items: [], history: [], total: 0 } })),
-    ]).then(([plRes, favRes, histRes]) => {
-      const getCount = (res, legacyKey) => {
-        if (!res?.data) return 0;
-        if (typeof res.data.total === 'number') return res.data.total;
-        if (Array.isArray(res.data.items)) return res.data.items.length;
-        if (Array.isArray(res.data[legacyKey])) return res.data[legacyKey].length;
-        return 0;
-      };
+  useEffect(() => { if (isAuthenticated) load(); }, [isAuthenticated, load]);
 
-      setStats({
-        playlists: getCount(plRes, 'playlists'),
-        favorites: getCount(favRes, 'favorites'),
-        history: getCount(histRes, 'history'),
-      });
-    });
-  }, [isAuthenticated, navigate]);
-
-  if (!isAuthenticated) return null;
-
-  return (
-    <div className="max-w-2xl mx-auto space-y-8 animate-in fade-in duration-300">
-      {/* Profile Card */}
-      <div className="bg-surface-2 rounded-2xl border border-zinc-800 p-6 md:p-8 shadow-xl">
-        <div className="flex flex-col sm:flex-row items-center gap-6">
-          <div className="w-24 h-24 rounded-full bg-gradient-to-tr from-brand-600 to-brand-500 flex items-center justify-center text-3xl font-black text-white shadow-xl shadow-brand-600/30">
-            {user?.name ? user.name[0].toUpperCase() : 'U'}
-          </div>
-
-          <div className="flex-1 text-center sm:text-left space-y-1.5">
-            <div className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full bg-brand-500/10 text-brand-300 border border-brand-500/20 text-[11px] font-semibold">
-              <ShieldCheck className="w-3.5 h-3.5 text-emerald-400" />
-              <span>Ad-Free Member</span>
-            </div>
-            <h1 className="text-2xl font-bold text-white">{user?.name}</h1>
-            <p className="text-xs text-zinc-400 flex items-center justify-center sm:justify-start gap-1.5">
-              <Mail className="w-3.5 h-3.5" />
-              <span>{user?.email}</span>
-            </p>
-          </div>
-
-          <button
-            onClick={() => {
-              logout();
-              navigate('/');
-            }}
-            className="px-4 py-2 rounded-xl bg-rose-500/10 hover:bg-rose-500/20 text-rose-400 border border-rose-500/20 text-xs font-semibold flex items-center gap-2 transition-colors"
-          >
-            <LogOut className="w-4 h-4" />
-            <span>Sign Out</span>
-          </button>
-        </div>
-
-        {/* Stats Grid */}
-        <div className="grid grid-cols-3 gap-4 mt-8 pt-6 border-t border-zinc-800/80">
-          <div
-            onClick={() => navigate('/favorites')}
-            className="p-4 rounded-xl bg-zinc-900/60 border border-zinc-800 text-center cursor-pointer hover:border-zinc-700 transition-colors"
-          >
-            <Heart className="w-5 h-5 text-rose-400 mx-auto mb-1.5" />
-            <div className="text-xl font-bold text-white">{stats.favorites}</div>
-            <div className="text-[11px] text-zinc-400 font-medium">Favourites</div>
-          </div>
-
-          <div
-            onClick={() => navigate('/')}
-            className="p-4 rounded-xl bg-zinc-900/60 border border-zinc-800 text-center cursor-pointer hover:border-zinc-700 transition-colors"
-          >
-            <ListMusic className="w-5 h-5 text-brand-400 mx-auto mb-1.5" />
-            <div className="text-xl font-bold text-white">{stats.playlists}</div>
-            <div className="text-[11px] text-zinc-400 font-medium">Playlists</div>
-          </div>
-
-          <div
-            onClick={() => navigate('/history')}
-            className="p-4 rounded-xl bg-zinc-900/60 border border-zinc-800 text-center cursor-pointer hover:border-zinc-700 transition-colors"
-          >
-            <History className="w-5 h-5 text-sky-400 mx-auto mb-1.5" />
-            <div className="text-xl font-bold text-white">{stats.history}</div>
-            <div className="text-[11px] text-zinc-400 font-medium">Tracks Played</div>
-          </div>
-        </div>
+  if (isLoading) return <div className="flex justify-center py-24"><Loader2 className="w-8 h-8 animate-spin text-brand-400" /></div>;
+  if (!isAuthenticated) return <Navigate to="/login" replace />;
+  if (error) return <ErrorState message={error} onRetry={load} />;
+  if (!profile) {
+    return (
+      <div className="max-w-2xl mx-auto space-y-4 pt-6" role="status" aria-label="Loading profile">
+        <div className="flex items-center gap-4"><Skeleton className="w-24 h-24 rounded-full" /><div className="flex-1 space-y-2"><Skeleton className="h-6 w-1/2" /><Skeleton className="h-4 w-1/3" /></div></div>
+        <Skeleton className="h-16 w-full" /><Skeleton className="h-10 w-full" />
       </div>
-    </div>
-  );
+    );
+  }
+  return <ProfileView profile={profile} isSelf onProfileChange={setProfile} />;
 };
 
 export default Profile;

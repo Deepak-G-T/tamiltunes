@@ -1,13 +1,14 @@
 import React from 'react';
 import { NavLink } from 'react-router-dom';
-import { Home, Compass, Search, Library } from 'lucide-react';
+import { Home, Compass, Search, Library, User } from 'lucide-react';
 import { haptic } from '../../lib/haptics';
 
 const ITEMS = [
   { to: '/', end: true, label: 'Home', Icon: Home },
   { to: '/explore', label: 'Explore', Icon: Compass },
   { to: '/search', label: 'Search', Icon: Search },
-  { to: '/favorites', label: 'Library', Icon: Library }
+  { to: '/favorites', label: 'Library', Icon: Library },
+  { to: '/profile', label: 'Profile', Icon: User }
 ];
 
 const MobileNav = () => {

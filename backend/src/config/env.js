@@ -55,7 +55,8 @@ export const config = {
   databaseUrl: process.env.DATABASE_URL || 'postgresql://postgres:postgres@localhost:5432/tamiltunes',
   jiosaavnApiUrl: process.env.JIOSAAVN_API_URL || 'https://www.jiosaavn.com/api.php',
   musicProvider: (process.env.MUSIC_PROVIDER || 'jiosaavn').toLowerCase(),
-  corsOrigin: process.env.CORS_ORIGIN || '',
+  // FRONTEND_URL is an alias: both are comma-separated explicit origins
+  corsOrigin: [process.env.CORS_ORIGIN, process.env.FRONTEND_URL].filter(Boolean).join(','),
   vercelTeamSlug: getVercelTeamSlug(),
   enableExternalStreams: process.env.ENABLE_EXTERNAL_STREAMS === 'true',
   trustProxy: parseTrustProxy(),
