@@ -62,7 +62,7 @@ const MiniPlayer = () => {
 
         {/* Right: Controls + Expand hint */}
         <div className="flex items-center gap-1.5" onClick={(e) => e.stopPropagation()}>
-          <VideoModeToggle />
+          <VideoModeToggle compact />
           <button
             onClick={togglePlay}
             className="w-9 h-9 rounded-full bg-purple-600 hover:bg-purple-500 text-white flex items-center justify-center shadow-md active:scale-90 transition-transform"
