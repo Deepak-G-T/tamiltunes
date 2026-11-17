@@ -160,7 +160,12 @@ JWT_SECRET=your_super_secret_jwt_key_at_least_32_characters
 JWT_EXPIRES_IN=7d
 DATABASE_URL=postgresql://postgres:password@localhost:5432/tamiltunes?schema=public
 JIOSAAVN_API_URL=https://www.jiosaavn.com/api.php
-CORS_ORIGIN=*
+CORS_ORIGIN=   # extra allowed origins, comma-separated ("*" is NOT a wildcard here)
+
+# Optional: video lookup (see CLAUDE.md). Everything below is off unless set.
+# YOUTUBE_API_KEY=
+# VIDEO_CHANNEL_ALLOWLIST=UCxxxxxxxx,UCyyyyyyyy   # official channel IDs, fail-closed when empty
+# YOUTUBE_DAILY_BUDGET=5000                        # quota units/day (a lookup costs 101)
 ```
 
 Generate Prisma Client:
@@ -206,6 +211,7 @@ Open `http://localhost:3000` in your web browser.
 |---|---|---|---|
 | `GET` | `/api/music/home` | Curated Tamil sections | No |
 | `GET` | `/api/music/search?query=...` | Search songs, albums, artists | No |
+| `GET` | `/api/music/song/:id` | Single song, with optional `videoId` (`?fresh=1` bypasses the cache; rate-limited to 30/min) | No |
 | `GET` | `/api/music/albums/:id` | Get album and tracklist | No |
 | `GET` | `/api/music/artists/:id` | Get artist details and top songs | No |
 | `GET` | `/api/music/health` | Music provider health check | No |
@@ -300,7 +306,7 @@ Use any managed PostgreSQL provider (e.g., [Render PostgreSQL](https://render.co
    - `NODE_ENV`: `production`
    - `PORT`: `10000`
    - `JWT_SECRET`: *(auto-generated or random 32 characters)*
-   - `CORS_ORIGIN`: `*`
+   - `CORS_ORIGIN`: *(your exact Vercel origin; `*` is not treated as a wildcard)*
    - `DATABASE_URL`: *(PostgreSQL connection string)*
    - `MUSIC_PROVIDER`: `jiosaavn` *(or `youtube` for YouTube IFrame engine, `local`)*
 
@@ -314,6 +320,18 @@ Use any managed PostgreSQL provider (e.g., [Render PostgreSQL](https://render.co
    - `VITE_API_BASE_URL=https://your-backend-domain.onrender.com/api`
 
 ---
+
+## 🎬 Optional: Video mode
+
+Songs can carry an optional `videoId`. When present (and the song also has an audio stream), the player shows an
+**Audio / Video** toggle. Video plays through the YouTube IFrame player, kept visible at 200×200 or larger; switching
+keeps the position and waits for a tap to play. If YouTube refuses to embed (errors 101/150) the player falls back to
+audio with a toast.
+
+`videoId` comes from a curated map (`backend/src/services/music/curatedVideos.js`) and, **only if you opt in**, from a
+cached YouTube Data API lookup limited to an allow-list of official channels. `YOUTUBE_API_KEY`,
+`VIDEO_CHANNEL_ALLOWLIST` and `YOUTUBE_DAILY_BUDGET` are all optional; without a key the API is never called. See
+`CLAUDE.md` for details.
 
 ## ⚖️ Legal & Compliance Notice
 

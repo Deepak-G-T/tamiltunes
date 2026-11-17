@@ -9,7 +9,7 @@
     "lint": "oxlint",
     "preview": "vite preview",
     "test": "vitest run",
-    "test:ui": "node src/test/runPlaywrightAudit.mjs"
+    "test:ui": "vite build && node scripts/run-ui-audits.mjs"
   },
   "dependencies": {
     "@tailwindcss/vite": "^4.3.5",

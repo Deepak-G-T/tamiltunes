@@ -22,6 +22,9 @@ const __dirname = path.dirname(__filename);
 
 const app = express();
 
+// Behind Render/Vercel proxies: needed so rate limiting sees the real client IP
+app.set('trust proxy', config.trustProxy);
+
 // Security Middlewares
 app.use(helmet({
   crossOriginResourcePolicy: { policy: 'cross-origin' }

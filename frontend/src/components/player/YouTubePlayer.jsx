@@ -2,7 +2,8 @@ import React, { useEffect, useState, useRef, useImperativeHandle, forwardRef } f
 
 /**
  * YouTubePlayer Component
- * Uses the official YouTube IFrame Player API (visible floating player, min 200x200)
+ * Uses the official YouTube IFrame Player API (visible floating player, min 200x200). While the
+ * full-screen player is open, the iframe is pinned over its registered <VideoSlot> instead (`rect`).
  * Implements the exact same playback interface as HTML5 audio engine:
  * play, pause, seek, setVolume, mute, unMute, onTimeUpdate, onEnded, onPlaying, onPause, onBuffering.
  */
@@ -14,12 +15,15 @@ const YouTubePlayer = forwardRef(({
   onBuffering,
   onEnded,
   onTimeUpdate,
-  onError
+  onError,
+  rect = null
 }, ref) => {
   const playerRef = useRef(null);
   const isReadyRef = useRef(false);
   const progressTimerRef = useRef(null);
+  const pendingRef = useRef(null); // load requested while the player exists but is not ready yet
   const pendingVideoIdRef = useRef(propVideoId || null);
+  const pendingIntentRef = useRef({ autoPlay: true, startSeconds: 0 }); // how to start a video requested before the API/player was ready
 
   // Responsive mobile check for non-overlapping bottom position
   const [isMobile, setIsMobile] = useState(() => typeof window !== 'undefined' && window.innerWidth < 768);
@@ -35,7 +39,8 @@ const YouTubePlayer = forwardRef(({
     if (propVideoId) {
       pendingVideoIdRef.current = propVideoId;
       if (!playerRef.current && window.YT && window.YT.Player) {
-        initPlayer(propVideoId, true);
+        const { autoPlay, startSeconds } = pendingIntentRef.current;
+        initPlayer(propVideoId, autoPlay, startSeconds);
       }
     }
   }, [propVideoId]);
@@ -44,7 +49,7 @@ const YouTubePlayer = forwardRef(({
   useEffect(() => {
     if (window.YT && window.YT.Player) {
       if (pendingVideoIdRef.current) {
-        initPlayer(pendingVideoIdRef.current);
+        initPlayer(pendingVideoIdRef.current, pendingIntentRef.current.autoPlay, pendingIntentRef.current.startSeconds);
       }
       return;
     }
@@ -63,7 +68,7 @@ const YouTubePlayer = forwardRef(({
     window.onYouTubeIframeAPIReady = () => {
       if (typeof prevOnReady === 'function') prevOnReady();
       if (pendingVideoIdRef.current) {
-        initPlayer(pendingVideoIdRef.current);
+        initPlayer(pendingVideoIdRef.current, pendingIntentRef.current.autoPlay, pendingIntentRef.current.startSeconds);
       }
     };
 
@@ -77,12 +82,13 @@ const YouTubePlayer = forwardRef(({
     };
   }, []);
 
-  const initPlayer = (vid, autoPlay = true) => {
+  const initPlayer = (vid, autoPlay = true, startSeconds = 0) => {
     if (playerRef.current || !window.YT || !window.YT.Player) return;
 
     try {
       const playerVars = {
         autoplay: autoPlay ? 1 : 0,
+        start: Math.max(0, Math.floor(startSeconds || 0)),
         controls: 1,
         disablekb: 0,
         fs: 1,
@@ -93,8 +99,8 @@ const YouTubePlayer = forwardRef(({
       };
 
       const opts = {
-        height: '200',
-        width: '240',
+        height: '100%',
+        width: '100%',
         playerVars,
         events: {
           onReady: (event) => {
@@ -102,6 +108,11 @@ const YouTubePlayer = forwardRef(({
             window.__ytPlayerInstance = event.target;
             if (autoPlay && typeof event.target.playVideo === 'function') {
               event.target.playVideo();
+            }
+            if (pendingRef.current) {
+              const { videoId, autoPlay: pendingAutoPlay, startSeconds: pendingStart } = pendingRef.current;
+              pendingRef.current = null;
+              applyVideo(videoId, pendingAutoPlay, pendingStart);
             }
           },
           onStateChange: (event) => {
@@ -138,6 +149,14 @@ const YouTubePlayer = forwardRef(({
     }
   };
 
+  const applyVideo = (videoId, autoPlay, startSeconds) => {
+    const player = playerRef.current;
+    if (!player) return;
+    const payload = { videoId, startSeconds: Math.max(0, Math.floor(startSeconds || 0)) };
+    if (autoPlay && typeof player.loadVideoById === 'function') player.loadVideoById(payload);
+    else if (typeof player.cueVideoById === 'function') player.cueVideoById(payload); // cue = no autoplay
+  };
+
   const startProgressTimer = () => {
     stopProgressTimer();
     progressTimerRef.current = setInterval(() => {
@@ -159,30 +178,22 @@ const YouTubePlayer = forwardRef(({
   };
 
   useImperativeHandle(ref, () => ({
-    loadVideo(videoId, autoPlay = true) {
+    loadVideo(videoId, autoPlay = true, startSeconds = 0) {
       if (!videoId) return;
       pendingVideoIdRef.current = videoId;
+      pendingIntentRef.current = { autoPlay, startSeconds };
 
       if (!playerRef.current) {
         if (window.YT && window.YT.Player) {
-          initPlayer(videoId, autoPlay);
+          initPlayer(videoId, autoPlay, startSeconds); // player is created WITH the videoId
         }
-        return;
+        return; // otherwise the API-ready handler creates it using pendingIntentRef
       }
 
-      if (isReadyRef.current && typeof playerRef.current.loadVideoById === 'function') {
-        if (autoPlay) {
-          playerRef.current.loadVideoById(videoId);
-        } else {
-          playerRef.current.cueVideoById(videoId);
-        }
+      if (isReadyRef.current) {
+        applyVideo(videoId, autoPlay, startSeconds);
       } else {
-        // Retry shortly once iframe finishes handshake
-        setTimeout(() => {
-          if (playerRef.current && typeof playerRef.current.loadVideoById === 'function') {
-            playerRef.current.loadVideoById(videoId);
-          }
-        }, 500);
+        pendingRef.current = { videoId, autoPlay, startSeconds };
       }
     },
     play() {
@@ -232,30 +243,45 @@ const YouTubePlayer = forwardRef(({
     }
   }));
 
-  // On mobile: sits at bottom 154px (above 64px mini-player + 56px bottom nav + >= 12px buffer)
-  // On desktop: sits at bottom 96px (above 80px player bar + 16px buffer)
+  // Default: floating player (mobile bottom 154px above mini player + nav + >= 12px buffer; desktop 96px).
+  // `rect` (full-screen player open): pinned over the registered slot instead.
   const computedBottom = visible ? (isMobile ? '154px' : '96px') : '-400px';
-
-  return (
-    <div
-      id="yt-player-container"
-      style={{
-        position: 'fixed',
+  const placement = rect
+    ? {
+        top: rect.top,
+        left: rect.left,
+        width: Math.max(rect.width, 200),
+        height: Math.max(rect.height, 200),
+        opacity: 1,
+        pointerEvents: 'auto',
+        zIndex: 100000
+      }
+    : {
         bottom: computedBottom,
         right: '16px',
         width: '240px',
         height: '200px',
-        minWidth: '200px',
-        minHeight: '200px',
         opacity: visible ? 1 : 0,
         pointerEvents: visible ? 'auto' : 'none',
-        zIndex: visible ? 45 : -1,
+        zIndex: visible ? 45 : -1
+      };
+
+  return (
+    <div
+      id="yt-player-container"
+      data-testid="yt-player-container"
+      data-visible={rect || visible ? 'true' : 'false'}
+      style={{
+        position: 'fixed',
+        minWidth: '200px',
+        minHeight: '200px',
+        ...placement,
         borderRadius: '12px',
         overflow: 'hidden',
         backgroundColor: '#09090b',
         border: '1px solid #27272a',
         boxShadow: '0 20px 25px -5px rgba(0, 0, 0, 0.8), 0 8px 10px -6px rgba(0, 0, 0, 0.6)',
-        transition: 'opacity 0.25s ease, bottom 0.25s ease'
+        transition: rect ? 'none' : 'opacity 0.25s ease, bottom 0.25s ease'
       }}
       aria-label="YouTube Video Player"
     >

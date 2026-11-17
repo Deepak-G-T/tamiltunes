@@ -7,6 +7,8 @@ import { fileURLToPath } from 'url';
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 const projectRoot = path.resolve(__dirname, '../../../');
+// Optional: point at an existing Chromium binary (e.g. CHROMIUM_PATH=/opt/pw-browsers/chromium); default unchanged
+const chromiumOverride = process.env.CHROMIUM_PATH ? { executablePath: process.env.CHROMIUM_PATH } : {};
 const screenshotDir = path.resolve(projectRoot, 'audit/screenshots');
 
 if (!fs.existsSync(screenshotDir)) {
@@ -143,7 +145,7 @@ async function runAudit() {
   console.log('✓ Vite preview server running at', baseURL);
 
   // 2. Launch Chromium
-  const browser = await chromium.launch({ headless: true });
+  const browser = await chromium.launch({ headless: true, ...chromiumOverride });
   console.log('✓ Playwright Chromium browser initialized');
 
   const setupMockRoutes = async (page) => {
@@ -403,6 +405,7 @@ async function runAudit() {
   console.log('\n--- Running Dedicated YouTube Player Autoplay & Video Data Test (--autoplay-policy=no-user-gesture-required) ---');
   const ytAutoplayBrowser = await chromium.launch({
     headless: true,
+    ...chromiumOverride,
     args: ['--autoplay-policy=no-user-gesture-required']
   });
 
