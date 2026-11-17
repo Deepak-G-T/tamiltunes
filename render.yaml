@@ -14,9 +14,9 @@ services:
       - key: JWT_SECRET
         generateValue: true
       - key: CORS_ORIGIN
-        sync: false # set to the exact Vercel origin(s), comma-separated; "*" is rejected in production
+        sync: false # REQUIRED: exact Vercel origin(s), comma-separated. "*" is NOT a wildcard (it matches nothing)
       - key: VERCEL_TEAM_SLUG
-        sync: false # optional: allows https://<project>-<hash>-<slug>.vercel.app previews
+        sync: false # REQUIRED in production: startup fails if unset. Pins the Vercel preview-origin regex to your team
       - key: MUSIC_PROVIDER
         value: jiosaavn
       - key: ENABLE_EXTERNAL_STREAMS
