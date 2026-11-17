@@ -43,8 +43,7 @@ Songs may carry an optional `videoId`. It comes from the curated map `backend/sr
 - Results (including "no video found") are cached 24h; transient errors 10 min. Home/search never call the API
   inline: they use the curated map and cache, and queue background lookups. Only `GET /api/music/song/:id` awaits one
   (that route is limited to 30 requests/min per IP; `?fresh=1` stays open to guests for expired-stream recovery).
-- Curated entries are "oEmbed-verified by a previous agent, embeddability unverified"; the player falls back to audio
-  with a toast on YouTube errors 101/150.
+- The player falls back to audio with a toast on YouTube errors 101/150 (video not embeddable).
 - The curated map serves official *video songs*, not lyric videos. Entries marked `candidate` (older ids, lyric videos)
   are kept in the file but never served (e.g. Badass `IqwIOlhfCak` is titled "LEO - Badass Lyric"). All nine served ids
   were checked by fetching the YouTube watch page and oEmbed endpoint: the uploader is an official channel, the title says
