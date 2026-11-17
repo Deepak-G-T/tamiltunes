@@ -8,6 +8,7 @@ import {
   calculateNewQueueIndexAfterRemoval
 } from '../utils/queueLogic';
 import Toast from '../components/common/Toast';
+import { getCoverColor, rgbVar } from '../lib/coverColor';
 import { engineFor, canToggleVideo, getVideoId, planSwitch, planEmbedError } from '../lib/playbackLogic';
 
 const AudioContext = createContext();
@@ -69,6 +70,23 @@ export const AudioProvider = ({ children }) => {
   useEffect(() => {
     isPlayingRef.current = isPlaying;
   }, [isPlaying]);
+
+  // Page-wide colour wash follows the playing song's artwork (falls back to a stable seed colour)
+  useEffect(() => {
+    if (typeof document === 'undefined') return undefined;
+    const root = document.documentElement;
+    if (!currentSong) {
+      root.style.removeProperty('--cover-rgb');
+      return undefined;
+    }
+    let cancelled = false;
+    getCoverColor(currentSong.image, currentSong.id).then((rgb) => {
+      if (!cancelled) root.style.setProperty('--cover-rgb', rgbVar(rgb));
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, [currentSong?.id, currentSong?.image]);
 
   const showToast = useCallback((message) => setToast({ id: Date.now(), message }), []);
   useEffect(() => {

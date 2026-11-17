@@ -16,6 +16,12 @@
   --color-brand-900: #0b3d20;
   --color-brand-950: #062613;
 
+  /* warm Tamil-inspired accent (saffron/turmeric), used sparingly next to the green */
+  --color-accent-300: #ffd27a;
+  --color-accent-400: #ffb938;
+  --color-accent-500: #f5a524;
+  --color-accent-700: #a86a0a;
+
   --color-surface-0: #000000;
   --color-surface-1: #121212;
   --color-surface-2: #181818;
@@ -127,4 +133,63 @@ input[type="range"]:active::-moz-range-thumb {
 .scrollbar-none {
   -ms-overflow-style: none;
   scrollbar-width: none;
+}
+
+/* ---------- Style upgrade: cover-colour washes, motion, Tamil accents ---------- */
+
+/* --cover-rgb is set from the playing song's artwork (see AudioContext); the fallback is the brand green */
+.cover-wash {
+  background: linear-gradient(to bottom, rgb(var(--cover-rgb, 11 61 32) / 0.55), rgb(var(--cover-rgb, 11 61 32) / 0.12) 55%, transparent);
+  transition: background 0.8s ease;
+}
+.cover-wash-strong {
+  background: linear-gradient(to bottom, rgb(var(--cover-rgb, 11 61 32) / 0.75), rgb(var(--cover-rgb, 11 61 32) / 0.2) 65%, transparent);
+}
+.cover-glow {
+  background: radial-gradient(closest-side, rgb(var(--cover-rgb, 29 185 84) / 0.55), transparent 70%);
+  transition: background 0.8s ease;
+}
+
+/* subtle kolam-style dot lattice, used as a decorative texture */
+.kolam {
+  background-image: radial-gradient(circle at 1px 1px, rgb(255 255 255 / 0.09) 1px, transparent 1.6px);
+  background-size: 18px 18px;
+}
+
+/* animated equalizer bars (playing song) */
+@keyframes eq-bounce {
+  0%, 100% { transform: scaleY(0.25); }
+  50% { transform: scaleY(1); }
+}
+.eq-bar { transform-origin: bottom; animation: eq-bounce 0.9s ease-in-out infinite; }
+.eq-bar:nth-child(2) { animation-duration: 0.65s; animation-delay: -0.2s; }
+.eq-bar:nth-child(3) { animation-duration: 1.1s; animation-delay: -0.45s; }
+
+/* vinyl record behind the full-screen artwork */
+@keyframes vinyl-spin { to { transform: rotate(360deg); } }
+.vinyl {
+  background:
+    radial-gradient(circle at center, #1a1a1a 0 18%, transparent 18.5%),
+    radial-gradient(circle at center, rgb(var(--cover-rgb, 29 185 84)) 0 16%, transparent 16.5%),
+    repeating-radial-gradient(circle at center, #0b0b0b 0 2px, #151515 2px 4px);
+}
+.vinyl-spin { animation: vinyl-spin 6s linear infinite; }
+
+/* route change */
+@keyframes page-in {
+  from { opacity: 0; transform: translateY(8px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+.page-in { animation: page-in 0.28s ease-out both; }
+
+/* card lift on hover (desktop pointers only) */
+@media (hover: hover) {
+  .lift { transition: transform 0.25s ease, background-color 0.3s ease; }
+  .lift:hover { transform: translateY(-3px); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .eq-bar, .vinyl-spin, .page-in { animation: none !important; }
+  .lift:hover { transform: none; }
+  .cover-wash, .cover-glow { transition: none; }
 }
