@@ -1,0 +1,66 @@
+﻿
+### Search Evaluation Table (48 Varied Queries)
+
+| # | Query | Category | Kept | Dropped | Primary Reason | Detected Language | Top Retained Song |
+|---|---|---|---|---|---|---|---|
+| 1 | sivaji ganesan tm sounda | Old Songs    |  15 |   0 | PASS_RECOGNIZED_ARTIST   | tamil    | Malarndhum Malaradha (T. M. Soundara |
+| 2 | mgr kannadasan hits      | Old Songs    |  15 |   0 | PASS_FILM_INDICATOR      | tamil    | Unnai Arindhal (From "Vettaikkaran") |
+| 3 | viswanathan ramamoorthy  | Old Songs    |  14 |   1 | PASS_RECOGNIZED_ARTIST   | tamil    | Kodutthathellam Kodutthan (T.M. Soun |
+| 4 | ilaiyaraaja 80s hits     | Old Songs    |  10 |   0 | PASS_RECOGNIZED_ARTIST   | tamil    | Sangathil Padatha (Ilaiyaraaja, S. J |
+| 5 | spb 80s tamil melodies   | Old Songs    |   1 |   0 | PASS_RECOGNIZED_ARTIST   | tamil    | O Nenje (S. P. Balasubrahmanyam, S.P |
+| 6 | kannadasan hits          | Old Songs    |  15 |   0 | PASS_FILM_INDICATOR      | tamil    | Aruna Runam (From "Pithamagan") (Kan |
+| 7 | k.j. yesudas tamil everg | Old Songs    |  15 |   0 | PASS_RECOGNIZED_ARTIST   | tamil    | Aana Alayira Neeli Malai (K.J. Yesud |
+| 8 | m.s. viswanathan melodie | Old Songs    |  12 |   3 | PASS_RECOGNIZED_ARTIST   | tamil    | Kaatru Vaanga Ponen - Chill Trap (T. |
+| 9 | enjoy enjaami            | Indie        |   1 |   7 | PASS_RECOGNIZED_ARTIST   | tamil    | Enjoy Enjaami (Arivu, Santhosh Naray |
+| 10 | katchi sera              | Indie        |   2 |   9 | PASS_FILM_INDICATOR      | tamil    | Katchi Sera (From "Think Indie") (Sa |
+| 11 | therukural arivu         | Indie        |   7 |   0 | PASS_RECOGNIZED_ARTIST   | tamil    | thamizhachi. (ofRO, Arivu)           |
+| 12 | dhee indie tamil         | Indie        |   6 |   2 | PASS_FILM_INDICATOR      | tamil    | Paiya Dei (From "Think Indie") (Asal |
+| 13 | sean roldan live         | Indie        |   2 |   2 | PASS_RECOGNIZED_ARTIST   | tamil    | Murugan Goes Facebook Live (Sean Rol |
+| 14 | asuran blood bath        | Indie        |   1 |   0 | PASS_RECOGNIZED_ARTIST   | tamil    | The Blood Bath (Arunraja Kamaraj, G. |
+| 15 | kandha sashti kavasam    | Devotional   |  10 |   5 | PASS_RECOGNIZED_ARTIST   | tamil    | Kandha Sashti Kavasam (Ishaan Dev, D |
+| 16 | vinayagar agaval tms     | Devotional   |   9 |   6 | PASS_RECOGNIZED_ARTIST   | tamil    | Vinayagar Agaval (Dr. Sirkazhi G. Si |
+| 17 | amman padalgal l.r. eswa | Devotional   |  11 |   4 | PASS_FILM_INDICATOR      | tamil    | Kalasala Kalasala (Vaali, Thaman S,  |
+| 18 | murugan devotional tamil | Devotional   |   6 |   9 | PASS_RECOGNIZED_ARTIST   | tamil    | Adi Meethu Adi Vaithu (Extended Vers |
+| 19 | krishna devotional tamil | Devotional   |   6 |   9 | PASS_RECOGNIZED_ARTIST   | tamil    | Aayarpadi Maligaiyil (S. P. Balasubr |
+| 20 | thiruppugazh tms         | Devotional   |   1 |   0 | PASS_DEVOTIONAL_SCRIPTURE | tamil    | Thirupugazh Paadal (T.M.S. Selvakuma |
+| 21 | vezha vera               | Misspellings |   1 |   1 | PASS_FILM_INDICATOR      | tamil    | Veezha Veera (From "OM Chapter 1: Ud |
+| 22 | alirudh ravichander      | Misspellings |  13 |   0 | PASS_FILM_INDICATOR      | tamil    | Don'u Don'u Don'u (From "Maari") (Th |
+| 23 | ilaiyaraja songs         | Misspellings |  14 |   1 | PASS_RECOGNIZED_ARTIST   | tamil    | Aagaasam (Ilaiyaraaja Version) (Yuva |
+| 24 | yuvan shanker raja       | Misspellings |  15 |   0 | PASS_RECOGNIZED_ARTIST   | tamil    | Thuli Thuli (Tanvi Shah, Yuvan Shank |
+| 25 | kolavari di              | Misspellings |  14 |   1 | PASS_RECOGNIZED_ARTIST   | tamil    | Why This Kolaveri Di? (The Soup of L |
+| 26 | harris jayaraj hits      | Misspellings |  14 |   1 | PASS_RECOGNIZED_ARTIST   | tamil    | Unakkul Naane (Rohini, Harris Jayara |
+| 27 | veezha veera             | Film Hits    |   2 |   0 | PASS_FILM_INDICATOR      | tamil    | Veezha Veera (From "OM Chapter 1: Ud |
+| 28 | badass leo               | Film Hits    |  10 |   2 | PASS_RECOGNIZED_ARTIST   | tamil    | Badass (Anirudh Ravichander, Vishnu  |
+| 29 | hukum jailer             | Film Hits    |   6 |   1 | PASS_RECOGNIZED_ARTIST   | tamil    | Hukum - Thalaivar Alappara (Anirudh  |
+| 30 | naa ready                | Film Hits    |   9 |   6 | PASS_RECOGNIZED_ARTIST   | tamil    | Naa Ready (Vijay, Anirudh Ravichande |
+| 31 | aalaporaan thamizhan     | Film Hits    |  11 |   1 | PASS_RECOGNIZED_ARTIST   | tamil    | Aalaporaan Thamizhan (A.R. Rahman, K |
+| 32 | vaathi coming            | Film Hits    |   7 |   1 | PASS_RECOGNIZED_ARTIST   | tamil    | Vaathi Coming (Anirudh Ravichander,  |
+| 33 | arabic kuthu             | Film Hits    |  10 |   5 | PASS_RECOGNIZED_ARTIST   | tamil    | Arabic Kuthu - Halamithi Habibo (Ani |
+| 34 | kaavaalaa                | Film Hits    |  12 |   3 | PASS_RECOGNIZED_ARTIST   | tamil    | Kaavaalaa (Shilpa Rao, Anirudh Ravic |
+| 35 | marana mass              | Film Gaana   |  14 |   1 | PASS_FILM_INDICATOR      | tamil    | Marana Mass (From "Petta") (Anirudh  |
+| 36 | aaluma doluma            | Film Gaana   |  15 |   0 | PASS_RECOGNIZED_ARTIST   | tamil    | Aaluma Doluma (Anirudh Ravichander,  |
+| 37 | danga maari              | Film Gaana   |  15 |   0 | PASS_RECOGNIZED_ARTIST   | tamil    | Danga Maari Oodhari (Dhanush, Harris |
+| 38 | marana gana viji         | Film Gaana   |  15 |   0 | PASS_RECOGNIZED_ARTIST   | tamil    | Danga Maari Oodhari (Dhanush, Harris |
+| 39 | telugu dj songs          | Non-Tamil    |   1 |   9 | PASS_RECOGNIZED_ARTIST   | tamil    | Dj Dj (Vidyasagar, Benny Dayal, Such |
+| 40 | hindi arijit singh hits  | Non-Tamil    |   6 |   9 | PASS_RECOGNIZED_ARTIST   | tamil    | Naan Un (A.R. Rahman, Arijit Singh,  |
+| 41 | malayalam premam songs   | Non-Tamil    |   1 |   4 | PASS_RECOGNIZED_ARTIST   | tamil    | Premameh (Ganessan Manohgaran, M Jag |
+| 42 | kannada kgf songs        | Non-Tamil    |   9 |   1 | PASS_RECOGNIZED_ARTIST   | tamil    | The Monster Song (Ravi Basrur, Adith |
+| 43 | punjabi pop sidhu        | Non-Tamil    |   2 |  13 | PASS_RECOGNIZED_ARTIST   | tamil    | God Mode - Hyper Pop (Sai Abhyankkar |
+| 44 | whatsapp status tamil    | Spam/Meme    |   0 |   2 | REJECT_SPAM_PATTERN      | tamil    | None                                 |
+| 45 | tamil dj remix           | Spam/Meme    |   0 |  15 | REJECT_SPAM_PATTERN      | tamil    | None                                 |
+| 46 | slowed reverb tamil      | Spam/Meme    |   0 |  15 | REJECT_SPAM_PATTERN      | tamil    | None                                 |
+| 47 | salem gana velu          | Spam/Meme    |  12 |   3 | PASS_RECOGNIZED_ARTIST   | tamil    | Velum Mayilum (Nivas K Prasanna, Siv |
+| 48 | trending gana surya      | Spam/Meme    |   0 |   5 | REJECT_SPAM_PATTERN      | tamil    | None                                 |
+
+### False Positives & False Negatives Analysis
+
+- **False Positives Detected (6):**
+  - Query "telugu dj songs" [Non-Tamil]: allowed "Dj Dj" via PASS_RECOGNIZED_ARTIST
+  - Query "hindi arijit singh hits" [Non-Tamil]: allowed "Naan Un" via PASS_RECOGNIZED_ARTIST
+  - Query "malayalam premam songs" [Non-Tamil]: allowed "Premameh" via PASS_RECOGNIZED_ARTIST
+  - Query "kannada kgf songs" [Non-Tamil]: allowed "The Monster Song" via PASS_RECOGNIZED_ARTIST
+  - Query "punjabi pop sidhu" [Non-Tamil]: allowed "God Mode - Hyper Pop" via PASS_RECOGNIZED_ARTIST
+  - Query "salem gana velu" [Spam/Meme]: allowed "Velum Mayilum" via PASS_RECOGNIZED_ARTIST
+
+- **False Negatives Detected (0):**
+  - None! All legitimate Tamil tracks were successfully retained.

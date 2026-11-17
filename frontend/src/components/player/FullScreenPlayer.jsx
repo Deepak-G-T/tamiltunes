@@ -17,6 +17,8 @@ import {
 import { useAudio } from '../../context/AudioContext';
 import ProgressBar from './ProgressBar';
 import VolumeSlider from './VolumeSlider';
+import VideoSlot from './VideoSlot';
+import VideoModeToggle from './VideoModeToggle';
 
 const MUSIC_COVER_FALLBACK = "data:image/svg+xml;charset=UTF-8,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 300 300'%3E%3Cdefs%3E%3ClinearGradient id='bg' x1='0%25' y1='0%25' x2='100%25' y2='100%25'%3E%3Cstop offset='0%25' stop-color='%233b185f'/%3E%3Cstop offset='50%25' stop-color='%231f1338'/%3E%3Cstop offset='100%25' stop-color='%230f091f'/%3E%3C/linearGradient%3E%3C/defs%3E%3Crect width='300' height='300' rx='16' fill='url(%23bg)'/%3E%3Ccircle cx='150' cy='150' r='60' fill='%23a855f7' opacity='0.2'/%3E%3Cpath d='M135 180V120l50-14v54m-50 0a16 16 0 11-32 0 16 16 0 0132 0zm50-14a16 16 0 11-32 0 16 16 0 0132 0z' stroke='%23c084fc' stroke-width='6' fill='none' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E";
 
@@ -40,7 +42,8 @@ const FullScreenPlayer = ({ isOpen, onClose, onToggleFavorite, isFavorite }) => 
     toggleShuffle,
     repeatMode,
     toggleRepeat,
-    setIsQueueOpen
+    setIsQueueOpen,
+    activeEngine
   } = useAudio();
 
   // Lock body scroll when full screen player is open on mobile
@@ -102,7 +105,11 @@ const FullScreenPlayer = ({ isOpen, onClose, onToggleFavorite, isFavorite }) => 
 
       {/* Center Artwork & Metadata */}
       <div className="relative z-10 flex flex-col items-center justify-center my-auto max-w-sm sm:max-w-md mx-auto w-full py-4">
-        {/* Album Cover */}
+        {/* Video surface (YouTube engine active) or album cover */}
+        {activeEngine === 'youtube' && (
+          <VideoSlot className="w-full aspect-video mb-6 shadow-2xl border border-zinc-800/80" />
+        )}
+        {activeEngine !== 'youtube' && (
         <div className="relative w-56 h-56 xs:w-64 xs:h-64 sm:w-80 sm:h-80 rounded-2xl overflow-hidden shadow-2xl border border-zinc-800/80 mb-6 group bg-zinc-900">
           <img
             src={currentSong.image || MUSIC_COVER_FALLBACK}
@@ -122,6 +129,9 @@ const FullScreenPlayer = ({ isOpen, onClose, onToggleFavorite, isFavorite }) => 
             </div>
           )}
         </div>
+        )}
+
+        <VideoModeToggle className="mb-4" />
 
         {/* Title, Artist, & Favorite */}
         <div className="w-full flex items-center justify-between mb-3 px-1">
@@ -182,7 +192,8 @@ const FullScreenPlayer = ({ isOpen, onClose, onToggleFavorite, isFavorite }) => 
         <div className="flex items-center justify-between mb-5">
           <button
             onClick={toggleShuffle}
-            className={`p-2.5 transition-colors active:scale-90 ${
+            aria-label={`Shuffle ${isShuffle ? 'On' : 'Off'}`}
+            className={`p-2.5 transition-colors active:scale-90 focus-visible:ring-2 focus-visible:ring-purple-500 focus-visible:outline-none ${
               isShuffle ? 'text-purple-400' : 'text-zinc-500 hover:text-white'
             }`}
           >
@@ -191,28 +202,32 @@ const FullScreenPlayer = ({ isOpen, onClose, onToggleFavorite, isFavorite }) => 
 
           <button
             onClick={previousTrack}
-            className="p-2.5 text-zinc-300 hover:text-white active:scale-90 transition-all"
+            aria-label="Previous track"
+            className="p-2.5 text-zinc-300 hover:text-white active:scale-90 focus-visible:ring-2 focus-visible:ring-purple-500 focus-visible:outline-none transition-all"
           >
             <SkipBack className="w-7 h-7" />
           </button>
 
           <button
             onClick={togglePlay}
-            className="w-16 h-16 rounded-full bg-purple-600 hover:bg-purple-500 text-white flex items-center justify-center shadow-lg shadow-purple-600/40 hover:scale-105 active:scale-95 transition-all"
+            aria-label={isPlaying ? 'Pause' : 'Play'}
+            className="w-16 h-16 rounded-full bg-purple-600 hover:bg-purple-500 text-white flex items-center justify-center shadow-lg shadow-purple-600/40 hover:scale-105 active:scale-95 focus-visible:ring-2 focus-visible:ring-purple-400 focus-visible:outline-none transition-all"
           >
             {isPlaying ? <Pause className="w-7 h-7" /> : <Play className="w-7 h-7 ml-1" />}
           </button>
 
           <button
             onClick={nextTrack}
-            className="p-2.5 text-zinc-300 hover:text-white active:scale-90 transition-all"
+            aria-label="Next track"
+            className="p-2.5 text-zinc-300 hover:text-white active:scale-90 focus-visible:ring-2 focus-visible:ring-purple-500 focus-visible:outline-none transition-all"
           >
             <SkipForward className="w-7 h-7" />
           </button>
 
           <button
             onClick={toggleRepeat}
-            className={`p-2.5 transition-colors active:scale-90 ${
+            aria-label={`Repeat: ${repeatMode}`}
+            className={`p-2.5 transition-colors active:scale-90 focus-visible:ring-2 focus-visible:ring-purple-500 focus-visible:outline-none ${
               repeatMode !== 'off' ? 'text-purple-400' : 'text-zinc-500 hover:text-white'
             }`}
           >

@@ -2,7 +2,7 @@
  * LRU In-memory TTL Cache Service for TamilTunes API
  * Capped at 500 entries with Least Recently Used (LRU) eviction and a 10-minute default TTL.
  */
-class LruCacheService {
+export class LruCacheService {
   constructor(maxEntries = 500, defaultTtlSeconds = 600) {
     this.maxEntries = maxEntries;
     this.defaultTtlMs = defaultTtlSeconds * 1000; // 10 minutes

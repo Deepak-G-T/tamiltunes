@@ -65,8 +65,15 @@ class InMemoryDb {
   };
 
   playlist = {
-    findMany: async ({ where, include, orderBy }) => {
+    count: async ({ where } = {}) => {
+      if (!where || !where.userId) return this.playlists.size;
+      return Array.from(this.playlists.values()).filter((p) => p.userId === where.userId).length;
+    },
+    findMany: async ({ where, include, orderBy, take, skip }) => {
       let list = Array.from(this.playlists.values()).filter((p) => p.userId === where.userId);
+      const start = skip || 0;
+      const end = take !== undefined ? start + take : undefined;
+      list = list.slice(start, end);
       if (include?.songs) {
         list = list.map((p) => {
           const songs = Array.from(this.playlistSongs.values())
@@ -141,8 +148,18 @@ class InMemoryDb {
   };
 
   favorite = {
-    findMany: async ({ where, include, orderBy }) => {
+    count: async ({ where } = {}) => {
+      if (!where || !where.userId) return this.favorites.size;
+      return Array.from(this.favorites.values()).filter((f) => f.userId === where.userId).length;
+    },
+    findMany: async ({ where, include, select, orderBy, take, skip }) => {
       let list = Array.from(this.favorites.values()).filter((f) => f.userId === where.userId);
+      const start = skip || 0;
+      const end = take !== undefined ? start + take : undefined;
+      list = list.slice(start, end);
+      if (select?.songId) {
+        return list.map((f) => ({ songId: f.songId }));
+      }
       return list.map((f) => ({
         ...f,
         song: this.songs.get(f.songId) || { id: f.songId, title: 'Tamil Song' }
@@ -171,12 +188,18 @@ class InMemoryDb {
   };
 
   listeningHistory = {
-    findMany: async ({ where, include, orderBy, take }) => {
+    count: async ({ where } = {}) => {
+      if (!where || !where.userId) return this._historyItems.length;
+      return this._historyItems.filter((h) => h.userId === where.userId).length;
+    },
+    findMany: async ({ where, include, orderBy, take, skip }) => {
       let list = this._historyItems
         .filter((h) => h.userId === where.userId)
         .slice()
-        .reverse()
-        .slice(0, take || 50);
+        .reverse();
+      const start = skip || 0;
+      const end = take !== undefined ? start + take : undefined;
+      list = list.slice(start, end);
       return list.map((h) => ({
         ...h,
         song: this.songs.get(h.songId) || { id: h.songId, title: 'Tamil Song' }
@@ -202,6 +225,8 @@ const fallbackDb = new InMemoryDb();
 
 // Verify PostgreSQL connection on boot (migrations are managed externally via render/cli)
 export const initDb = async () => {
+  const isProduction = (config.nodeEnv === 'production' || process.env.NODE_ENV === 'production');
+
   if (prismaInstance) {
     try {
       await prismaInstance.$connect();
@@ -211,11 +236,33 @@ export const initDb = async () => {
       console.log('Connected to PostgreSQL via Prisma (tables verified)');
       return prismaInstance;
     } catch (err) {
-      console.warn('PostgreSQL connection check failed, using local development store:', err.message);
+      if (isProduction) {
+        console.error('\n================================================================================');
+        console.error('FATAL PRODUCTION DATABASE ERROR: Unable to connect to PostgreSQL via Prisma in production environment!');
+        console.error(`Reason: ${err.message}`);
+        console.error('In-memory database fallback is strictly disabled in production.');
+        console.error('================================================================================\n');
+        process.exit(1);
+      }
+      console.warn('\n================================================================================');
+      console.warn('⚠️  WARNING: PostgreSQL connection check failed! (NODE_ENV != production)');
+      console.warn(`Reason: ${err.message}`);
+      console.warn('Falling back to IN-MEMORY LOCAL DATA STORE for development purposes only.');
+      console.warn('Data will NOT be persisted across server restarts!');
+      console.warn('================================================================================\n');
       isPostgresAvailable = false;
       return fallbackDb;
     }
   }
+
+  if (isProduction) {
+    console.error('FATAL PRODUCTION DATABASE ERROR: PrismaClient instance failed to initialize in production environment!');
+    process.exit(1);
+  }
+
+  console.warn('\n================================================================================');
+  console.warn('⚠️  WARNING: No PrismaClient instance available. Using local in-memory store.');
+  console.warn('================================================================================\n');
   return fallbackDb;
 };
 
@@ -224,6 +271,10 @@ export const db = new Proxy({}, {
   get(target, prop) {
     if (isPostgresAvailable && prismaInstance) {
       return prismaInstance[prop];
+    }
+    const isProduction = (config.nodeEnv === 'production' || process.env.NODE_ENV === 'production');
+    if (isProduction) {
+      throw new Error(`Production database access failure: PostgreSQL unavailable and fallback disabled for "${String(prop)}"`);
     }
     return fallbackDb[prop];
   }

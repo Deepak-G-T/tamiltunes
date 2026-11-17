@@ -26,23 +26,59 @@ const History = () => {
 
   const [historyList, setHistoryList] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [loadingMore, setLoadingMore] = useState(false);
+  const [total, setTotal] = useState(0);
+  const [hasMore, setHasMore] = useState(false);
+  const [offset, setOffset] = useState(0);
+  const LIMIT = 50;
 
-  useEffect(() => {
+  const fetchHistory = (newOffset = 0, isAppend = false) => {
     if (!isAuthenticated) {
       setLoading(false);
       return;
     }
+    if (isAppend) {
+      setLoadingMore(true);
+    } else {
+      setLoading(true);
+    }
 
-    setLoading(true);
-    api.get('/history')
+    api.get('/history', { params: { limit: LIMIT, offset: newOffset } })
       .then(({ data }) => {
         if (data.success) {
-          setHistoryList(data.history || []);
+          const items = data.items || data.history || [];
+          const totalCount = data.total !== undefined ? data.total : (items.length + newOffset);
+          const more = data.hasMore !== undefined ? data.hasMore : (items.length === LIMIT && items.length + newOffset < totalCount);
+
+          if (isAppend) {
+            setHistoryList((prev) => [...prev, ...items]);
+          } else {
+            setHistoryList(items);
+          }
+          setTotal(totalCount);
+          setHasMore(more);
+          setOffset(newOffset);
         }
       })
-      .catch(console.error)
-      .finally(() => setLoading(false));
+      .catch((err) => {
+        if (err.response?.status !== 401) {
+          console.error('Error fetching listening history:', err);
+        }
+      })
+      .finally(() => {
+        setLoading(false);
+        setLoadingMore(false);
+      });
+  };
+
+  useEffect(() => {
+    fetchHistory(0, false);
   }, [isAuthenticated]);
+
+  const handleLoadMore = () => {
+    if (loadingMore || !hasMore) return;
+    fetchHistory(offset + LIMIT, true);
+  };
 
   const handleClearHistory = async () => {
     if (!window.confirm('Clear all your listening history?')) return;
@@ -129,6 +165,7 @@ const History = () => {
                     <img
                       src={song.image || 'https://images.unsplash.com/photo-1511671782779-c97d3d27a1d4?w=100&auto=format&fit=crop&q=80'}
                       alt={song.title}
+                      loading="lazy"
                       className="w-full h-full object-cover"
                     />
                     <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 flex items-center justify-center transition-opacity">
@@ -152,6 +189,19 @@ const History = () => {
               </div>
             );
           })}
+        </div>
+      )}
+
+      {hasMore && (
+        <div className="pt-4 text-center">
+          <button
+            onClick={handleLoadMore}
+            disabled={loadingMore}
+            className="px-6 py-2 rounded-full bg-zinc-800 hover:bg-zinc-700 text-zinc-300 hover:text-white text-xs font-semibold transition-all inline-flex items-center gap-2 border border-zinc-700/60"
+          >
+            {loadingMore && <Loader2 className="w-3.5 h-3.5 animate-spin text-purple-400" />}
+            <span>{loadingMore ? 'Loading more...' : 'Load more history'}</span>
+          </button>
         </div>
       )}
     </div>

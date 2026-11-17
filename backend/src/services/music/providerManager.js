@@ -4,52 +4,38 @@ import { LocalAudioProvider, CURATED_TAMIL_SONGS, CURATED_ALBUMS, CURATED_ARTIST
 import { musicCache } from '../cacheService.js';
 import { config } from '../../config/env.js';
 
-// Recognized official Tamil cinema distributors and labels
+// Recognized official Tamil cinema distributors, indie channels, and devotional labels
 const OFFICIAL_LABELS = [
   'sony', 'saregama', 'think music', 'divo', 'lahari', 't-series',
   'zee music', 'muzik247', 'star music', 'ayngaran', 'five star',
   'mass audios', 'sun pictures', 'lyca', 'trend music', 'noise and grains',
   'ananda audio', 'rajshri', 'tips', 'universal', 'warner', 'think indie',
-  'dvo', 'aditya music', 'v creations', 'gemini', 'junglee music', 'trendmusic'
+  'dvo', 'aditya music', 'v creations', 'gemini', 'junglee music', 'trendmusic',
+  'symphony', 'giri', 'ramana', 'divine'
 ];
 
-// Unofficial social media and amateur meme audio to strictly filter out
-const JUNK_AUDIO_PATTERNS = [
+// Short junk filter for obvious spam audio formats, amateur meme songs, and remix variants
+const SPAM_PATTERNS = [
   /whatsapp\s+status/i,
   /status\s+video/i,
+  /status\s+la\s+potu/i,
   /bass\s+boosted/i,
-  /dj\s+remix/i,
-  /\bremix\b/i,
-  /lofi\s+flip/i,
-  /slowed\s+reverb/i,
-  /cover\s+song/i,
-  /cover\s+version/i,
   /karaoke/i,
+  /slowed\s*(?:and|n|&|\+)?\s*reverb(?:ed)?/i,
+  /speed\s*up/i,
+  /\b(dj\s+)?remix\b/i,
+  /\b(remake|mashup|trap\s*mix|trap\s*remix|club\s*mix|chill\s*trap|lo-?fi|flip)\b/i,
   /ringtone/i,
   /bgm\s+cut/i,
-  /\bmashup\b/i,
-  /\btribute\b/i,
   /trending\s+version/i,
-  /the\s+independeners/i,
   /salem\s+gana/i,
   /trending\s+gana/i,
   /gana\s+surya/i,
   /gana\s+suriya/i,
-  /gana\s+velu/i,
-  /gana\s+mani/i,
-  /gana\s+stephen/i,
-  /gana\s+vinoth/i,
-  /gana\s+killer/i,
-  /gana\s+harish/i,
-  /gana\s+prabha/i,
-  /gana\s+micheal/i,
-  /trending\s+la\s+alla/i,
-  /unakosam\s+en\s+usura/i,
-  /veruthutu\s+pora/i,
-  /independent\s+gana/i
+  /gana\s+velu/i
 ];
 
-// Top authentic Tamil music directors, singers, and lyricists
+// Top authentic Tamil music directors, singers, poets, indie artists, and lyricists
 const RECOGNIZED_TAMIL_ARTISTS = [
   'anirudh', 'a.r. rahman', 'ar rahman', 'rahman', 'yuvan', 'ilaiyaraaja', 'ilayaraja',
   'harris jayaraj', 'sid sriram', 'g.v. prakash', 'gv prakash', 'santhosh narayanan',
@@ -60,34 +46,82 @@ const RECOGNIZED_TAMIL_ARTISTS = [
   'karthik', 'sujatha', 'chitra', 'swarnalatha', 'mano', 'sadhana sargam', 'unni menon',
   'tippu', 'harish raghavendra', 'naresh iyer', 'alisha thomas', 'shashaa tirupati',
   'sathyaprakash', 'deepthi suresh', 'arunraja kamaraj', 'super subu', 'vignesh shivan',
-  'kaala bhairava', 'silambarasan', 'dhanush', 'kamal haasan', 'rajinikanth', 'vijay',
-  'marana gana viji', 'rokesh', 'gana ulaganathan', 'shankar ganesh'
+  'kaala bhairava', 'silambarasan', 'dhanush', 'kamal haasan', 'rajinikanth', 'thalapathy vijay',
+  'marana gana viji', 'rokesh', 'gana ulaganathan', 'shankar ganesh', 'arun srinivasan',
+  'arivu', 'therukural', 't.m. soundararajan', 'tm soundararajan', 'soundararajan',
+  'kannadasan', 'vaali', 'm.s. viswanathan', 'viswanathan', 'ramamoorthy',
+  'l.r. eswari', 'lr eswari', 'sirpy', 'veeramanidaasan', 'veeramani daasan',
+  'k.b. sundarambal', 'mahanadhi shobana', 't.l. maharajan', 'p. susheela',
+  'soolamangalam', 'bombay sisters', 'm.s. subbulakshmi', 'subbulakshmi',
+  'sirkazhi', 'sivachidambaram', 'vani jayaram', 'veeramani', 'murugadas',
+  'srinivas', 'ravi basrur', 'ghibran', 'ananya bhat'
 ];
 
 /**
+ * Extracts and splits all credited artists from primary, featured, singer, composer fields
+ */
+export const extractCreditedArtists = (song) => {
+  if (!song) return [];
+  const sources = [
+    song.artist,
+    song.singers,
+    song.primary_artists,
+    song.music,
+    song.more_info?.singers,
+    song.more_info?.music,
+    ...(Array.isArray(song.more_info?.artistMap?.artists)
+      ? song.more_info.artistMap.artists.map((a) => a.name)
+      : []),
+    ...(Array.isArray(song.more_info?.artistMap?.primary_artists)
+      ? song.more_info.artistMap.primary_artists.map((a) => a.name)
+      : [])
+  ].filter(Boolean);
+
+  const artists = new Set();
+  for (const src of sources) {
+    if (typeof src === 'string') {
+      const parts = src.split(/[,;/&|]|\band\b|\bwith\b|\bfeat\.?\b|\bft\.?\b/i);
+      for (const p of parts) {
+        const clean = p.trim().toLowerCase();
+        if (clean.length > 1) {
+          artists.add(clean);
+        }
+      }
+    }
+  }
+  return Array.from(artists);
+};
+
+/**
  * Validates whether a song originates from an official film release or reputable label
- * Strictly excludes amateur meme/independent uploads while preserving authentic film Gaana
+ * Uses positive signals (official label, "From <film>", recognized composer/singer)
+ * with a short junk filter for obvious spam.
  */
 export const isOfficialFilmRelease = (song) => {
   if (!song) return false;
   const combined = `${song.title || ''} ${song.artist || ''} ${song.album || ''} ${song.singers || ''}`.toLowerCase();
 
-  // Reject non-Tamil language versions (Telugu, Hindi, Kannada, Malayalam, etc.)
-  const lang = (song.language || song.more_info?.language || '').toLowerCase();
-  if (['telugu', 'hindi', 'kannada', 'malayalam', 'punjabi', 'bhojpuri'].includes(lang)) {
+  // Reject non-Tamil languages (must be Tamil or unclassified single)
+  const lang = (song.language || song.more_info?.language || '').toLowerCase().trim();
+  if (lang && lang !== 'tamil' && lang !== 'unknown') {
     return false;
   }
   if (
     combined.includes('[telugu]') ||
     combined.includes('[hindi]') ||
     combined.includes('[kannada]') ||
-    combined.includes('[malayalam]')
+    combined.includes('[malayalam]') ||
+    combined.includes('[punjabi]') ||
+    combined.includes('[marathi]')
   ) {
     return false;
   }
 
-  // Reject social media junk audio and amateur meme creators
-  if (JUNK_AUDIO_PATTERNS.some((pattern) => pattern.test(combined))) {
+  // Reject obvious spam audio formats and amateur remix variants
+  if (
+    SPAM_PATTERNS.some((pattern) => pattern.test(combined)) ||
+    /\b(remix|remake|mashup|chill\s*trap|lo-?fi|flip)\b/i.test(song.title || '')
+  ) {
     return false;
   }
 
@@ -96,14 +130,16 @@ export const isOfficialFilmRelease = (song) => {
     return true;
   }
 
-  // Check if labeled by recognized official distributor
+  // Positive Signal 1: Check if distributed by recognized official label
   const songLabel = (song.label || song.more_info?.label || '').toLowerCase();
-  if (OFFICIAL_LABELS.some((lbl) => songLabel.includes(lbl))) {
+  const hasRecognizedLabel = OFFICIAL_LABELS.some((lbl) => songLabel.includes(lbl));
+  if (hasRecognizedLabel) {
     return true;
   }
 
-  // Check film release indicators in title or album
+  // Positive Signal 2: Check film release indicator ("From <film>", soundtrack, OST) in title or album
   const hasFilmIndicator =
+    /from\s+["'].+?["']/i.test(combined) ||
     combined.includes('from "') ||
     combined.includes("from '") ||
     combined.includes('soundtrack') ||
@@ -114,16 +150,38 @@ export const isOfficialFilmRelease = (song) => {
     return true;
   }
 
-  // Check if track features a recognized Tamil music director/singer
-  const hasRecognizedArtist = RECOGNIZED_TAMIL_ARTISTS.some((a) => combined.includes(a));
+  // Positive Signal 3: Check if track features a recognized Tamil music director/singer/lyricist
+  // Multi-artist whitelist check so any credited artist counts
+  const creditedArtists = extractCreditedArtists(song);
+  const hasRecognizedArtist =
+    creditedArtists.some((credited) =>
+      RECOGNIZED_TAMIL_ARTISTS.some((whitelisted) =>
+        credited.includes(whitelisted) || whitelisted.includes(credited)
+      )
+    ) || RECOGNIZED_TAMIL_ARTISTS.some((a) => combined.includes(a));
+
   if (hasRecognizedArtist) {
-    const normTitle = (song.title || '').toLowerCase().trim();
-    const normAlbum = (song.album || '').toLowerCase().trim();
-    // Reject self-titled amateur singles
-    if (normTitle && normAlbum && normTitle === normAlbum && !hasFilmIndicator) {
-      return false;
-    }
     return true;
+  }
+
+  // Positive Signal 4: Traditional Tamil devotional scripture / prayers
+  // Requires BOTH a scripture-name match AND at least one more corroborating signal
+  // (known label, recognized artist, film indicator, or devotional/traditional album marker)
+  const isScriptureMatch =
+    /\b(kavasam|kavacham|agaval|thiru[p]+ugazh|thevaram|thiruvasagam|abirami\s+andhadhi)\b/i.test(combined);
+
+  if (isScriptureMatch && (lang === 'tamil' || !lang)) {
+    const hasDevotionalAlbumMarker =
+      /soundtrack|original|traditional|devotional|classical|temple|bakthi|spiritual/i.test(song.album || '');
+    const hasCorroboratingSignal =
+      hasRecognizedLabel ||
+      hasFilmIndicator ||
+      hasRecognizedArtist ||
+      hasDevotionalAlbumMarker;
+
+    if (hasCorroboratingSignal) {
+      return true;
+    }
   }
 
   return false;
@@ -172,6 +230,12 @@ export class MusicProviderManager {
 
     const cached = musicCache.get(cacheKey);
     if (cached) return cached;
+
+    if (this.providerName === 'youtube') {
+      const ytData = await this.providers.youtube.searchTracks(query, options);
+      musicCache.set(cacheKey, ytData, 600);
+      return ytData;
+    }
 
     let result = { songs: [], albums: [], artists: [] };
 
@@ -238,11 +302,23 @@ export class MusicProviderManager {
 
   /**
    * Get single track by ID (with 10-minute cache)
+   * If fresh=true, bypasses the cache and re-fetches from provider.
+   * Cache key includes active provider name: `song_${this.providerName}_${id}`.
    */
-  async getSong(id) {
+  async getSong(id, { fresh = false } = {}) {
     const cacheKey = `song_${this.providerName}_${id}`;
-    const cached = musicCache.get(cacheKey);
-    if (cached) return cached;
+    if (!fresh) {
+      const cached = musicCache.get(cacheKey);
+      if (cached) return cached;
+    }
+
+    if (this.providerName === 'youtube' || (typeof id === 'string' && id.startsWith('yt_'))) {
+      const ytSong = await this.providers.youtube.getSong(id);
+      if (ytSong) {
+        musicCache.set(cacheKey, ytSong, 600);
+        return ytSong;
+      }
+    }
 
     // Check curated tracks
     const curated = CURATED_TAMIL_SONGS.find((s) => s.id === id);
@@ -295,6 +371,12 @@ export class MusicProviderManager {
     const cached = musicCache.get(cacheKey);
     if (cached) {
       return cached;
+    }
+
+    if (this.providerName === 'youtube') {
+      const ytFeed = await this.providers.youtube.getHomeFeed();
+      musicCache.set(cacheKey, ytFeed, 600);
+      return ytFeed;
     }
 
     // Base curated authentic tracks

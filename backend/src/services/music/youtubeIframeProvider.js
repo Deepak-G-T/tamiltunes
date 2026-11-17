@@ -2,24 +2,6 @@ import { MusicProvider } from './musicProvider.js';
 
 export const YOUTUBE_TAMIL_COLLECTION = [
   {
-    id: 'yt_veezha_veera',
-    title: 'Veezha Veera',
-    artist: 'Sai Abhyankkar, Tippu, Arun Srinivasan',
-    singers: 'Sai Abhyankkar, Tippu, Arun Srinivasan',
-    album: 'OM Chapter 1: Udhiram',
-    duration: 236,
-    image: 'https://c.saavncdn.com/696/Veezha-Veera-From-OM-Chapter-1-Udhiram-The-Blood-Wood-Tamil-Tamil-2026-20261019161818-500x500.jpg',
-    youtubeId: 'pYVzWlqZ388',
-    embedUrl: 'https://www.youtube-nocookie.com/embed/pYVzWlqZ388?autoplay=1&enablejsapi=1',
-    streamUrl: 'https://www.youtube-nocookie.com/embed/pYVzWlqZ388?autoplay=1&enablejsapi=1',
-    isPlayable: true,
-    provider: 'youtube',
-    source: 'youtube',
-    videoId: 'pYVzWlqZ388',
-    category: 'trending',
-    licenseNotice: 'Official YouTube IFrame Player Embed (Divo TV / Think Music)'
-  },
-  {
     id: 'yt_badass_leo',
     title: 'Badass (Leo)',
     artist: 'Anirudh Ravichander',
@@ -27,13 +9,13 @@ export const YOUTUBE_TAMIL_COLLECTION = [
     album: 'Leo',
     duration: 229,
     image: 'https://c.saavncdn.com/415/Leo-Original-Motion-Picture-Soundtrack-English-2023-20231019170311-500x500.jpg',
-    youtubeId: 'I7x_5lFk89s',
-    embedUrl: 'https://www.youtube-nocookie.com/embed/I7x_5lFk89s?autoplay=1&enablejsapi=1',
-    streamUrl: 'https://www.youtube-nocookie.com/embed/I7x_5lFk89s?autoplay=1&enablejsapi=1',
+    youtubeId: 'IqwIOlhfCak',
+    embedUrl: 'https://www.youtube-nocookie.com/embed/IqwIOlhfCak?autoplay=1&enablejsapi=1',
+    streamUrl: 'https://www.youtube-nocookie.com/embed/IqwIOlhfCak?autoplay=1&enablejsapi=1',
     isPlayable: true,
     provider: 'youtube',
     source: 'youtube',
-    videoId: 'I7x_5lFk89s',
+    videoId: 'IqwIOlhfCak',
     category: 'trending',
     licenseNotice: 'Official YouTube IFrame Player Embed (Sony Music South)'
   },
@@ -45,13 +27,13 @@ export const YOUTUBE_TAMIL_COLLECTION = [
     album: 'Jailer',
     duration: 206,
     image: 'https://c.saavncdn.com/187/Jailer-Tamil-2023-20230728081443-500x500.jpg',
-    youtubeId: '1F3HM635S0k',
-    embedUrl: 'https://www.youtube-nocookie.com/embed/1F3HM635S0k?autoplay=1&enablejsapi=1',
-    streamUrl: 'https://www.youtube-nocookie.com/embed/1F3HM635S0k?autoplay=1&enablejsapi=1',
+    youtubeId: '1F3hm6MfR1k',
+    embedUrl: 'https://www.youtube-nocookie.com/embed/1F3hm6MfR1k?autoplay=1&enablejsapi=1',
+    streamUrl: 'https://www.youtube-nocookie.com/embed/1F3hm6MfR1k?autoplay=1&enablejsapi=1',
     isPlayable: true,
     provider: 'youtube',
     source: 'youtube',
-    videoId: '1F3HM635S0k',
+    videoId: '1F3hm6MfR1k',
     category: 'trending',
     licenseNotice: 'Official YouTube IFrame Player Embed (Sun TV)'
   },
@@ -76,37 +58,19 @@ export const YOUTUBE_TAMIL_COLLECTION = [
   {
     id: 'yt_aalaporaan_thamizhan',
     title: 'Aalaporaan Thamizhan',
-    artist: 'A.R. Rahman, Kailash Kher, D. Sathyaprakash, Pooja AV',
-    singers: 'Kailash Kher, D. Sathyaprakash, Pooja AV',
+    artist: 'A.R. Rahman, Kailash Kher, D. Sathyaprakash',
+    singers: 'Kailash Kher, D. Sathyaprakash',
     album: 'Mersal',
     duration: 348,
     image: 'https://c.saavncdn.com/568/Mersal-Tamil-2017-20170820-500x500.jpg',
-    youtubeId: '3X8E9M9G6x0',
-    embedUrl: 'https://www.youtube-nocookie.com/embed/3X8E9M9G6x0?autoplay=1&enablejsapi=1',
-    streamUrl: 'https://www.youtube-nocookie.com/embed/3X8E9M9G6x0?autoplay=1&enablejsapi=1',
+    youtubeId: 'xsbLtHql4g8',
+    embedUrl: 'https://www.youtube-nocookie.com/embed/xsbLtHql4g8?autoplay=1&enablejsapi=1',
+    streamUrl: 'https://www.youtube-nocookie.com/embed/xsbLtHql4g8?autoplay=1&enablejsapi=1',
     isPlayable: true,
     provider: 'youtube',
     source: 'youtube',
-    videoId: '3X8E9M9G6x0',
+    videoId: 'xsbLtHql4g8',
     category: 'trending',
-    licenseNotice: 'Official YouTube IFrame Player Embed (Sony Music South)'
-  },
-  {
-    id: 'yt_aaluma_doluma',
-    title: 'Aaluma Doluma',
-    artist: 'Anirudh Ravichander, Badshah, G. Rokesh',
-    singers: 'Anirudh Ravichander',
-    album: 'Vedalam',
-    duration: 258,
-    image: 'https://c.saavncdn.com/264/Vedalam-Tamil-2015-500x500.jpg',
-    youtubeId: 'uLpQvi8b_60',
-    embedUrl: 'https://www.youtube-nocookie.com/embed/uLpQvi8b_60?autoplay=1&enablejsapi=1',
-    streamUrl: 'https://www.youtube-nocookie.com/embed/uLpQvi8b_60?autoplay=1&enablejsapi=1',
-    isPlayable: true,
-    provider: 'youtube',
-    source: 'youtube',
-    videoId: 'uLpQvi8b_60',
-    category: 'gana',
     licenseNotice: 'Official YouTube IFrame Player Embed (Sony Music South)'
   },
   {
@@ -125,6 +89,78 @@ export const YOUTUBE_TAMIL_COLLECTION = [
     source: 'youtube',
     videoId: 'fRD_3vJagxk',
     category: 'gana',
+    licenseNotice: 'Official YouTube IFrame Player Embed (Sony Music South)'
+  },
+  {
+    id: 'yt_arabic_kuthu',
+    title: 'Arabic Kuthu - Halamithi Habibo',
+    artist: 'Anirudh Ravichander, Jonita Gandhi',
+    singers: 'Anirudh Ravichander, Jonita Gandhi',
+    album: 'Beast',
+    duration: 280,
+    image: 'https://c.saavncdn.com/433/Beast-Tamil-2022-20220504194042-500x500.jpg',
+    youtubeId: 'KUN5Uf9mObQ',
+    embedUrl: 'https://www.youtube-nocookie.com/embed/KUN5Uf9mObQ?autoplay=1&enablejsapi=1',
+    streamUrl: 'https://www.youtube-nocookie.com/embed/KUN5Uf9mObQ?autoplay=1&enablejsapi=1',
+    isPlayable: true,
+    provider: 'youtube',
+    source: 'youtube',
+    videoId: 'KUN5Uf9mObQ',
+    category: 'trending',
+    licenseNotice: 'Official YouTube IFrame Player Embed (Sun TV)'
+  },
+  {
+    id: 'yt_kaavaalaa',
+    title: 'Kaavaalaa',
+    artist: 'Anirudh Ravichander, Shilpa Rao',
+    singers: 'Anirudh Ravichander, Shilpa Rao',
+    album: 'Jailer',
+    duration: 190,
+    image: 'https://c.saavncdn.com/187/Jailer-Tamil-2023-20230728081443-500x500.jpg',
+    youtubeId: 'RVLNBVK8auM',
+    embedUrl: 'https://www.youtube-nocookie.com/embed/RVLNBVK8auM?autoplay=1&enablejsapi=1',
+    streamUrl: 'https://www.youtube-nocookie.com/embed/RVLNBVK8auM?autoplay=1&enablejsapi=1',
+    isPlayable: true,
+    provider: 'youtube',
+    source: 'youtube',
+    videoId: 'RVLNBVK8auM',
+    category: 'trending',
+    licenseNotice: 'Official YouTube IFrame Player Embed (Sun TV)'
+  },
+  {
+    id: 'yt_rowdy_baby',
+    title: 'Rowdy Baby',
+    artist: 'Dhanush, Dhee, Yuvan Shankar Raja',
+    singers: 'Dhanush, Dhee',
+    album: 'Maari 2',
+    duration: 282,
+    image: 'https://c.saavncdn.com/006/Maari-2-Tamil-2018-20181106-500x500.jpg',
+    youtubeId: 'x6Q7c9RyMzk',
+    embedUrl: 'https://www.youtube-nocookie.com/embed/x6Q7c9RyMzk?autoplay=1&enablejsapi=1',
+    streamUrl: 'https://www.youtube-nocookie.com/embed/x6Q7c9RyMzk?autoplay=1&enablejsapi=1',
+    isPlayable: true,
+    provider: 'youtube',
+    source: 'youtube',
+    videoId: 'x6Q7c9RyMzk',
+    category: 'trending',
+    licenseNotice: 'Official YouTube IFrame Player Embed (Wunderbar Films)'
+  },
+  {
+    id: 'yt_kolaveri_di',
+    title: 'Why This Kolaveri Di',
+    artist: 'Anirudh Ravichander, Dhanush',
+    singers: 'Dhanush',
+    album: '3',
+    duration: 250,
+    image: 'https://c.saavncdn.com/469/3-Tamil-2011-500x500.jpg',
+    youtubeId: 'YR12Z8f1Dh8',
+    embedUrl: 'https://www.youtube-nocookie.com/embed/YR12Z8f1Dh8?autoplay=1&enablejsapi=1',
+    streamUrl: 'https://www.youtube-nocookie.com/embed/YR12Z8f1Dh8?autoplay=1&enablejsapi=1',
+    isPlayable: true,
+    provider: 'youtube',
+    source: 'youtube',
+    videoId: 'YR12Z8f1Dh8',
+    category: 'trending',
     licenseNotice: 'Official YouTube IFrame Player Embed (Sony Music South)'
   }
 ];
@@ -156,21 +192,80 @@ export class YouTubeIframeProvider extends MusicProvider {
   }
 
   async getHomeFeed() {
+    const trending = YOUTUBE_TAMIL_COLLECTION.filter((s) => s.category === 'trending');
+    const gana = YOUTUBE_TAMIL_COLLECTION.filter((s) => s.category === 'gana');
+    const latest = YOUTUBE_TAMIL_COLLECTION.slice(0, 4);
+    const melodies = YOUTUBE_TAMIL_COLLECTION.filter((s) => s.id === 'yt_aalaporaan_thamizhan' || s.id === 'yt_kaavaalaa');
+    const nineties = YOUTUBE_TAMIL_COLLECTION.filter((s) => s.id === 'yt_aalaporaan_thamizhan');
+    const twoThousands = YOUTUBE_TAMIL_COLLECTION.filter((s) => s.id === 'yt_kolaveri_di');
+    const love = YOUTUBE_TAMIL_COLLECTION.filter((s) => s.id === 'yt_kaavaalaa' || s.id === 'yt_rowdy_baby');
+    const sad = YOUTUBE_TAMIL_COLLECTION.filter((s) => s.id === 'yt_kolaveri_di');
+    const folk = YOUTUBE_TAMIL_COLLECTION.filter((s) => s.id === 'yt_rowdy_baby' || s.id === 'yt_arabic_kuthu');
+    const instrumental = YOUTUBE_TAMIL_COLLECTION.slice(0, 2);
+
     return {
-      trending: YOUTUBE_TAMIL_COLLECTION.filter((s) => s.category === 'trending'),
-      gana: YOUTUBE_TAMIL_COLLECTION.filter((s) => s.category === 'gana'),
-      latest: YOUTUBE_TAMIL_COLLECTION.slice(0, 4),
-      melodies: [],
-      nineties: [],
-      twoThousands: [],
-      love: [],
-      sad: [],
-      folk: [],
-      instrumental: [],
-      popularAlbums: [],
-      popularArtists: [],
-      albums: [],
-      artists: []
+      trending,
+      latest,
+      gana,
+      melodies,
+      nineties,
+      twoThousands,
+      love,
+      sad,
+      folk,
+      instrumental,
+      popularAlbums: [
+        {
+          id: 'yt_album_leo',
+          name: 'Leo',
+          title: 'Leo',
+          artist: 'Anirudh Ravichander',
+          music: 'Anirudh Ravichander',
+          year: '2023',
+          image: 'https://c.saavncdn.com/415/Leo-Original-Motion-Picture-Soundtrack-English-2023-20231019170311-500x500.jpg',
+          songs: YOUTUBE_TAMIL_COLLECTION.filter((s) => s.album === 'Leo')
+        },
+        {
+          id: 'yt_album_jailer',
+          name: 'Jailer',
+          title: 'Jailer',
+          artist: 'Anirudh Ravichander',
+          music: 'Anirudh Ravichander',
+          year: '2023',
+          image: 'https://c.saavncdn.com/187/Jailer-Tamil-2023-20230728081443-500x500.jpg',
+          songs: YOUTUBE_TAMIL_COLLECTION.filter((s) => s.album === 'Jailer')
+        }
+      ],
+      popularArtists: [
+        {
+          id: 'yt_artist_anirudh',
+          name: 'Anirudh Ravichander',
+          role: 'Music Director & Singer',
+          image: 'https://c.saavncdn.com/artists/Anirudh_Ravichander_003_20260121134149_500x500.jpg',
+          topSongs: YOUTUBE_TAMIL_COLLECTION.filter((s) => s.artist.includes('Anirudh'))
+        }
+      ],
+      albums: [
+        {
+          id: 'yt_album_leo',
+          name: 'Leo',
+          title: 'Leo',
+          artist: 'Anirudh Ravichander',
+          music: 'Anirudh Ravichander',
+          year: '2023',
+          image: 'https://c.saavncdn.com/415/Leo-Original-Motion-Picture-Soundtrack-English-2023-20231019170311-500x500.jpg',
+          songs: YOUTUBE_TAMIL_COLLECTION.filter((s) => s.album === 'Leo')
+        }
+      ],
+      artists: [
+        {
+          id: 'yt_artist_anirudh',
+          name: 'Anirudh Ravichander',
+          role: 'Music Director & Singer',
+          image: 'https://c.saavncdn.com/artists/Anirudh_Ravichander_003_20260121134149_500x500.jpg',
+          topSongs: YOUTUBE_TAMIL_COLLECTION.filter((s) => s.artist.includes('Anirudh'))
+        }
+      ]
     };
   }
 }

@@ -1,6 +1,7 @@
 import { Router } from 'express';
 import {
   getFavorites,
+  getFavoriteIds,
   addFavorite,
   removeFavorite,
   favoriteSchema
@@ -10,6 +11,7 @@ import { validateBody } from '../middleware/validate.js';
 
 const router = Router();
 
+router.get('/ids', requireAuth, getFavoriteIds);
 router.get('/', requireAuth, getFavorites);
 router.post('/', requireAuth, validateBody(favoriteSchema), addFavorite);
 router.delete('/:songId', requireAuth, removeFavorite);

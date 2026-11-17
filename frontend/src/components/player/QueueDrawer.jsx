@@ -1,5 +1,5 @@
 import React from 'react';
-import { X, Trash2, Music, Play, Disc } from 'lucide-react';
+import { X, Trash2, Music, Play, Disc, ChevronUp, ChevronDown } from 'lucide-react';
 import { useAudio } from '../../context/AudioContext';
 
 const QueueDrawer = ({ isOpen, onClose }) => {
@@ -9,7 +9,8 @@ const QueueDrawer = ({ isOpen, onClose }) => {
     currentSong,
     playSong,
     removeFromQueue,
-    clearQueue
+    clearQueue,
+    moveInQueue
   } = useAudio();
 
   if (!isOpen) return null;
@@ -107,13 +108,36 @@ const QueueDrawer = ({ isOpen, onClose }) => {
                       </div>
                     </div>
 
-                    <button
-                      onClick={() => removeFromQueue(idx)}
-                      title="Remove from queue"
-                      className="p-1 rounded text-zinc-500 hover:text-rose-400 opacity-0 group-hover:opacity-100 transition-opacity ml-2"
-                    >
-                      <X className="w-3.5 h-3.5" />
-                    </button>
+                    <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity ml-2">
+                      {idx > 0 && (
+                        <button
+                          onClick={() => moveInQueue && moveInQueue(idx, idx - 1)}
+                          title="Move up"
+                          aria-label="Move track up"
+                          className="p-1 rounded text-zinc-500 hover:text-white hover:bg-zinc-700/50 transition-colors"
+                        >
+                          <ChevronUp className="w-3.5 h-3.5" />
+                        </button>
+                      )}
+                      {idx < queue.length - 1 && (
+                        <button
+                          onClick={() => moveInQueue && moveInQueue(idx, idx + 1)}
+                          title="Move down"
+                          aria-label="Move track down"
+                          className="p-1 rounded text-zinc-500 hover:text-white hover:bg-zinc-700/50 transition-colors"
+                        >
+                          <ChevronDown className="w-3.5 h-3.5" />
+                        </button>
+                      )}
+                      <button
+                        onClick={() => removeFromQueue(idx)}
+                        title="Remove from queue"
+                        aria-label="Remove from queue"
+                        className="p-1 rounded text-zinc-500 hover:text-rose-400 hover:bg-zinc-700/50 transition-colors"
+                      >
+                        <X className="w-3.5 h-3.5" />
+                      </button>
+                    </div>
                   </div>
                 );
               })}

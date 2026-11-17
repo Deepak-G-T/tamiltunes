@@ -58,19 +58,23 @@ const Home = () => {
         if (isMounted) setLoading(false);
       });
 
-    // Fetch user favorites if logged in
+    // Fetch user favorite song IDs if logged in (lightweight lookup)
     if (isAuthenticated) {
-      api.get('/favorites')
+      api.get('/favorites/ids')
         .then(({ data }) => {
-          if (isMounted && data.success && Array.isArray(data.favorites)) {
+          if (isMounted && data.success && Array.isArray(data.ids)) {
             const map = {};
-            data.favorites.forEach((f) => {
-              map[f.songId || f.id] = true;
+            data.ids.forEach((id) => {
+              map[id] = true;
             });
             setFavoritesMap(map);
           }
         })
-        .catch(() => {});
+        .catch((err) => {
+          if (err.response?.status !== 401) {
+            console.warn('Failed to load favorite IDs:', err);
+          }
+        });
     }
 
     return () => {

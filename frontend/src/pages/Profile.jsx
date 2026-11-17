@@ -17,14 +17,22 @@ const Profile = () => {
     }
 
     Promise.all([
-      api.get('/playlists').catch(() => ({ data: { playlists: [] } })),
-      api.get('/favorites').catch(() => ({ data: { favorites: [] } })),
-      api.get('/history').catch(() => ({ data: { history: [] } })),
+      api.get('/playlists').catch((err) => ({ data: { items: [], playlists: [], total: 0 } })),
+      api.get('/favorites').catch((err) => ({ data: { items: [], favorites: [], total: 0 } })),
+      api.get('/history').catch((err) => ({ data: { items: [], history: [], total: 0 } })),
     ]).then(([plRes, favRes, histRes]) => {
+      const getCount = (res, legacyKey) => {
+        if (!res?.data) return 0;
+        if (typeof res.data.total === 'number') return res.data.total;
+        if (Array.isArray(res.data.items)) return res.data.items.length;
+        if (Array.isArray(res.data[legacyKey])) return res.data[legacyKey].length;
+        return 0;
+      };
+
       setStats({
-        playlists: plRes.data?.playlists?.length || 0,
-        favorites: favRes.data?.favorites?.length || 0,
-        history: histRes.data?.history?.length || 0,
+        playlists: getCount(plRes, 'playlists'),
+        favorites: getCount(favRes, 'favorites'),
+        history: getCount(histRes, 'history'),
       });
     });
   }, [isAuthenticated, navigate]);

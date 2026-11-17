@@ -22,13 +22,49 @@ const __dirname = path.dirname(__filename);
 
 const app = express();
 
+// Behind Render/Vercel proxies: needed so rate limiting sees the real client IP
+app.set('trust proxy', config.trustProxy);
+
 // Security Middlewares
 app.use(helmet({
   crossOriginResourcePolicy: { policy: 'cross-origin' }
 }));
 
+// Allowed origins whitelist
+const ALLOWED_ORIGINS = [
+  'https://in-five-11.vercel.app',
+  'http://localhost:5173',
+  'http://localhost:3000',
+  'http://localhost:5000',
+  'http://127.0.0.1:5173'
+];
+
+const customOrigins = config.corsOrigin ? config.corsOrigin.split(',').map((o) => o.trim()) : [];
+
+// Build preview regex strictly from VERCEL_TEAM_SLUG without guessing
+export const getPreviewRegex = (teamSlug = config.vercelTeamSlug) => {
+  if (!teamSlug) return null;
+  const escapedSlug = teamSlug.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+  return new RegExp(`^https:\\/\\/in-five-11(?:-[a-zA-Z0-9_-]+)?-${escapedSlug}\\.vercel\\.app$`);
+};
+
+export const isOriginAllowed = (origin, teamSlug = config.vercelTeamSlug) => {
+  if (!origin) return true; // Server-to-server, curl, mobile native
+  if (ALLOWED_ORIGINS.includes(origin)) return true;
+  if (customOrigins.includes(origin)) return true;
+  const previewRegex = getPreviewRegex(teamSlug);
+  if (previewRegex && previewRegex.test(origin)) return true;
+  return false;
+};
+
 app.use(cors({
-  origin: config.corsOrigin === '*' ? true : config.corsOrigin.split(','),
+  origin: (origin, callback) => {
+    if (isOriginAllowed(origin)) {
+      callback(null, true);
+    } else {
+      callback(null, false);
+    }
+  },
   credentials: true
 }));
 

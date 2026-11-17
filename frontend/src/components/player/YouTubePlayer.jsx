@@ -1,27 +1,56 @@
-import React, { useEffect, useRef, useImperativeHandle, forwardRef } from 'react';
+import React, { useEffect, useState, useRef, useImperativeHandle, forwardRef } from 'react';
 
 /**
  * YouTubePlayer Component
- * Uses the official YouTube IFrame Player API (hidden offscreen iframe)
+ * Uses the official YouTube IFrame Player API (visible floating player, min 200x200). While the
+ * full-screen player is open, the iframe is pinned over its registered <VideoSlot> instead (`rect`).
  * Implements the exact same playback interface as HTML5 audio engine:
  * play, pause, seek, setVolume, mute, unMute, onTimeUpdate, onEnded, onPlaying, onPause, onBuffering.
  */
 const YouTubePlayer = forwardRef(({
+  videoId: propVideoId,
+  visible = false,
   onPlaying,
   onPause,
   onBuffering,
   onEnded,
   onTimeUpdate,
-  onError
+  onError,
+  rect = null
 }, ref) => {
   const playerRef = useRef(null);
   const isReadyRef = useRef(false);
   const progressTimerRef = useRef(null);
+  const pendingRef = useRef(null); // load requested while the player exists but is not ready yet
+  const pendingVideoIdRef = useRef(propVideoId || null);
+  const pendingIntentRef = useRef({ autoPlay: true, startSeconds: 0 }); // how to start a video requested before the API/player was ready
+
+  // Responsive mobile check for non-overlapping bottom position
+  const [isMobile, setIsMobile] = useState(() => typeof window !== 'undefined' && window.innerWidth < 768);
+
+  useEffect(() => {
+    const handleResize = () => setIsMobile(window.innerWidth < 768);
+    window.addEventListener('resize', handleResize);
+    return () => window.removeEventListener('resize', handleResize);
+  }, []);
+
+  // Update pendingVideoIdRef when prop changes
+  useEffect(() => {
+    if (propVideoId) {
+      pendingVideoIdRef.current = propVideoId;
+      if (!playerRef.current && window.YT && window.YT.Player) {
+        const { autoPlay, startSeconds } = pendingIntentRef.current;
+        initPlayer(propVideoId, autoPlay, startSeconds);
+      }
+    }
+  }, [propVideoId]);
 
   // Load YouTube IFrame API script once
   useEffect(() => {
     if (window.YT && window.YT.Player) {
-      initPlayer();
+      if (pendingVideoIdRef.current) {
+        initPlayer(pendingVideoIdRef.current, pendingIntentRef.current.autoPlay, pendingIntentRef.current.startSeconds);
+      }
       return;
     }
 
@@ -38,7 +67,9 @@ const YouTubePlayer = forwardRef(({
     const prevOnReady = window.onYouTubeIframeAPIReady;
     window.onYouTubeIframeAPIReady = () => {
       if (typeof prevOnReady === 'function') prevOnReady();
-      initPlayer();
+      if (pendingVideoIdRef.current) {
+        initPlayer(pendingVideoIdRef.current, pendingIntentRef.current.autoPlay, pendingIntentRef.current.startSeconds);
+      }
     };
 
     return () => {
@@ -51,28 +82,41 @@ const YouTubePlayer = forwardRef(({
     };
   }, []);
 
-  const initPlayer = () => {
-    if (playerRef.current || !window.YT) return;
+  const initPlayer = (vid, autoPlay = true, startSeconds = 0) => {
+    if (playerRef.current || !window.YT || !window.YT.Player) return;
 
     try {
-      playerRef.current = new window.YT.Player('yt-player-iframe', {
-        height: '1',
-        width: '1',
-        playerVars: {
-          autoplay: 0,
-          controls: 0,
-          disablekb: 1,
-          fs: 0,
-          modestbranding: 1,
-          playsinline: 1,
-          rel: 0,
-          origin: window.location.origin
-        },
+      const playerVars = {
+        autoplay: autoPlay ? 1 : 0,
+        start: Math.max(0, Math.floor(startSeconds || 0)),
+        controls: 1,
+        disablekb: 0,
+        fs: 1,
+        modestbranding: 1,
+        playsinline: 1,
+        rel: 0,
+        origin: window.location.origin
+      };
+
+      const opts = {
+        height: '100%',
+        width: '100%',
+        playerVars,
         events: {
           onReady: (event) => {
             isReadyRef.current = true;
+            window.__ytPlayerInstance = event.target;
+            if (autoPlay && typeof event.target.playVideo === 'function') {
+              event.target.playVideo();
+            }
+            if (pendingRef.current) {
+              const { videoId, autoPlay: pendingAutoPlay, startSeconds: pendingStart } = pendingRef.current;
+              pendingRef.current = null;
+              applyVideo(videoId, pendingAutoPlay, pendingStart);
+            }
           },
           onStateChange: (event) => {
+            window.__ytPlayerState = event.data;
             // YT.PlayerState: ENDED = 0, PLAYING = 1, PAUSED = 2, BUFFERING = 3, CUED = 5
             if (event.data === window.YT.PlayerState.PLAYING) {
               startProgressTimer();
@@ -88,14 +132,29 @@ const YouTubePlayer = forwardRef(({
             }
           },
           onError: (e) => {
-            console.warn('YouTube IFrame Player error:', e.data);
+            console.warn('YouTube IFrame Player error:', e?.data);
             if (onError) onError(e);
           }
         }
-      });
+      };
+
+      if (vid) {
+        opts.videoId = vid;
+      }
+
+      playerRef.current = new window.YT.Player('yt-player-iframe', opts);
+      window.__ytPlayerInstance = playerRef.current;
     } catch (err) {
       console.warn('Could not initialize YT.Player:', err);
     }
+  };
+
+  const applyVideo = (videoId, autoPlay, startSeconds) => {
+    const player = playerRef.current;
+    if (!player) return;
+    const payload = { videoId, startSeconds: Math.max(0, Math.floor(startSeconds || 0)) };
+    if (autoPlay && typeof player.loadVideoById === 'function') player.loadVideoById(payload);
+    else if (typeof player.cueVideoById === 'function') player.cueVideoById(payload); // cue = no autoplay
   };
 
   const startProgressTimer = () => {
@@ -119,21 +178,22 @@ const YouTubePlayer = forwardRef(({
   };
 
   useImperativeHandle(ref, () => ({
-    loadVideo(videoId, autoPlay = true) {
+    loadVideo(videoId, autoPlay = true, startSeconds = 0) {
       if (!videoId) return;
-      if (playerRef.current && isReadyRef.current && typeof playerRef.current.loadVideoById === 'function') {
-        if (autoPlay) {
-          playerRef.current.loadVideoById(videoId);
-        } else {
-          playerRef.current.cueVideoById(videoId);
+      pendingVideoIdRef.current = videoId;
+      pendingIntentRef.current = { autoPlay, startSeconds };
+
+      if (!playerRef.current) {
+        if (window.YT && window.YT.Player) {
+          initPlayer(videoId, autoPlay, startSeconds); // player is created WITH the videoId
         }
+        return; // otherwise the API-ready handler creates it using pendingIntentRef
+      }
+
+      if (isReadyRef.current) {
+        applyVideo(videoId, autoPlay, startSeconds);
       } else {
-        // Retry shortly once iframe finishes handshake
-        setTimeout(() => {
-          if (playerRef.current && typeof playerRef.current.loadVideoById === 'function') {
-            playerRef.current.loadVideoById(videoId);
-          }
-        }, 500);
+        pendingRef.current = { videoId, autoPlay, startSeconds };
       }
     },
     play() {
@@ -183,22 +243,49 @@ const YouTubePlayer = forwardRef(({
     }
   }));
 
+  // Default: floating player (mobile bottom 154px above mini player + nav + >= 12px buffer; desktop 96px).
+  // `rect` (full-screen player open): pinned over the registered slot instead.
+  const computedBottom = visible ? (isMobile ? '154px' : '96px') : '-400px';
+  const placement = rect
+    ? {
+        top: rect.top,
+        left: rect.left,
+        width: Math.max(rect.width, 200),
+        height: Math.max(rect.height, 200),
+        opacity: 1,
+        pointerEvents: 'auto',
+        zIndex: 100000
+      }
+    : {
+        bottom: computedBottom,
+        right: '16px',
+        width: '240px',
+        height: '200px',
+        opacity: visible ? 1 : 0,
+        pointerEvents: visible ? 'auto' : 'none',
+        zIndex: visible ? 45 : -1
+      };
+
   return (
     <div
       id="yt-player-container"
+      data-testid="yt-player-container"
+      data-visible={rect || visible ? 'true' : 'false'}
       style={{
         position: 'fixed',
-        bottom: -200,
-        right: -200,
-        width: 1,
-        height: 1,
-        opacity: 0,
-        pointerEvents: 'none',
-        zIndex: -1
+        minWidth: '200px',
+        minHeight: '200px',
+        ...placement,
+        borderRadius: '12px',
+        overflow: 'hidden',
+        backgroundColor: '#09090b',
+        border: '1px solid #27272a',
+        boxShadow: '0 20px 25px -5px rgba(0, 0, 0, 0.8), 0 8px 10px -6px rgba(0, 0, 0, 0.6)',
+        transition: rect ? 'none' : 'opacity 0.25s ease, bottom 0.25s ease'
       }}
-      aria-hidden="true"
+      aria-label="YouTube Video Player"
     >
-      <div id="yt-player-iframe" />
+      <div id="yt-player-iframe" style={{ width: '100%', height: '100%', minWidth: '200px', minHeight: '200px' }} />
     </div>
   );
 });

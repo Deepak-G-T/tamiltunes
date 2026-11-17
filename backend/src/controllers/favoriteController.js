@@ -13,15 +13,49 @@ export const favoriteSchema = z.object({
 
 export const getFavorites = async (req, res, next) => {
   try {
-    const favorites = await db.favorite.findMany({
-      where: { userId: req.user.id },
-      include: { song: true },
-      orderBy: { createdAt: 'desc' }
-    });
+    const limit = Math.min(Math.max(parseInt(req.query.limit, 10) || 50, 1), 100);
+    const offset = Math.max(parseInt(req.query.offset, 10) || 0, 0);
+
+    const [total, favorites] = await Promise.all([
+      db.favorite.count({ where: { userId: req.user.id } }),
+      db.favorite.findMany({
+        where: { userId: req.user.id },
+        include: { song: true },
+        orderBy: { createdAt: 'desc' },
+        take: limit,
+        skip: offset
+      })
+    ]);
+
+    const hasMore = offset + favorites.length < total;
 
     res.json({
       success: true,
-      favorites
+      items: favorites,
+      favorites,
+      total,
+      limit,
+      offset,
+      hasMore
+    });
+  } catch (err) {
+    next(err);
+  }
+};
+
+export const getFavoriteIds = async (req, res, next) => {
+  try {
+    const favorites = await db.favorite.findMany({
+      where: { userId: req.user.id },
+      select: { songId: true },
+      take: 5000
+    });
+
+    const ids = favorites.map((f) => f.songId);
+    res.json({
+      success: true,
+      ids,
+      total: ids.length
     });
   } catch (err) {
     next(err);

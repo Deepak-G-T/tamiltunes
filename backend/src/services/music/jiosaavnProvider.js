@@ -132,7 +132,7 @@ export class JioSaavnProvider extends MusicProvider {
 
     try {
       const controller = new AbortController();
-      const timeoutId = setTimeout(() => controller.abort(), 12000);
+      const timeoutId = setTimeout(() => controller.abort(), 20000);
 
       const res = await fetch(url, {
         headers: {

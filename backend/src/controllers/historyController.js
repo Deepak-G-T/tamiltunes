@@ -13,16 +13,30 @@ export const historySchema = z.object({
 
 export const getHistory = async (req, res, next) => {
   try {
-    const history = await db.listeningHistory.findMany({
-      where: { userId: req.user.id },
-      include: { song: true },
-      orderBy: { playedAt: 'desc' },
-      take: 50
-    });
+    const limit = Math.min(Math.max(parseInt(req.query.limit, 10) || 50, 1), 100);
+    const offset = Math.max(parseInt(req.query.offset, 10) || 0, 0);
+
+    const [total, history] = await Promise.all([
+      db.listeningHistory.count({ where: { userId: req.user.id } }),
+      db.listeningHistory.findMany({
+        where: { userId: req.user.id },
+        include: { song: true },
+        orderBy: { playedAt: 'desc' },
+        take: limit,
+        skip: offset
+      })
+    ]);
+
+    const hasMore = offset + history.length < total;
 
     res.json({
       success: true,
-      history
+      items: history,
+      history,
+      total,
+      limit,
+      offset,
+      hasMore
     });
   } catch (err) {
     next(err);

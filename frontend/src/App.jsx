@@ -1,43 +1,52 @@
-import React from 'react';
+import React, { Suspense, lazy } from 'react';
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
 import { AuthProvider } from './context/AuthContext';
 import { AudioProvider } from './context/AudioContext';
 import MainLayout from './components/layout/MainLayout';
+import { Loader2 } from 'lucide-react';
 
-// Pages
-import Home from './pages/Home';
-import Explore from './pages/Explore';
-import Search from './pages/Search';
-import AlbumDetail from './pages/AlbumDetail';
-import ArtistDetail from './pages/ArtistDetail';
-import PlaylistDetail from './pages/PlaylistDetail';
-import Favorites from './pages/Favorites';
-import History from './pages/History';
-import Login from './pages/Login';
-import Signup from './pages/Signup';
-import Profile from './pages/Profile';
+const PageLoader = () => (
+  <div className="flex items-center justify-center min-h-[50vh] text-purple-400">
+    <Loader2 className="w-8 h-8 animate-spin" />
+  </div>
+);
+
+// Code-split routes via React.lazy for optimized bundle performance
+const Home = lazy(() => import('./pages/Home'));
+const Explore = lazy(() => import('./pages/Explore'));
+const Search = lazy(() => import('./pages/Search'));
+const AlbumDetail = lazy(() => import('./pages/AlbumDetail'));
+const ArtistDetail = lazy(() => import('./pages/ArtistDetail'));
+const PlaylistDetail = lazy(() => import('./pages/PlaylistDetail'));
+const Favorites = lazy(() => import('./pages/Favorites'));
+const History = lazy(() => import('./pages/History'));
+const Login = lazy(() => import('./pages/Login'));
+const Signup = lazy(() => import('./pages/Signup'));
+const Profile = lazy(() => import('./pages/Profile'));
 
 function App() {
   return (
     <BrowserRouter>
       <AuthProvider>
         <AudioProvider>
-          <Routes>
-            <Route path="/" element={<MainLayout />}>
-              <Route index element={<Home />} />
-              <Route path="explore" element={<Explore />} />
-              <Route path="search" element={<Search />} />
-              <Route path="album/:id" element={<AlbumDetail />} />
-              <Route path="artist/:id" element={<ArtistDetail />} />
-              <Route path="playlist/:id" element={<PlaylistDetail />} />
-              <Route path="favorites" element={<Favorites />} />
-              <Route path="history" element={<History />} />
-              <Route path="login" element={<Login />} />
-              <Route path="signup" element={<Signup />} />
-              <Route path="profile" element={<Profile />} />
-              <Route path="*" element={<Navigate to="/" replace />} />
-            </Route>
-          </Routes>
+          <Suspense fallback={<PageLoader />}>
+            <Routes>
+              <Route path="/" element={<MainLayout />}>
+                <Route index element={<Home />} />
+                <Route path="explore" element={<Explore />} />
+                <Route path="search" element={<Search />} />
+                <Route path="album/:id" element={<AlbumDetail />} />
+                <Route path="artist/:id" element={<ArtistDetail />} />
+                <Route path="playlist/:id" element={<PlaylistDetail />} />
+                <Route path="favorites" element={<Favorites />} />
+                <Route path="history" element={<History />} />
+                <Route path="login" element={<Login />} />
+                <Route path="signup" element={<Signup />} />
+                <Route path="profile" element={<Profile />} />
+                <Route path="*" element={<Navigate to="/" replace />} />
+              </Route>
+            </Routes>
+          </Suspense>
         </AudioProvider>
       </AuthProvider>
     </BrowserRouter>

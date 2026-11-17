@@ -7,18 +7,38 @@ const AddToPlaylistModal = ({ isOpen, onClose, song, onOpenCreatePlaylist }) => 
   const [loading, setLoading] = useState(true);
   const [addingId, setAddingId] = useState(null);
   const [statusMap, setStatusMap] = useState({});
+  const [hasMore, setHasMore] = useState(false);
+  const [offset, setOffset] = useState(0);
+  const LIMIT = 50;
+
+  const fetchPlaylists = (newOffset = 0, isAppend = false) => {
+    if (!isOpen) return;
+    setLoading(true);
+    api.get('/playlists', { params: { limit: LIMIT, offset: newOffset } })
+      .then(({ data }) => {
+        if (data.success) {
+          const items = data.items || data.playlists || [];
+          const more = data.hasMore !== undefined ? data.hasMore : (items.length === LIMIT);
+          if (isAppend) {
+            setPlaylists((prev) => [...prev, ...items]);
+          } else {
+            setPlaylists(items);
+          }
+          setHasMore(more);
+          setOffset(newOffset);
+        }
+      })
+      .catch((err) => {
+        if (err.response?.status !== 401) {
+          console.error('Failed to load playlists:', err);
+        }
+      })
+      .finally(() => setLoading(false));
+  };
 
   useEffect(() => {
     if (isOpen) {
-      setLoading(true);
-      api.get('/playlists')
-        .then(({ data }) => {
-          if (data.success) {
-            setPlaylists(data.playlists || []);
-          }
-        })
-        .catch(console.error)
-        .finally(() => setLoading(false));
+      fetchPlaylists(0, false);
     }
   }, [isOpen]);
 

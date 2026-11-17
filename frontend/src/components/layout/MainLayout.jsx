@@ -1,5 +1,6 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Outlet } from 'react-router-dom';
+import { RefreshCw } from 'lucide-react';
 import Sidebar from './Sidebar';
 import TopNav from './TopNav';
 import MobileNav from './MobileNav';
@@ -12,6 +13,16 @@ const MainLayout = () => {
   const [mobileSidebarOpen, setMobileSidebarOpen] = useState(false);
   const [createPlaylistOpen, setCreatePlaylistOpen] = useState(false);
   const [addToPlaylistSong, setAddToPlaylistSong] = useState(null);
+  const [isServerWaking, setIsServerWaking] = useState(false);
+
+  useEffect(() => {
+    const handleColdStart = (e) => {
+      setIsServerWaking(!!e.detail?.isWaking);
+    };
+
+    window.addEventListener('tamiltunes:server-coldstart', handleColdStart);
+    return () => window.removeEventListener('tamiltunes:server-coldstart', handleColdStart);
+  }, []);
 
   return (
     <div className="flex h-screen w-screen bg-[#09090B] text-white overflow-hidden">
@@ -43,6 +54,20 @@ const MainLayout = () => {
         {/* Top Navbar */}
         <TopNav onToggleMobileSidebar={() => setMobileSidebarOpen(true)} />
 
+        {/* Cold Start Indicator for Render Free Tier */}
+        {isServerWaking && (
+          <div
+            role="status"
+            aria-live="polite"
+            className="bg-amber-950/80 border-b border-amber-500/40 text-amber-200 text-xs px-4 py-2 flex items-center justify-center gap-2.5 z-40 animate-pulse shadow-md"
+          >
+            <RefreshCw className="w-3.5 h-3.5 text-amber-400 animate-spin flex-shrink-0" />
+            <span className="font-medium">
+              Waking up the server (Render free tier may take up to 30s)... Retrying request automatically.
+            </span>
+          </div>
+        )}
+
         {/* Dynamic page content container */}
         <main className="flex-1 overflow-y-auto px-4 md:px-8 py-6 pb-36 md:pb-28">
           <Outlet context={{
@@ -50,6 +75,8 @@ const MainLayout = () => {
             onOpenCreatePlaylist: () => setCreatePlaylistOpen(true)
           }} />
         </main>
+
+        {/* Visible video surface when the YouTube engine is active */}
 
         {/* Mobile Mini Player */}
         <MiniPlayer />
