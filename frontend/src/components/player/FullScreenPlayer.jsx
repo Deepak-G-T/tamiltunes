@@ -63,8 +63,11 @@ const FullScreenPlayer = ({ isOpen, onClose, onToggleFavorite, isFavorite }) => 
   const content = (
     <div
       style={{ zIndex: 99999 }}
-      className="fixed inset-0 bg-black bg-gradient-to-b from-brand-900 via-black to-black flex flex-col justify-between p-4 sm:p-8 select-none overflow-y-auto animate-in fade-in duration-200"
+      className="fixed inset-0 bg-black flex flex-col justify-between p-4 sm:p-8 select-none overflow-y-auto overflow-x-hidden animate-in fade-in duration-200"
     >
+      {/* Cover-colour wash (follows the artwork) */}
+      <div aria-hidden="true" className="fixed inset-0 cover-wash-strong pointer-events-none" />
+
       {/* Blurred ambient background effect */}
       <div
         className="fixed inset-0 opacity-20 filter blur-3xl pointer-events-none scale-125"
@@ -110,7 +113,14 @@ const FullScreenPlayer = ({ isOpen, onClose, onToggleFavorite, isFavorite }) => 
           <VideoSlot className="w-full aspect-video mb-6 shadow-2xl border border-zinc-800/80" />
         )}
         {activeEngine !== 'youtube' && (
-        <div className="relative w-60 h-60 sm:w-80 sm:h-80 rounded-lg overflow-hidden shadow-[0_24px_64px_rgba(0,0,0,0.7)] mb-6 group bg-surface-3">
+        <div className="relative w-60 h-60 sm:w-80 sm:h-80 mb-6" data-testid="fs-artwork">
+          <div aria-hidden="true" className="cover-glow absolute -inset-10 pointer-events-none" />
+          <div
+            aria-hidden="true"
+            data-testid="vinyl"
+            className={`vinyl absolute top-1/2 -translate-y-1/2 right-[-13%] w-[92%] h-[92%] rounded-full shadow-[0_12px_32px_rgba(0,0,0,0.6)] ${isPlaying ? 'vinyl-spin' : ''}`}
+          />
+          <div className="relative w-full h-full rounded-lg overflow-hidden shadow-[0_24px_64px_rgba(0,0,0,0.7)] group bg-surface-3">
           <img
             src={currentSong.image || MUSIC_COVER_FALLBACK}
             alt={currentSong.title}
@@ -128,6 +138,7 @@ const FullScreenPlayer = ({ isOpen, onClose, onToggleFavorite, isFavorite }) => 
               <div className="w-10 h-10 border-4 border-brand-500 border-t-transparent rounded-full animate-spin" />
             </div>
           )}
+          </div>
         </div>
         )}
 
