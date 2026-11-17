@@ -277,6 +277,7 @@ const PlaylistDetail = () => {
                   <img
                     src={song.image || 'https://images.unsplash.com/photo-1511671782779-c97d3d27a1d4?w=80&auto=format&fit=crop&q=80'}
                     alt={song.title}
+                    loading="lazy"
                     className="w-9 h-9 rounded object-cover flex-shrink-0"
                   />
                   <div className="min-w-0">

@@ -182,7 +182,8 @@ const FullScreenPlayer = ({ isOpen, onClose, onToggleFavorite, isFavorite }) => 
         <div className="flex items-center justify-between mb-5">
           <button
             onClick={toggleShuffle}
-            className={`p-2.5 transition-colors active:scale-90 ${
+            aria-label={`Shuffle ${isShuffle ? 'On' : 'Off'}`}
+            className={`p-2.5 transition-colors active:scale-90 focus-visible:ring-2 focus-visible:ring-purple-500 focus-visible:outline-none ${
               isShuffle ? 'text-purple-400' : 'text-zinc-500 hover:text-white'
             }`}
           >
@@ -191,28 +192,32 @@ const FullScreenPlayer = ({ isOpen, onClose, onToggleFavorite, isFavorite }) => 
 
           <button
             onClick={previousTrack}
-            className="p-2.5 text-zinc-300 hover:text-white active:scale-90 transition-all"
+            aria-label="Previous track"
+            className="p-2.5 text-zinc-300 hover:text-white active:scale-90 focus-visible:ring-2 focus-visible:ring-purple-500 focus-visible:outline-none transition-all"
           >
             <SkipBack className="w-7 h-7" />
           </button>
 
           <button
             onClick={togglePlay}
-            className="w-16 h-16 rounded-full bg-purple-600 hover:bg-purple-500 text-white flex items-center justify-center shadow-lg shadow-purple-600/40 hover:scale-105 active:scale-95 transition-all"
+            aria-label={isPlaying ? 'Pause' : 'Play'}
+            className="w-16 h-16 rounded-full bg-purple-600 hover:bg-purple-500 text-white flex items-center justify-center shadow-lg shadow-purple-600/40 hover:scale-105 active:scale-95 focus-visible:ring-2 focus-visible:ring-purple-400 focus-visible:outline-none transition-all"
           >
             {isPlaying ? <Pause className="w-7 h-7" /> : <Play className="w-7 h-7 ml-1" />}
           </button>
 
           <button
             onClick={nextTrack}
-            className="p-2.5 text-zinc-300 hover:text-white active:scale-90 transition-all"
+            aria-label="Next track"
+            className="p-2.5 text-zinc-300 hover:text-white active:scale-90 focus-visible:ring-2 focus-visible:ring-purple-500 focus-visible:outline-none transition-all"
           >
             <SkipForward className="w-7 h-7" />
           </button>
 
           <button
             onClick={toggleRepeat}
-            className={`p-2.5 transition-colors active:scale-90 ${
+            aria-label={`Repeat: ${repeatMode}`}
+            className={`p-2.5 transition-colors active:scale-90 focus-visible:ring-2 focus-visible:ring-purple-500 focus-visible:outline-none ${
               repeatMode !== 'off' ? 'text-purple-400' : 'text-zinc-500 hover:text-white'
             }`}
           >

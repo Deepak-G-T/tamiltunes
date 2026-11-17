@@ -594,6 +594,40 @@ export const AudioProvider = ({ children }) => {
     }
   }, [currentTime, duration]);
 
+  // Global accessible keyboard shortcuts (Space, M, Arrows)
+  // Strictly disabled while typing in Search, Login, or any input/textarea
+  useEffect(() => {
+    const handleKeyDown = (e) => {
+      const activeTag = document.activeElement?.tagName;
+      if (activeTag === 'INPUT' || activeTag === 'TEXTAREA' || document.activeElement?.isContentEditable) {
+        return;
+      }
+
+      if (e.code === 'Space') {
+        e.preventDefault();
+        togglePlay();
+      } else if (e.code === 'KeyM') {
+        e.preventDefault();
+        toggleMute();
+      } else if (e.code === 'ArrowRight' && e.shiftKey) {
+        e.preventDefault();
+        nextTrack();
+      } else if (e.code === 'ArrowLeft' && e.shiftKey) {
+        e.preventDefault();
+        previousTrack();
+      } else if (e.code === 'ArrowRight') {
+        e.preventDefault();
+        seek(Math.min(duration, currentTime + 5));
+      } else if (e.code === 'ArrowLeft') {
+        e.preventDefault();
+        seek(Math.max(0, currentTime - 5));
+      }
+    };
+
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [togglePlay, toggleMute, nextTrack, previousTrack, seek, currentTime, duration]);
+
   return (
     <AudioContext.Provider
       value={{

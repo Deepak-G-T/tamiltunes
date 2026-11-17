@@ -168,7 +168,8 @@ const MusicPlayer = () => {
           <button
             onClick={() => toggleFavorite(currentSong)}
             title={isFavorite ? 'Remove from Favourites' : 'Add to Favourites'}
-            className="p-2 rounded-full hover:bg-zinc-800/60 transition-colors"
+            aria-label={isFavorite ? 'Remove from Favourites' : 'Add to Favourites'}
+            className="p-2 rounded-full hover:bg-zinc-800/60 focus-visible:ring-2 focus-visible:ring-purple-500 focus-visible:outline-none transition-colors"
           >
             <Heart
               className={`w-4 h-4 transition-colors ${
@@ -184,7 +185,8 @@ const MusicPlayer = () => {
             <button
               onClick={toggleShuffle}
               title={`Shuffle ${isShuffle ? 'On' : 'Off'}`}
-              className={`p-1.5 rounded-full transition-colors ${
+              aria-label={`Shuffle ${isShuffle ? 'On' : 'Off'}`}
+              className={`p-1.5 rounded-full transition-colors focus-visible:ring-2 focus-visible:ring-purple-500 focus-visible:outline-none ${
                 isShuffle ? 'text-purple-400' : 'text-zinc-500 hover:text-zinc-300'
               }`}
             >
@@ -194,7 +196,8 @@ const MusicPlayer = () => {
             <button
               onClick={previousTrack}
               title="Previous song"
-              className="p-1.5 rounded-full text-zinc-300 hover:text-white transition-colors"
+              aria-label="Previous track"
+              className="p-1.5 rounded-full text-zinc-300 hover:text-white focus-visible:ring-2 focus-visible:ring-purple-500 focus-visible:outline-none transition-colors"
             >
               <SkipBack className="w-5 h-5" />
             </button>
@@ -202,7 +205,8 @@ const MusicPlayer = () => {
             <button
               onClick={togglePlay}
               title={isPlaying ? 'Pause' : 'Play'}
-              className="w-10 h-10 rounded-full bg-purple-600 hover:bg-purple-500 text-white flex items-center justify-center shadow-md shadow-purple-600/30 hover:scale-105 active:scale-95 transition-all"
+              aria-label={isPlaying ? 'Pause' : 'Play'}
+              className="w-10 h-10 rounded-full bg-purple-600 hover:bg-purple-500 text-white flex items-center justify-center shadow-md shadow-purple-600/30 hover:scale-105 active:scale-95 focus-visible:ring-2 focus-visible:ring-purple-400 focus-visible:outline-none transition-all"
             >
               {isBuffering ? (
                 <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
@@ -216,7 +220,8 @@ const MusicPlayer = () => {
             <button
               onClick={nextTrack}
               title="Next song"
-              className="p-1.5 rounded-full text-zinc-300 hover:text-white transition-colors"
+              aria-label="Next track"
+              className="p-1.5 rounded-full text-zinc-300 hover:text-white focus-visible:ring-2 focus-visible:ring-purple-500 focus-visible:outline-none transition-colors"
             >
               <SkipForward className="w-5 h-5" />
             </button>
@@ -224,7 +229,8 @@ const MusicPlayer = () => {
             <button
               onClick={toggleRepeat}
               title={`Repeat: ${repeatMode}`}
-              className={`p-1.5 rounded-full transition-colors ${
+              aria-label={`Repeat: ${repeatMode}`}
+              className={`p-1.5 rounded-full transition-colors focus-visible:ring-2 focus-visible:ring-purple-500 focus-visible:outline-none ${
                 repeatMode !== 'off' ? 'text-purple-400' : 'text-zinc-500 hover:text-zinc-300'
               }`}
             >
@@ -245,7 +251,8 @@ const MusicPlayer = () => {
           <button
             onClick={() => setIsQueueOpen(!isQueueOpen)}
             title="Toggle Queue"
-            className={`p-2 rounded-lg transition-colors ${
+            aria-label="Toggle Queue"
+            className={`p-2 rounded-lg transition-colors focus-visible:ring-2 focus-visible:ring-purple-500 focus-visible:outline-none ${
               isQueueOpen ? 'text-purple-400 bg-purple-500/10' : 'text-zinc-400 hover:text-white'
             }`}
           >
@@ -262,7 +269,8 @@ const MusicPlayer = () => {
           <button
             onClick={() => setIsFullScreen(true)}
             title="Full screen view"
-            className="p-2 rounded-lg text-zinc-400 hover:text-white transition-colors hidden lg:inline-block"
+            aria-label="Full screen view"
+            className="p-2 rounded-lg text-zinc-400 hover:text-white focus-visible:ring-2 focus-visible:ring-purple-500 focus-visible:outline-none transition-colors hidden lg:inline-block"
           >
             <Maximize2 className="w-4 h-4" />
           </button>
