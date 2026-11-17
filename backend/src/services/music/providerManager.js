@@ -4,28 +4,37 @@ import { LocalAudioProvider, CURATED_TAMIL_SONGS, CURATED_ALBUMS, CURATED_ARTIST
 import { musicCache } from '../cacheService.js';
 import { config } from '../../config/env.js';
 
-// Recognized official Tamil cinema distributors and labels
+// Recognized official Tamil cinema distributors, indie channels, and devotional labels
 const OFFICIAL_LABELS = [
   'sony', 'saregama', 'think music', 'divo', 'lahari', 't-series',
   'zee music', 'muzik247', 'star music', 'ayngaran', 'five star',
   'mass audios', 'sun pictures', 'lyca', 'trend music', 'noise and grains',
   'ananda audio', 'rajshri', 'tips', 'universal', 'warner', 'think indie',
-  'dvo', 'aditya music', 'v creations', 'gemini', 'junglee music', 'trendmusic'
+  'dvo', 'aditya music', 'v creations', 'gemini', 'junglee music', 'trendmusic',
+  'symphony', 'giri', 'ramana', 'divine'
 ];
 
-// Short junk filter for obvious spam audio formats
+// Short junk filter for obvious spam audio formats and amateur social media meme songs
 const SPAM_PATTERNS = [
   /whatsapp\s+status/i,
   /status\s+video/i,
+  /status\s+la\s+potu/i,
   /bass\s+boosted/i,
   /karaoke/i,
-  /slowed\s+reverb/i,
+  /slowed\s*(?:and|n|&|\+)?\s*reverb(?:ed)?/i,
+  /speed\s*up/i,
   /dj\s+remix/i,
   /ringtone/i,
-  /bgm\s+cut/i
+  /bgm\s+cut/i,
+  /trending\s+version/i,
+  /salem\s+gana/i,
+  /trending\s+gana/i,
+  /gana\s+surya/i,
+  /gana\s+suriya/i,
+  /gana\s+velu/i
 ];
 
-// Top authentic Tamil music directors, singers, and lyricists
+// Top authentic Tamil music directors, singers, poets, indie artists, and lyricists
 const RECOGNIZED_TAMIL_ARTISTS = [
   'anirudh', 'a.r. rahman', 'ar rahman', 'rahman', 'yuvan', 'ilaiyaraaja', 'ilayaraja',
   'harris jayaraj', 'sid sriram', 'g.v. prakash', 'gv prakash', 'santhosh narayanan',
@@ -36,8 +45,12 @@ const RECOGNIZED_TAMIL_ARTISTS = [
   'karthik', 'sujatha', 'chitra', 'swarnalatha', 'mano', 'sadhana sargam', 'unni menon',
   'tippu', 'harish raghavendra', 'naresh iyer', 'alisha thomas', 'shashaa tirupati',
   'sathyaprakash', 'deepthi suresh', 'arunraja kamaraj', 'super subu', 'vignesh shivan',
-  'kaala bhairava', 'silambarasan', 'dhanush', 'kamal haasan', 'rajinikanth', 'vijay',
-  'marana gana viji', 'rokesh', 'gana ulaganathan', 'shankar ganesh', 'arun srinivasan'
+  'kaala bhairava', 'silambarasan', 'dhanush', 'kamal haasan', 'rajinikanth', 'thalapathy vijay',
+  'marana gana viji', 'rokesh', 'gana ulaganathan', 'shankar ganesh', 'arun srinivasan',
+  'arivu', 'therukural', 't.m. soundararajan', 'tm soundararajan', 'soundararajan',
+  'kannadasan', 'vaali', 'm.s. viswanathan', 'viswanathan', 'ramamoorthy',
+  'l.r. eswari', 'lr eswari', 'sirpy', 'veeramanidaasan', 'veeramani daasan',
+  'k.b. sundarambal', 'mahanadhi shobana', 't.l. maharajan', 'p. susheela'
 ];
 
 /**
@@ -49,16 +62,18 @@ export const isOfficialFilmRelease = (song) => {
   if (!song) return false;
   const combined = `${song.title || ''} ${song.artist || ''} ${song.album || ''} ${song.singers || ''}`.toLowerCase();
 
-  // Reject non-Tamil language dubs (Telugu, Hindi, Kannada, Malayalam, etc.)
-  const lang = (song.language || song.more_info?.language || '').toLowerCase();
-  if (['telugu', 'hindi', 'kannada', 'malayalam', 'punjabi', 'bhojpuri'].includes(lang)) {
+  // Reject non-Tamil languages (must be Tamil or unclassified single)
+  const lang = (song.language || song.more_info?.language || '').toLowerCase().trim();
+  if (lang && lang !== 'tamil' && lang !== 'unknown') {
     return false;
   }
   if (
     combined.includes('[telugu]') ||
     combined.includes('[hindi]') ||
     combined.includes('[kannada]') ||
-    combined.includes('[malayalam]')
+    combined.includes('[malayalam]') ||
+    combined.includes('[punjabi]') ||
+    combined.includes('[marathi]')
   ) {
     return false;
   }
