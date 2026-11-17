@@ -396,6 +396,97 @@ async function runAudit() {
     await context.close();
   }
 
+  // =========================================================================
+  // Dedicated YouTube Player Autoplay & Video Data Test
+  // Launched with --autoplay-policy=no-user-gesture-required for this test only
+  // =========================================================================
+  console.log('\n--- Running Dedicated YouTube Player Autoplay & Video Data Test (--autoplay-policy=no-user-gesture-required) ---');
+  const ytAutoplayBrowser = await chromium.launch({
+    headless: true,
+    args: ['--autoplay-policy=no-user-gesture-required']
+  });
+
+  try {
+    const ytContext = await ytAutoplayBrowser.newContext({
+      viewport: { width: 390, height: 844 },
+      hasTouch: true,
+      isMobile: true
+    });
+    const ytPage = await ytContext.newPage();
+    await setupMockRoutes(ytPage);
+
+    await ytPage.goto(`${baseURL}/`, { waitUntil: 'networkidle' });
+    await ytPage.waitForTimeout(500);
+
+    // Tap first YouTube track: "Badass (Leo)" (videoId: "IqwIOlhfCak")
+    const songCard = ytPage.locator('text=Badass (Leo)').first();
+    await songCard.tap();
+    await ytPage.waitForTimeout(1000);
+
+    // 1. Verify iframe src contains the track's video ID
+    const iframeLoc = ytPage.locator('#yt-player-container iframe');
+    await iframeLoc.waitFor({ state: 'attached', timeout: 5000 });
+    const iframeSrc = (await iframeLoc.getAttribute('src')) || '';
+    console.log(`[YouTube Autoplay Test] IFrame src: ${iframeSrc}`);
+    const expectedVideoId = 'IqwIOlhfCak';
+    if (!iframeSrc.includes(expectedVideoId)) {
+      throw new Error(`Expected iframe src to contain videoId "${expectedVideoId}", got: "${iframeSrc}"`);
+    }
+    console.log(`✓ [YouTube Autoplay Test] Assertion: IFrame src includes video ID "${expectedVideoId}" -> PASS`);
+
+    // 2. Wait for player instance and evaluate getVideoData()
+    await ytPage.waitForFunction(() => {
+      const p = window.__ytPlayerInstance;
+      return p && typeof p.getVideoData === 'function' && p.getVideoData().video_id;
+    }, { timeout: 8000 });
+
+    const videoData = await ytPage.evaluate(() => {
+      const p = window.__ytPlayerInstance;
+      return p.getVideoData();
+    });
+    console.log(`[YouTube Autoplay Test] getVideoData():`, JSON.stringify(videoData));
+    const actualVideoId = videoData?.video_id;
+    console.log(`[YouTube Autoplay Test] Assertion: getVideoData().video_id === "${expectedVideoId}" ->`, actualVideoId === expectedVideoId ? 'PASS' : 'FAIL');
+    if (actualVideoId !== expectedVideoId) {
+      throw new Error(`Expected getVideoData().video_id to be "${expectedVideoId}", got "${actualVideoId}"`);
+    }
+
+    // 3. Evaluate player state (polling up to 6s)
+    const STATE_NAMES = {
+      '-1': 'UNSTARTED (-1)',
+      '0': 'ENDED (0)',
+      '1': 'PLAYING (1)',
+      '2': 'PAUSED (2)',
+      '3': 'BUFFERING (3)',
+      '5': 'CUED (5)'
+    };
+
+    let reachedState = await ytPage.evaluate(() => {
+      const p = window.__ytPlayerInstance;
+      return typeof p?.getPlayerState === 'function' ? p.getPlayerState() : -1;
+    });
+
+    for (let i = 0; i < 12 && reachedState !== 1; i++) {
+      await ytPage.waitForTimeout(500);
+      reachedState = await ytPage.evaluate(() => {
+        const p = window.__ytPlayerInstance;
+        return typeof p?.getPlayerState === 'function' ? p.getPlayerState() : -1;
+      });
+    }
+
+    const stateDesc = STATE_NAMES[reachedState] || `UNKNOWN (${reachedState})`;
+    console.log(`[YouTube Autoplay Test] Player state reached: ${stateDesc}`);
+    if (reachedState === 1) {
+      console.log('✓ [YouTube Autoplay Test] Assertion: Player state became 1 (PLAYING) -> PASS');
+    } else {
+      console.log(`ℹ [YouTube Autoplay Test] Player state reached: ${stateDesc} (reported per prompt instruction)`);
+    }
+
+    await ytContext.close();
+  } finally {
+    await ytAutoplayBrowser.close();
+  }
+
   // Cleanup
   await browser.close();
   await server.close();

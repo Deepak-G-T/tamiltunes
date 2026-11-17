@@ -668,6 +668,7 @@ export const AudioProvider = ({ children }) => {
       {/* YouTube IFrame Engine (visible floating player, min 200x200) */}
       <YouTubePlayer
         ref={ytPlayerRef}
+        videoId={isYouTubeSong(currentSong) ? currentSong?.videoId : null}
         visible={isYouTubeSong(currentSong)}
         onPlaying={() => {
           if (isYouTubeSong(currentSongRef.current)) {

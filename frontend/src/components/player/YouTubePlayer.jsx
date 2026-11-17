@@ -7,6 +7,7 @@ import React, { useEffect, useState, useRef, useImperativeHandle, forwardRef } f
  * play, pause, seek, setVolume, mute, unMute, onTimeUpdate, onEnded, onPlaying, onPause, onBuffering.
  */
 const YouTubePlayer = forwardRef(({
+  videoId: propVideoId,
   visible = false,
   onPlaying,
   onPause,
@@ -18,6 +19,7 @@ const YouTubePlayer = forwardRef(({
   const playerRef = useRef(null);
   const isReadyRef = useRef(false);
   const progressTimerRef = useRef(null);
+  const pendingVideoIdRef = useRef(propVideoId || null);
 
   // Responsive mobile check for non-overlapping bottom position
   const [isMobile, setIsMobile] = useState(() => typeof window !== 'undefined' && window.innerWidth < 768);
@@ -28,10 +30,22 @@ const YouTubePlayer = forwardRef(({
     return () => window.removeEventListener('resize', handleResize);
   }, []);
 
+  // Update pendingVideoIdRef when prop changes
+  useEffect(() => {
+    if (propVideoId) {
+      pendingVideoIdRef.current = propVideoId;
+      if (!playerRef.current && window.YT && window.YT.Player) {
+        initPlayer(propVideoId, true);
+      }
+    }
+  }, [propVideoId]);
+
   // Load YouTube IFrame API script once
   useEffect(() => {
     if (window.YT && window.YT.Player) {
-      initPlayer();
+      if (pendingVideoIdRef.current) {
+        initPlayer(pendingVideoIdRef.current);
+      }
       return;
     }
 
@@ -48,7 +62,9 @@ const YouTubePlayer = forwardRef(({
     const prevOnReady = window.onYouTubeIframeAPIReady;
     window.onYouTubeIframeAPIReady = () => {
       if (typeof prevOnReady === 'function') prevOnReady();
-      initPlayer();
+      if (pendingVideoIdRef.current) {
+        initPlayer(pendingVideoIdRef.current);
+      }
     };
 
     return () => {
@@ -61,28 +77,35 @@ const YouTubePlayer = forwardRef(({
     };
   }, []);
 
-  const initPlayer = () => {
-    if (playerRef.current || !window.YT) return;
+  const initPlayer = (vid, autoPlay = true) => {
+    if (playerRef.current || !window.YT || !window.YT.Player) return;
 
     try {
-      playerRef.current = new window.YT.Player('yt-player-iframe', {
+      const playerVars = {
+        autoplay: autoPlay ? 1 : 0,
+        controls: 1,
+        disablekb: 0,
+        fs: 1,
+        modestbranding: 1,
+        playsinline: 1,
+        rel: 0,
+        origin: window.location.origin
+      };
+
+      const opts = {
         height: '200',
         width: '240',
-        playerVars: {
-          autoplay: 0,
-          controls: 1,
-          disablekb: 0,
-          fs: 1,
-          modestbranding: 1,
-          playsinline: 1,
-          rel: 0,
-          origin: window.location.origin
-        },
+        playerVars,
         events: {
           onReady: (event) => {
             isReadyRef.current = true;
+            window.__ytPlayerInstance = event.target;
+            if (autoPlay && typeof event.target.playVideo === 'function') {
+              event.target.playVideo();
+            }
           },
           onStateChange: (event) => {
+            window.__ytPlayerState = event.data;
             // YT.PlayerState: ENDED = 0, PLAYING = 1, PAUSED = 2, BUFFERING = 3, CUED = 5
             if (event.data === window.YT.PlayerState.PLAYING) {
               startProgressTimer();
@@ -102,7 +125,14 @@ const YouTubePlayer = forwardRef(({
             if (onError) onError(e);
           }
         }
-      });
+      };
+
+      if (vid) {
+        opts.videoId = vid;
+      }
+
+      playerRef.current = new window.YT.Player('yt-player-iframe', opts);
+      window.__ytPlayerInstance = playerRef.current;
     } catch (err) {
       console.warn('Could not initialize YT.Player:', err);
     }
@@ -131,7 +161,16 @@ const YouTubePlayer = forwardRef(({
   useImperativeHandle(ref, () => ({
     loadVideo(videoId, autoPlay = true) {
       if (!videoId) return;
-      if (playerRef.current && isReadyRef.current && typeof playerRef.current.loadVideoById === 'function') {
+      pendingVideoIdRef.current = videoId;
+
+      if (!playerRef.current) {
+        if (window.YT && window.YT.Player) {
+          initPlayer(videoId, autoPlay);
+        }
+        return;
+      }
+
+      if (isReadyRef.current && typeof playerRef.current.loadVideoById === 'function') {
         if (autoPlay) {
           playerRef.current.loadVideoById(videoId);
         } else {
