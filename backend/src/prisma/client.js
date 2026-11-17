@@ -225,6 +225,8 @@ const fallbackDb = new InMemoryDb();
 
 // Verify PostgreSQL connection on boot (migrations are managed externally via render/cli)
 export const initDb = async () => {
+  const isProduction = (config.nodeEnv === 'production' || process.env.NODE_ENV === 'production');
+
   if (prismaInstance) {
     try {
       await prismaInstance.$connect();
@@ -234,11 +236,33 @@ export const initDb = async () => {
       console.log('Connected to PostgreSQL via Prisma (tables verified)');
       return prismaInstance;
     } catch (err) {
-      console.warn('PostgreSQL connection check failed, using local development store:', err.message);
+      if (isProduction) {
+        console.error('\n================================================================================');
+        console.error('FATAL PRODUCTION DATABASE ERROR: Unable to connect to PostgreSQL via Prisma in production environment!');
+        console.error(`Reason: ${err.message}`);
+        console.error('In-memory database fallback is strictly disabled in production.');
+        console.error('================================================================================\n');
+        process.exit(1);
+      }
+      console.warn('\n================================================================================');
+      console.warn('⚠️  WARNING: PostgreSQL connection check failed! (NODE_ENV != production)');
+      console.warn(`Reason: ${err.message}`);
+      console.warn('Falling back to IN-MEMORY LOCAL DATA STORE for development purposes only.');
+      console.warn('Data will NOT be persisted across server restarts!');
+      console.warn('================================================================================\n');
       isPostgresAvailable = false;
       return fallbackDb;
     }
   }
+
+  if (isProduction) {
+    console.error('FATAL PRODUCTION DATABASE ERROR: PrismaClient instance failed to initialize in production environment!');
+    process.exit(1);
+  }
+
+  console.warn('\n================================================================================');
+  console.warn('⚠️  WARNING: No PrismaClient instance available. Using local in-memory store.');
+  console.warn('================================================================================\n');
   return fallbackDb;
 };
 
@@ -247,6 +271,10 @@ export const db = new Proxy({}, {
   get(target, prop) {
     if (isPostgresAvailable && prismaInstance) {
       return prismaInstance[prop];
+    }
+    const isProduction = (config.nodeEnv === 'production' || process.env.NODE_ENV === 'production');
+    if (isProduction) {
+      throw new Error(`Production database access failure: PostgreSQL unavailable and fallback disabled for "${String(prop)}"`);
     }
     return fallbackDb[prop];
   }
