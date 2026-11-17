@@ -35,6 +35,23 @@ const levenshtein = (a, b) => {
   return prev[b.length];
 };
 
+// YouTube upload titles that are NOT the music video (lyric/audio-only/promo/other recordings).
+const NOT_A_VIDEO_SONG_RE = /\b(lyric|lyrics|lyrical|audio|jukebox|teaser|trailer|promo|reaction|cover|remix|karaoke|status|8d|slowed|reverb|making|behind the scenes|live|full album|mashup)\b/i;
+const OFFICIAL_VIDEO_RE = /\b(official (music )?video|video song|full video|music video)\b/i;
+
+/**
+ * Ranks a YouTube upload title: -1 = reject (lyric/audio/etc.), otherwise higher is better.
+ * "Hukum - Video Song | Jailer" and "... (Official Video)" beat a plain title.
+ */
+export const scoreVideoTitle = (title) => {
+  const t = title || '';
+  if (NOT_A_VIDEO_SONG_RE.test(t)) return -1;
+  let score = 0;
+  if (OFFICIAL_VIDEO_RE.test(t)) score += 2;
+  if (/\bofficial\b/i.test(t)) score += 1;
+  return score;
+};
+
 const FUZZY_MIN_LENGTH = 10; // only tolerate one typo on longer titles ("Aalaporan Thamizhan")
 
 // Title candidates for matching: the whole normalized title, and its main part before a " - subtitle"
@@ -105,7 +122,8 @@ export const createVideoLookup = ({
   };
 
   const apiSearch = async (song) => {
-    const q = `${song.title} ${(song.artist || song.singers || '').split(',')[0]}`.trim();
+    // Ask for the official music video, not the lyric/audio upload
+    const q = `${song.title} ${(song.artist || song.singers || '').split(',')[0]} official video song`.trim();
     const call = async (path, params) => {
       const url = new URL(`${API_BASE}/${path}`);
       for (const [k, v] of Object.entries({ ...params, key: cfg.youtubeApiKey })) url.searchParams.set(k, v);
@@ -117,7 +135,7 @@ export const createVideoLookup = ({
     };
 
     const search = await call('search', {
-      part: 'snippet', type: 'video', videoEmbeddable: 'true', maxResults: '5', q
+      part: 'snippet', type: 'video', videoEmbeddable: 'true', maxResults: '10', q
     });
     const ids = (search.items || []).map((i) => i?.id?.videoId).filter((id) => VIDEO_ID_RE.test(id || ''));
     if (ids.length === 0) return null;
@@ -125,14 +143,18 @@ export const createVideoLookup = ({
     const details = await call('videos', { part: 'status,snippet', id: ids.join(',') });
     const allow = new Set(cfg.videoChannelAllowlist);
     const byId = new Map((details.items || []).map((v) => [v.id, v]));
+    let best = null;
     for (const id of ids) {
       const v = byId.get(id);
       if (!v) continue;
       if (v.status?.embeddable !== true) continue;
       if (v.status?.privacyStatus && v.status.privacyStatus !== 'public') continue;
       if (!allow.has(v.snippet?.channelId)) continue; // official channels only, matched by id
-      return id;
+      const score = scoreVideoTitle(v.snippet?.title);
+      if (score < 0) continue; // lyric / audio / promo upload: not the video song
+      if (!best || score > best.score) best = { id, score }; // ties keep search order
     }
+    if (best) return best.id;
     return null;
   };
 

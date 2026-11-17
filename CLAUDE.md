@@ -38,6 +38,9 @@ Songs may carry an optional `videoId`. It comes from the curated map `backend/sr
   (that route is limited to 30 requests/min per IP; `?fresh=1` stays open to guests for expired-stream recovery).
 - Curated entries are "oEmbed-verified by a previous agent, embeddability unverified"; the player falls back to audio
   with a toast on YouTube errors 101/150.
-- Hukum has two conflicting ids: `1F3hm6MfR1k` (used by the `yt_hukum_jailer` record on fix/youtube-feed and supplied by
-  the owner) and the older `1F3HM635S0k`. Only the first is served; the second is kept as an unserved `candidate`
-  until the owner confirms it manually.
+- The curated map serves official *video songs*, not lyric videos. Entries marked `candidate` (older ids, lyric
+  videos) are kept in the file but never served. Served ids marked "found by web search" were matched by YouTube title
+  only (uploader and embeddability unverified): confirm each on a phone. Badass still uses its original id until a
+  confirmed video-song id is supplied (candidate seen: `ZdMZ40GSVmc`, "Leo - Badass Video").
+- The YouTube API lookup (when enabled) prefers titles with "Official Video"/"Video Song" and rejects lyric, audio,
+  jukebox, teaser, live and similar uploads.
