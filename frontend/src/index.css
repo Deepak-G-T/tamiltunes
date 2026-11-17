@@ -218,12 +218,15 @@ input[type="range"]:active::-moz-range-thumb {
 @keyframes nav-pop { 0% { transform: scale(1); } 40% { transform: scale(1.25) translateY(-2px); } 100% { transform: scale(1); } }
 .nav-pop { animation: nav-pop 0.35s ease-out; }
 
+@keyframes heart-pop { 0% { transform: scale(0.6); } 55% { transform: scale(1.3); } 100% { transform: scale(1); } }
+.heart-pop { animation: heart-pop 0.4s cubic-bezier(0.2, 0.8, 0.2, 1); }
+
 /* press feedback on touch */
 .press { transition: transform 0.12s ease; }
 .press:active { transform: scale(0.96); }
 
 @media (prefers-reduced-motion: reduce) {
-  .slide-up, .stagger > *, .shimmer, .art-in, .breathe, .nav-pop { animation: none !important; }
+  .slide-up, .stagger > *, .shimmer, .art-in, .breathe, .nav-pop, .heart-pop { animation: none !important; }
   .press:active { transform: none; }
   .eq-bar, .vinyl-spin, .page-in { animation: none !important; }
   .lift:hover { transform: none; }

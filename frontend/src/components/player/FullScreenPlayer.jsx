@@ -11,7 +11,6 @@ import {
   Repeat1,
   ListMusic,
   Heart,
-  ShieldCheck,
   Disc
 } from 'lucide-react';
 import { useAudio } from '../../context/AudioContext';
@@ -145,7 +144,7 @@ const FullScreenPlayer = ({ isOpen, onClose, onToggleFavorite, isFavorite }) => 
         {activeEngine !== 'youtube' && (
         <div
           key={currentSong.id}
-          className="relative w-60 h-60 sm:w-80 sm:h-80 mb-6 art-in"
+          className="relative w-[min(70vw,20rem)] h-[min(70vw,20rem)] mb-6 art-in"
           data-testid="fs-artwork"
           style={{ touchAction: 'none' }}
           onTouchStart={artSwipe.onTouchStart}
@@ -183,50 +182,50 @@ const FullScreenPlayer = ({ isOpen, onClose, onToggleFavorite, isFavorite }) => 
         <VideoModeToggle className="mb-4" />
 
         {/* Title, Artist, & Favorite */}
-        <div className="w-full flex items-center justify-between mb-3 px-1">
+        <div className="w-full flex items-start justify-between mb-3 px-1">
           <div className="min-w-0 flex-1 mr-3">
-            <h2 className="text-2xl sm:text-3xl font-extrabold text-white truncate tracking-tight">
+            <h2 className="text-2xl sm:text-3xl font-extrabold text-white line-clamp-2 tracking-tight leading-tight">
               {currentSong.title}
             </h2>
-            <p className="text-sm font-medium text-zinc-400 truncate mt-1">
+            <p className="text-sm font-medium text-zinc-300 line-clamp-2 mt-1">
               {currentSong.artist || currentSong.singers}
             </p>
             {currentSong.album && (
-              <p className="text-xs text-brand-400/80 truncate mt-0.5">
-                {currentSong.album}
-              </p>
+              <span className="inline-flex max-w-full mt-2 px-2.5 py-0.5 rounded-full bg-brand-500/15 text-brand-300 text-xs font-semibold">
+                <span className="truncate">{currentSong.album}</span>
+              </span>
             )}
           </div>
           {onToggleFavorite && (
             <button
-              onClick={() => onToggleFavorite(currentSong)}
-              className="p-3 rounded-full hover:bg-zinc-800/60 active:scale-90 transition-transform"
+              onClick={() => {
+                haptic(12);
+                onToggleFavorite(currentSong);
+              }}
+              aria-label={isFavorite ? 'Remove from favourites' : 'Add to favourites'}
+              aria-pressed={!!isFavorite}
+              className="p-3 -mt-1 rounded-full hover:bg-white/10 active:scale-90 transition-transform"
             >
               <Heart
-                className={`w-6 h-6 transition-colors ${
-                  isFavorite ? 'fill-rose-500 text-rose-500' : 'text-zinc-400 hover:text-white'
+                key={isFavorite ? 'on' : 'off'}
+                className={`w-7 h-7 transition-colors ${
+                  isFavorite ? 'fill-brand-500 text-brand-500 heart-pop' : 'text-zinc-300 hover:text-white'
                 }`}
               />
             </button>
           )}
         </div>
 
-        {/* License Notice / Stream Status Badge */}
-        <div className="w-full mb-3 px-1">
-          <div className="flex items-center gap-1.5 text-[11px] text-zinc-500">
-            <ShieldCheck className="w-3.5 h-3.5 text-emerald-400 flex-shrink-0" />
-            <span className="truncate">
-              {currentSong.licenseNotice || '320kbps CD Quality Audio • Direct Tamil Stream'}
-            </span>
+        {/* Playback error (the stream/licence provider text that used to be here was removed) */}
+        {playbackError && (
+          <div className="w-full mb-3 px-1" role="status">
+            <p className="text-xs text-amber-300 bg-amber-500/10 rounded-lg px-3 py-2">{playbackError}</p>
           </div>
-          {playbackError && (
-            <p className="text-xs text-amber-400 mt-1 px-1">{playbackError}</p>
-          )}
-        </div>
+        )}
       </div>
 
       {/* Bottom Controls */}
-      <div className="relative z-10 max-w-sm sm:max-w-md mx-auto w-full pb-2">
+      <div className="relative z-10 max-w-sm sm:max-w-md mx-auto w-full pb-[max(0.5rem,env(safe-area-inset-bottom))]">
         {/* Scrubber */}
         <div className="mb-5">
           <ProgressBar
@@ -296,7 +295,7 @@ const FullScreenPlayer = ({ isOpen, onClose, onToggleFavorite, isFavorite }) => 
         </div>
 
         {/* Volume */}
-        <div className="flex justify-center pb-2">
+        <div className="hidden sm:flex justify-center pb-2">
           <VolumeSlider
             volume={volume}
             isMuted={isMuted}

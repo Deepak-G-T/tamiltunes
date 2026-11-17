@@ -15,7 +15,8 @@ fs.mkdirSync(OUT, { recursive: true });
 
 const SONG_VIDEO = {
   id: 'tt_video_1', title: 'Badass (Leo)', artist: 'Anirudh Ravichander', album: 'Leo', duration: 10,
-  image: '', streamUrl: 'https://aac.saavncdn.com/test_320.mp4', source: 'audio', videoId: 'IqwIOlhfCak'
+  image: '', streamUrl: 'https://aac.saavncdn.com/test_320.mp4', source: 'audio', videoId: 'IqwIOlhfCak',
+  licenseNotice: 'High-Quality Tamil Audio Stream (cyberboysumanjay/JioSaavnAPI)'
 };
 const SONG_PLAIN = {
   id: 'tt_plain_1', title: 'Plain Audio Song', artist: 'Someone', album: 'Plain', duration: 10,
@@ -191,6 +192,11 @@ async function runViewport(browser, width, height) {
   // 6. full-screen player: toggle present, video surface >=200x200 in video mode
   await mini.click({ position: { x: 20, y: 10 } });
   await page.waitForSelector('[aria-label="Close now playing"]');
+  const fsText = await page.locator('[aria-label="Close now playing"]').evaluate((el) => {
+    const root = el.closest('div[style*="z-index"]') || document.body;
+    return root.innerText;
+  });
+  check(`[${tag}] full-screen player never shows the provider/licence line`, !/cyberboysumanjay|High-Quality Tamil Audio Stream/i.test(fsText), fsText.slice(0, 200));
   check(`[${tag}] toggle visible in FullScreenPlayer`, await page.locator('[data-testid=video-toggle]').last().isVisible());
   await page.locator('[data-testid=mode-video]').last().click(); // portal is last in DOM
   await page.waitForTimeout(700);
