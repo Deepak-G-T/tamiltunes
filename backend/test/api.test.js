@@ -3,6 +3,7 @@ import app, { isOriginAllowed } from '../src/app.js';
 import { initDb } from '../src/prisma/client.js';
 import { musicService, isOfficialFilmRelease } from '../src/services/music/providerManager.js';
 import { musicCache } from '../src/services/cacheService.js';
+import { config } from '../src/config/env.js';
 
 const runTests = async () => {
   console.log('--- Starting TamilTunes Backend Integration Tests ---');
@@ -468,12 +469,31 @@ const runTests = async () => {
     console.log(`✓ YouTube Provider Home Feed: PASSED (${totalSongsVerified} songs verified across shelves, 100% contain videoId/source/provider)`);
 
     // =========================================================================
-    // 14C. GET /api/music/song/:id RECOVERY ENDPOINT TESTS
+    // 14C. GET /api/music/song/:id RECOVERY ENDPOINT & CACHE BYPASS TESTS
     // =========================================================================
-    console.log('--- Testing GET /api/music/song/:id Endpoint ---');
+    console.log('--- Testing GET /api/music/song/:id Endpoint & fresh=1 Cache Bypass ---');
     const songSuccessRes = await fetch(`${BASE}/music/song/yt_badass_leo`).then((r) => r.json());
     if (!songSuccessRes.success || songSuccessRes.data?.id !== 'yt_badass_leo' || !songSuccessRes.data?.videoId) {
       throw new Error(`Expected GET /api/music/song/yt_badass_leo to return song with videoId, got ${JSON.stringify(songSuccessRes)}`);
+    }
+
+    // Verify cache key includes active provider name
+    const expectedCacheKey = `song_youtube_yt_badass_leo`;
+    if (!musicCache.has(expectedCacheKey)) {
+      throw new Error(`Expected cache to contain key "${expectedCacheKey}", keys: ${JSON.stringify(musicCache.keys())}`);
+    }
+
+    // Mutate cached value to verify cache hit without fresh
+    musicCache.set(expectedCacheKey, { ...songSuccessRes.data, title: 'MUTATED_CACHED_TITLE' }, 600);
+    const cachedHitRes = await fetch(`${BASE}/music/song/yt_badass_leo`).then((r) => r.json());
+    if (cachedHitRes.data?.title !== 'MUTATED_CACHED_TITLE') {
+      throw new Error(`Expected normal GET to hit cache with mutated title, got "${cachedHitRes.data?.title}"`);
+    }
+
+    // With fresh=1, cache must be bypassed and fresh song returned
+    const freshRes = await fetch(`${BASE}/music/song/yt_badass_leo?fresh=1`).then((r) => r.json());
+    if (freshRes.data?.title === 'MUTATED_CACHED_TITLE' || !freshRes.data?.title.includes('Badass')) {
+      throw new Error(`Expected GET with fresh=1 to bypass cache, got "${freshRes.data?.title}"`);
     }
 
     const songNotFoundRes = await fetch(`${BASE}/music/song/non_existent_id_9999`);
@@ -484,7 +504,30 @@ const runTests = async () => {
     if (songNotFoundJson.success !== false) {
       throw new Error(`Expected success: false for non-existent song, got ${JSON.stringify(songNotFoundJson)}`);
     }
-    console.log('✓ GET /api/music/song/:id Recovery Endpoint: PASSED (200 on valid ID, 404 on missing ID)');
+    console.log('✓ GET /api/music/song/:id Recovery Endpoint: PASSED (200 on valid ID, cache key has provider, fresh=1 bypasses cache, 404 on missing ID)');
+
+    // =========================================================================
+    // 14D. STREAMING PROXY SECURITY & HOST ALLOW-LIST TESTS
+    // =========================================================================
+    console.log('--- Testing /api/music/stream Security & Host Allowlist ---');
+    // When config.enableExternalStreams is false (default), requests must return 403 Forbidden
+    const streamForbiddenRes = await fetch(`${BASE}/music/stream?url=https://aac.saavncdn.com/test.mp4`);
+    if (streamForbiddenRes.status !== 403) {
+      throw new Error(`Expected 403 when ENABLE_EXTERNAL_STREAMS is false, got ${streamForbiddenRes.status}`);
+    }
+
+    // Temporarily enable stream proxy to test host allowlist enforcement
+    config.enableExternalStreams = true;
+    const streamSsrRes = await fetch(`${BASE}/music/stream?url=http://169.254.169.254/latest/meta-data/`);
+    if (streamSsrRes.status !== 403) {
+      throw new Error(`Expected 403 for SSRF internal IP host, got ${streamSsrRes.status}`);
+    }
+    const streamEvilRes = await fetch(`${BASE}/music/stream?url=https://evil.com/malicious.mp3`);
+    if (streamEvilRes.status !== 403) {
+      throw new Error(`Expected 403 for unlisted evil.com host, got ${streamEvilRes.status}`);
+    }
+    config.enableExternalStreams = false; // Restore to default false
+    console.log('✓ /api/music/stream Security: PASSED (disabled by default with 403, rejects non-allowlisted and internal hosts)');
 
     // Reset back to mock provider for remaining tests
     musicService.setProvider('mock');

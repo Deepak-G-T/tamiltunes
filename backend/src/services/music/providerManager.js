@@ -302,11 +302,15 @@ export class MusicProviderManager {
 
   /**
    * Get single track by ID (with 10-minute cache)
+   * If fresh=true, bypasses the cache and re-fetches from provider.
+   * Cache key includes active provider name: `song_${this.providerName}_${id}`.
    */
-  async getSong(id) {
+  async getSong(id, { fresh = false } = {}) {
     const cacheKey = `song_${this.providerName}_${id}`;
-    const cached = musicCache.get(cacheKey);
-    if (cached) return cached;
+    if (!fresh) {
+      const cached = musicCache.get(cacheKey);
+      if (cached) return cached;
+    }
 
     if (this.providerName === 'youtube' || (typeof id === 'string' && id.startsWith('yt_'))) {
       const ytSong = await this.providers.youtube.getSong(id);

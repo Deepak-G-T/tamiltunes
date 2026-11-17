@@ -1,5 +1,6 @@
 import { Readable } from 'stream';
 import { musicService } from '../services/music/providerManager.js';
+import { config } from '../config/env.js';
 
 export const getHomeFeed = async (req, res, next) => {
   try {
@@ -37,7 +38,8 @@ export const searchMusic = async (req, res, next) => {
 export const getSongById = async (req, res, next) => {
   try {
     const { id } = req.params;
-    const song = await musicService.getSong(id);
+    const fresh = req.query.fresh === '1' || req.query.fresh === 'true';
+    const song = await musicService.getSong(id, { fresh });
 
     if (!song) {
       return res.status(404).json({
@@ -99,9 +101,32 @@ export const getArtistById = async (req, res, next) => {
 
 export const proxyStream = async (req, res, next) => {
   try {
+    if (!config.enableExternalStreams) {
+      return res.status(403).json({
+        success: false,
+        error: 'Forbidden: External stream proxy is disabled. Set ENABLE_EXTERNAL_STREAMS=true to enable.'
+      });
+    }
+
     const { url } = req.query;
-    if (!url || !url.startsWith('http')) {
-      return res.status(400).send('Invalid audio URL');
+    if (!url || typeof url !== 'string' || !url.startsWith('http')) {
+      return res.status(400).json({ success: false, error: 'Invalid audio URL' });
+    }
+
+    let parsedUrl;
+    try {
+      parsedUrl = new URL(url);
+    } catch {
+      return res.status(400).json({ success: false, error: 'Malformed audio URL' });
+    }
+
+    // Host allowlist: only allow official CDN domains (e.g. *.saavncdn.com, saavncdn.com)
+    const ALLOWED_HOST_REGEX = /^(?:[a-zA-Z0-9-]+\.)*saavncdn\.com$/i;
+    if (!ALLOWED_HOST_REGEX.test(parsedUrl.hostname)) {
+      return res.status(403).json({
+        success: false,
+        error: `Forbidden: Host "${parsedUrl.hostname}" is not permitted for stream proxying.`
+      });
     }
 
     const headers = {
@@ -112,6 +137,17 @@ export const proxyStream = async (req, res, next) => {
     }
 
     const response = await fetch(url, { headers });
+
+    // Enforce size limit (max 50MB) to prevent buffer exhaustion and SSRF abuse
+    const contentLength = response.headers.get('content-length');
+    const MAX_STREAM_BYTES = 50 * 1024 * 1024; // 50MB
+    if (contentLength && parseInt(contentLength, 10) > MAX_STREAM_BYTES) {
+      return res.status(413).json({
+        success: false,
+        error: `Payload Too Large: Audio stream exceeds limit of ${MAX_STREAM_BYTES} bytes.`
+      });
+    }
+
     res.status(response.status);
 
     for (const [key, val] of response.headers.entries()) {
@@ -127,7 +163,7 @@ export const proxyStream = async (req, res, next) => {
     }
   } catch (err) {
     console.warn('Streaming proxy error:', err.message);
-    res.status(502).send('Streaming proxy error');
+    res.status(502).json({ success: false, error: 'Streaming proxy error' });
   }
 };
 

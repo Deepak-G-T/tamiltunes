@@ -110,7 +110,7 @@ describe('Stream Recovery by Song ID Unit Test', () => {
 
       song._hasRetriedFreshFetch = true;
       try {
-        const { data } = await api.get(`/music/song/${encodeURIComponent(song.id)}`);
+        const { data } = await api.get(`/music/song/${encodeURIComponent(song.id)}?fresh=1`);
         if (data?.data?.streamUrl) {
           song.streamUrl = data.data.streamUrl;
           return;
@@ -125,8 +125,8 @@ describe('Stream Recovery by Song ID Unit Test', () => {
 
     await handleExpiredStream(mockSong);
 
-    // Verify recovery queried GET /music/song/:id (NOT a title search query)
-    expect(songEndpointCalledWith).toBe('/music/song/tt_trending_expired_1');
+    // Verify recovery queried GET /music/song/:id?fresh=1 (NOT a title search query)
+    expect(songEndpointCalledWith).toBe('/music/song/tt_trending_expired_1?fresh=1');
     expect(mockSong._hasRetriedFreshFetch).toBe(true);
     expect(playbackErrorSet).toBe('Stream expired. Skipping to next track...');
     expect(nextTrackCalled).toBe(true);

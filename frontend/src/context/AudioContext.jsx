@@ -133,7 +133,7 @@ export const AudioProvider = ({ children }) => {
     }
   };
 
-  // Attempt to refresh expired stream URL by song ID (GET /api/music/song/:id)
+  // Attempt to refresh expired stream URL by song ID (GET /api/music/song/:id?fresh=1)
   const handleExpiredStream = async (song) => {
     if (!song || song._hasRetriedFreshFetch) {
       setPlaybackError('Stream unavailable or expired. Skipping to next track...');
@@ -145,8 +145,8 @@ export const AudioProvider = ({ children }) => {
 
     song._hasRetriedFreshFetch = true;
     try {
-      // Refetch strictly by song ID from /api/music/song/:id
-      const { data } = await api.get(`/music/song/${encodeURIComponent(song.id)}`);
+      // Refetch strictly by song ID from /api/music/song/:id with fresh=1 to bypass cache
+      const { data } = await api.get(`/music/song/${encodeURIComponent(song.id)}?fresh=1`);
       const refreshedSong = data.data || data;
 
       if (refreshedSong && refreshedSong.streamUrl && refreshedSong.streamUrl !== song.streamUrl) {
