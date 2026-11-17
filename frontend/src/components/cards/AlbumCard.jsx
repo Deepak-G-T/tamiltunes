@@ -10,7 +10,7 @@ const AlbumCard = ({ album }) => {
   return (
     <div
       onClick={() => navigate(`/album/${album.id}`)}
-      className="group relative bg-[#18181B] hover:bg-[#27272A] p-3 rounded-xl transition-all duration-200 cursor-pointer border border-zinc-800/40 hover:border-zinc-700/60 shadow-sm hover:shadow-xl select-none"
+      className="group relative bg-surface-2 hover:bg-surface-4 p-3 rounded-xl transition-all duration-200 cursor-pointer border border-zinc-800/40 hover:border-zinc-700/60 shadow-sm hover:shadow-xl select-none"
     >
       <div className="relative aspect-square w-full rounded-lg overflow-hidden mb-3 bg-zinc-900 shadow-inner">
         <img
@@ -24,13 +24,13 @@ const AlbumCard = ({ album }) => {
           }}
           className="w-full h-full object-cover transition-transform duration-300 group-hover:scale-105"
         />
-        <div className="absolute bottom-2 right-2 w-10 h-10 rounded-full bg-purple-600 hover:bg-purple-500 text-white flex items-center justify-center shadow-lg opacity-0 translate-y-2 group-hover:opacity-100 group-hover:translate-y-0 transition-all duration-200">
+        <div className="absolute bottom-2 right-2 w-10 h-10 rounded-full bg-brand-500 hover:bg-brand-400 text-black flex items-center justify-center shadow-lg opacity-0 translate-y-2 group-hover:opacity-100 group-hover:translate-y-0 transition-all duration-200">
           <Play className="w-5 h-5 ml-0.5" />
         </div>
       </div>
 
       <div className="min-w-0">
-        <h4 className="text-sm font-semibold text-white truncate group-hover:text-purple-400 transition-colors">
+        <h4 className="text-sm font-semibold text-white truncate group-hover:text-brand-400 transition-colors">
           {album.name || album.title}
         </h4>
         <p className="text-xs text-zinc-400 truncate mt-0.5">

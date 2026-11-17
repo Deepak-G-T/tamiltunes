@@ -25,7 +25,7 @@ const MainLayout = () => {
   }, []);
 
   return (
-    <div className="flex h-screen w-screen bg-[#09090B] text-white overflow-hidden">
+    <div className="flex h-screen w-screen bg-black text-white overflow-hidden">
       {/* Desktop Sidebar */}
       <div className="hidden md:flex flex-shrink-0 h-full">
         <Sidebar onOpenCreatePlaylist={() => setCreatePlaylistOpen(true)} />
@@ -38,7 +38,7 @@ const MainLayout = () => {
             className="fixed inset-0 bg-black/60 backdrop-blur-sm"
             onClick={() => setMobileSidebarOpen(false)}
           />
-          <div className="relative w-64 h-full bg-[#111114] z-10 shadow-2xl animate-in slide-in-from-left duration-200">
+          <div className="relative w-64 h-full bg-surface-1 z-10 shadow-2xl animate-in slide-in-from-left duration-200">
             <Sidebar
               onOpenCreatePlaylist={() => {
                 setMobileSidebarOpen(false);

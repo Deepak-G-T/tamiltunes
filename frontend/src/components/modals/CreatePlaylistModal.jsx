@@ -39,7 +39,7 @@ const CreatePlaylistModal = ({ isOpen, onClose, onCreated }) => {
 
   return (
     <div className="fixed inset-0 z-50 bg-black/70 backdrop-blur-sm flex items-center justify-center p-4">
-      <div className="bg-[#18181B] rounded-2xl border border-zinc-800 max-w-md w-full p-6 shadow-2xl relative animate-in fade-in zoom-in-95 duration-150">
+      <div className="bg-surface-2 rounded-2xl border border-zinc-800 max-w-md w-full p-6 shadow-2xl relative animate-in fade-in zoom-in-95 duration-150">
         <button
           onClick={onClose}
           className="absolute top-4 right-4 p-1.5 rounded-lg text-zinc-400 hover:text-white hover:bg-zinc-800 transition-colors"
@@ -48,7 +48,7 @@ const CreatePlaylistModal = ({ isOpen, onClose, onCreated }) => {
         </button>
 
         <div className="flex items-center gap-2.5 mb-5">
-          <div className="w-9 h-9 rounded-lg bg-purple-600/20 text-purple-400 flex items-center justify-center">
+          <div className="w-9 h-9 rounded-lg bg-brand-500/20 text-brand-400 flex items-center justify-center">
             <ListMusic className="w-5 h-5" />
           </div>
           <div>
@@ -74,7 +74,7 @@ const CreatePlaylistModal = ({ isOpen, onClose, onCreated }) => {
               placeholder="e.g., AR Rahman Melodies, Ilaiyaraaja 80s Hits"
               value={name}
               onChange={(e) => setName(e.target.value)}
-              className="w-full px-3.5 py-2.5 rounded-lg bg-zinc-900 border border-zinc-700/80 text-white text-sm focus:outline-none focus:border-purple-500 focus:ring-1 focus:ring-purple-500 placeholder-zinc-500"
+              className="w-full px-3.5 py-2.5 rounded-lg bg-zinc-900 border border-zinc-700/80 text-white text-sm focus:outline-none focus:border-brand-500 focus:ring-1 focus:ring-brand-500 placeholder-zinc-500"
             />
           </div>
 
@@ -87,7 +87,7 @@ const CreatePlaylistModal = ({ isOpen, onClose, onCreated }) => {
               placeholder="Add an optional description"
               value={description}
               onChange={(e) => setDescription(e.target.value)}
-              className="w-full px-3.5 py-2 rounded-lg bg-zinc-900 border border-zinc-700/80 text-white text-sm focus:outline-none focus:border-purple-500 focus:ring-1 focus:ring-purple-500 placeholder-zinc-500 resize-none"
+              className="w-full px-3.5 py-2 rounded-lg bg-zinc-900 border border-zinc-700/80 text-white text-sm focus:outline-none focus:border-brand-500 focus:ring-1 focus:ring-brand-500 placeholder-zinc-500 resize-none"
             />
           </div>
 
@@ -102,7 +102,7 @@ const CreatePlaylistModal = ({ isOpen, onClose, onCreated }) => {
             <button
               type="submit"
               disabled={loading}
-              className="px-5 py-2 rounded-lg bg-purple-600 hover:bg-purple-500 text-white text-xs font-semibold flex items-center gap-1.5 shadow-md shadow-purple-600/30 transition-all disabled:opacity-50"
+              className="px-5 py-2 rounded-lg bg-brand-500 hover:bg-brand-400 text-black text-xs font-semibold flex items-center gap-1.5 shadow-md shadow-brand-600/30 transition-all disabled:opacity-50"
             >
               {loading && <Loader2 className="w-3.5 h-3.5 animate-spin" />}
               <span>Create Playlist</span>

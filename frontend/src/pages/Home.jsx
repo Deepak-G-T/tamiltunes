@@ -112,15 +112,15 @@ const Home = () => {
   return (
     <div className="space-y-8 animate-in fade-in duration-300">
       {/* Hero Showcase Banner */}
-      <div className="relative rounded-2xl overflow-hidden bg-gradient-to-r from-purple-900/50 via-violet-950/40 to-zinc-900 border border-purple-500/20 p-6 md:p-10 shadow-2xl">
-        <div className="absolute top-0 right-0 -mr-16 -mt-16 w-80 h-80 rounded-full bg-purple-600/10 blur-3xl pointer-events-none" />
+      <div className="relative rounded-2xl overflow-hidden bg-gradient-to-r from-brand-900/50 via-brand-950/40 to-zinc-900 border border-brand-500/20 p-6 md:p-10 shadow-2xl">
+        <div className="absolute top-0 right-0 -mr-16 -mt-16 w-80 h-80 rounded-full bg-brand-500/10 blur-3xl pointer-events-none" />
         <div className="relative z-10 max-w-2xl">
-          <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-purple-500/20 text-purple-300 border border-purple-500/30 text-xs font-semibold uppercase tracking-wider mb-3">
-            <Sparkles className="w-3.5 h-3.5 text-purple-400" />
+          <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-brand-500/20 text-brand-300 border border-brand-500/30 text-xs font-semibold uppercase tracking-wider mb-3">
+            <Sparkles className="w-3.5 h-3.5 text-brand-400" />
             <span>Pure Tamil Audio & High Fidelity</span>
           </div>
           <h1 className="text-3xl md:text-5xl font-black text-white tracking-tight leading-tight mb-3">
-            Welcome to <span className="text-transparent bg-clip-text bg-gradient-to-r from-purple-400 to-violet-200">TamilTunes</span>
+            Welcome to <span className="text-transparent bg-clip-text bg-gradient-to-r from-brand-400 to-brand-200">TamilTunes</span>
           </h1>
           <p className="text-sm md:text-base text-zinc-300 leading-relaxed mb-6 font-normal">
             Stream your favorite Kollywood blockbusters, legendary 90s melodies, soulful acoustic instrumentals, and contemporary chartbusters. Completely ad-free.
@@ -129,9 +129,9 @@ const Home = () => {
             {homeData.trending?.[0] && (
               <button
                 onClick={() => playSong(homeData.trending[0], homeData.trending)}
-                className="px-6 py-3 rounded-full bg-purple-600 hover:bg-purple-500 text-white text-sm font-bold flex items-center gap-2 shadow-lg shadow-purple-600/40 hover:scale-105 active:scale-95 transition-all"
+                className="px-6 py-3 rounded-full bg-brand-500 hover:bg-brand-400 text-black text-sm font-bold flex items-center gap-2 shadow-lg shadow-brand-600/40 hover:scale-105 active:scale-95 transition-all"
               >
-                <Play className="w-4 h-4 fill-white" />
+                <Play className="w-4 h-4 fill-black" />
                 <span>Play Trending Now</span>
               </button>
             )}
@@ -154,7 +154,7 @@ const Home = () => {
             onClick={() => setActiveTab(cat.id)}
             className={`px-4 py-2 rounded-full text-xs font-semibold whitespace-nowrap transition-all ${
               activeTab === cat.id
-                ? 'bg-purple-600 text-white shadow-md shadow-purple-600/30'
+                ? 'bg-brand-500 text-black shadow-md shadow-brand-600/30'
                 : 'bg-zinc-800/70 text-zinc-300 hover:bg-zinc-800 hover:text-white'
             }`}
           >
@@ -173,7 +173,7 @@ const Home = () => {
             </div>
             <button
               onClick={() => navigate('/search?q=Tamil')}
-              className="text-xs font-semibold text-purple-400 hover:text-purple-300 flex items-center gap-1"
+              className="text-xs font-semibold text-brand-400 hover:text-brand-300 flex items-center gap-1"
             >
               <span>View All</span>
               <ArrowRight className="w-3.5 h-3.5" />
@@ -200,7 +200,7 @@ const Home = () => {
         <section>
           <div className="flex items-center justify-between mb-4">
             <div className="flex items-center gap-2">
-              <Disc className="w-5 h-5 text-violet-400" />
+              <Disc className="w-5 h-5 text-brand-400" />
               <h2 className="text-xl font-bold text-white tracking-tight">Popular Tamil Albums</h2>
             </div>
           </div>
@@ -218,7 +218,7 @@ const Home = () => {
         <section>
           <div className="flex items-center justify-between mb-4">
             <div className="flex items-center gap-2">
-              <Award className="w-5 h-5 text-purple-400" />
+              <Award className="w-5 h-5 text-brand-400" />
               <h2 className="text-xl font-bold text-white tracking-tight">Iconic Composers & Singers</h2>
             </div>
           </div>

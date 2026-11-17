@@ -29,7 +29,7 @@ const TopNav = ({ onToggleMobileSidebar }) => {
   }, []);
 
   return (
-    <header className="h-16 bg-[#09090B]/80 backdrop-blur-md sticky top-0 z-30 px-4 md:px-8 flex items-center justify-between border-b border-zinc-800/40">
+    <header className="h-16 bg-black/80 backdrop-blur-md sticky top-0 z-30 px-4 md:px-8 flex items-center justify-between border-b border-zinc-800/40">
       {/* Left controls: Back / Forward & Mobile menu */}
       <div className="flex items-center gap-2">
         <button
@@ -65,7 +65,7 @@ const TopNav = ({ onToggleMobileSidebar }) => {
               onClick={() => setDropdownOpen(!dropdownOpen)}
               className="flex items-center gap-2.5 p-1.5 pr-3 rounded-full bg-zinc-900 hover:bg-zinc-800 border border-zinc-800 transition-colors"
             >
-              <div className="w-7 h-7 rounded-full bg-gradient-to-tr from-purple-600 to-indigo-500 flex items-center justify-center text-xs font-bold text-white shadow-sm">
+              <div className="w-7 h-7 rounded-full bg-gradient-to-tr from-brand-600 to-brand-500 flex items-center justify-center text-xs font-bold text-white shadow-sm">
                 {user?.name ? user.name[0].toUpperCase() : 'U'}
               </div>
               <span className="text-xs font-medium text-zinc-200 max-w-[120px] truncate hidden sm:inline">
@@ -74,7 +74,7 @@ const TopNav = ({ onToggleMobileSidebar }) => {
             </button>
 
             {dropdownOpen && (
-              <div className="absolute right-0 mt-2 w-48 bg-[#18181B] rounded-xl shadow-2xl border border-zinc-800/80 py-1.5 z-50 animate-in fade-in zoom-in-95 duration-100">
+              <div className="absolute right-0 mt-2 w-48 bg-surface-2 rounded-xl shadow-2xl border border-zinc-800/80 py-1.5 z-50 animate-in fade-in zoom-in-95 duration-100">
                 <div className="px-4 py-2 border-b border-zinc-800/60">
                   <p className="text-xs font-semibold text-white truncate">{user?.name}</p>
                   <p className="text-[11px] text-zinc-400 truncate">{user?.email}</p>
@@ -124,7 +124,7 @@ const TopNav = ({ onToggleMobileSidebar }) => {
             </button>
             <button
               onClick={() => navigate('/signup')}
-              className="px-4 py-1.5 text-xs font-semibold text-white bg-purple-600 hover:bg-purple-500 rounded-full shadow-md shadow-purple-600/30 transition-all hover:scale-105"
+              className="px-4 py-1.5 text-xs font-semibold text-black bg-brand-500 hover:bg-brand-400 rounded-full shadow-md shadow-brand-600/30 transition-all hover:scale-105"
             >
               Sign Up
             </button>

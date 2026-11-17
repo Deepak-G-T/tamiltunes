@@ -21,7 +21,7 @@ const VideoModeToggle = ({ className = '', compact = false }) => {
         data-testid={`mode-${target}`}
         aria-label={target === 'video' ? 'Switch to video' : 'Switch to audio'}
         title={target === 'video' ? 'Watch video' : 'Audio only'}
-        className={`p-2 rounded-full text-purple-300 hover:text-white active:scale-90 transition-transform ${className}`}
+        className={`p-2 rounded-full text-brand-300 hover:text-white active:scale-90 transition-transform ${className}`}
       >
         <Icon className="w-4 h-4" />
       </button>
@@ -38,7 +38,7 @@ const VideoModeToggle = ({ className = '', compact = false }) => {
       aria-pressed={playbackMode === mode}
       data-testid={`mode-${mode}`}
       className={`flex items-center gap-1 px-3 py-1.5 text-xs font-semibold rounded-full transition-colors ${
-        playbackMode === mode ? 'bg-purple-600 text-white' : 'text-zinc-400 hover:text-white'
+        playbackMode === mode ? 'bg-brand-500 text-black' : 'text-zinc-400 hover:text-white'
       }`}
     >
       <Icon className="w-3.5 h-3.5" />

@@ -55,7 +55,7 @@ const AlbumDetail = () => {
   if (loading) {
     return (
       <div className="py-24 flex flex-col items-center justify-center text-zinc-400 gap-3">
-        <Loader2 className="w-8 h-8 text-purple-500 animate-spin" />
+        <Loader2 className="w-8 h-8 text-brand-500 animate-spin" />
         <p className="text-xs">Loading album tracks...</p>
       </div>
     );
@@ -99,7 +99,7 @@ const AlbumDetail = () => {
       </button>
 
       {/* Album Header */}
-      <div className="flex flex-col md:flex-row items-center md:items-end gap-6 bg-gradient-to-b from-purple-900/30 to-transparent p-6 rounded-2xl border border-zinc-800/60">
+      <div className="flex flex-col md:flex-row items-center md:items-end gap-6 bg-gradient-to-b from-brand-900/30 to-transparent p-6 rounded-2xl border border-zinc-800/60">
         <div className="w-44 h-44 sm:w-52 sm:h-52 rounded-xl overflow-hidden shadow-2xl flex-shrink-0 bg-zinc-800">
           <img
             src={album.image || 'https://images.unsplash.com/photo-1514525253161-7a46d19cd819?w=500&auto=format&fit=crop&q=80'}
@@ -114,7 +114,7 @@ const AlbumDetail = () => {
         </div>
 
         <div className="flex-1 text-center md:text-left space-y-2">
-          <span className="text-[11px] font-bold uppercase tracking-widest text-purple-400">
+          <span className="text-[11px] font-bold uppercase tracking-widest text-brand-400">
             Tamil Album
           </span>
           <h1 className="text-2xl sm:text-4xl font-extrabold text-white tracking-tight">
@@ -130,7 +130,7 @@ const AlbumDetail = () => {
           <div className="pt-2">
             <button
               onClick={handlePlayAlbum}
-              className="px-6 py-2.5 rounded-full bg-purple-600 hover:bg-purple-500 text-white text-xs font-bold flex items-center gap-2 shadow-lg shadow-purple-600/30 hover:scale-105 active:scale-95 transition-all mx-auto md:mx-0"
+              className="px-6 py-2.5 rounded-full bg-brand-500 hover:bg-brand-400 text-black text-xs font-bold flex items-center gap-2 shadow-lg shadow-brand-600/30 hover:scale-105 active:scale-95 transition-all mx-auto md:mx-0"
             >
               {isCurrentAlbumPlaying ? (
                 <>
@@ -139,7 +139,7 @@ const AlbumDetail = () => {
                 </>
               ) : (
                 <>
-                  <Play className="w-4 h-4 fill-white" />
+                  <Play className="w-4 h-4 fill-black" />
                   <span>Play All Songs</span>
                 </>
               )}
@@ -167,18 +167,18 @@ const AlbumDetail = () => {
               key={song.id || idx}
               onClick={() => playSong(song, album.songs)}
               className={`grid grid-cols-12 items-center px-4 py-3 rounded-lg hover:bg-zinc-800/50 cursor-pointer group transition-colors ${
-                isThisSong ? 'bg-purple-500/10 text-purple-400' : 'text-zinc-300'
+                isThisSong ? 'bg-brand-500/10 text-brand-400' : 'text-zinc-300'
               }`}
             >
               <div className="col-span-1 text-xs text-zinc-500 group-hover:hidden">
                 {idx + 1}
               </div>
               <div className="col-span-1 hidden group-hover:block">
-                <Play className="w-4 h-4 text-purple-400 fill-purple-400" />
+                <Play className="w-4 h-4 text-brand-400 fill-brand-400" />
               </div>
 
               <div className="col-span-6 sm:col-span-7 min-w-0 pr-2">
-                <p className={`text-sm font-semibold truncate ${isThisSong ? 'text-purple-400' : 'text-white'}`}>
+                <p className={`text-sm font-semibold truncate ${isThisSong ? 'text-brand-400' : 'text-white'}`}>
                   {song.title}
                 </p>
                 <p className="text-xs text-zinc-400 truncate mt-0.5">
@@ -197,7 +197,7 @@ const AlbumDetail = () => {
                     if (onOpenAddToPlaylist) onOpenAddToPlaylist(song);
                   }}
                   title="Add to playlist"
-                  className="opacity-0 group-hover:opacity-100 hover:text-purple-400 transition-opacity"
+                  className="opacity-0 group-hover:opacity-100 hover:text-brand-400 transition-opacity"
                 >
                   <PlusCircle className="w-4 h-4" />
                 </button>

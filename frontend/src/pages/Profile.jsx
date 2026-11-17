@@ -42,14 +42,14 @@ const Profile = () => {
   return (
     <div className="max-w-2xl mx-auto space-y-8 animate-in fade-in duration-300">
       {/* Profile Card */}
-      <div className="bg-[#18181B] rounded-2xl border border-zinc-800 p-6 md:p-8 shadow-xl">
+      <div className="bg-surface-2 rounded-2xl border border-zinc-800 p-6 md:p-8 shadow-xl">
         <div className="flex flex-col sm:flex-row items-center gap-6">
-          <div className="w-24 h-24 rounded-full bg-gradient-to-tr from-purple-600 to-indigo-500 flex items-center justify-center text-3xl font-black text-white shadow-xl shadow-purple-600/30">
+          <div className="w-24 h-24 rounded-full bg-gradient-to-tr from-brand-600 to-brand-500 flex items-center justify-center text-3xl font-black text-white shadow-xl shadow-brand-600/30">
             {user?.name ? user.name[0].toUpperCase() : 'U'}
           </div>
 
           <div className="flex-1 text-center sm:text-left space-y-1.5">
-            <div className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full bg-purple-500/10 text-purple-300 border border-purple-500/20 text-[11px] font-semibold">
+            <div className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full bg-brand-500/10 text-brand-300 border border-brand-500/20 text-[11px] font-semibold">
               <ShieldCheck className="w-3.5 h-3.5 text-emerald-400" />
               <span>Ad-Free Member</span>
             </div>
@@ -87,7 +87,7 @@ const Profile = () => {
             onClick={() => navigate('/')}
             className="p-4 rounded-xl bg-zinc-900/60 border border-zinc-800 text-center cursor-pointer hover:border-zinc-700 transition-colors"
           >
-            <ListMusic className="w-5 h-5 text-purple-400 mx-auto mb-1.5" />
+            <ListMusic className="w-5 h-5 text-brand-400 mx-auto mb-1.5" />
             <div className="text-xl font-bold text-white">{stats.playlists}</div>
             <div className="text-[11px] text-zinc-400 font-medium">Playlists</div>
           </div>

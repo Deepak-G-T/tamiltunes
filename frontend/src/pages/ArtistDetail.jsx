@@ -49,7 +49,7 @@ const ArtistDetail = () => {
   if (loading) {
     return (
       <div className="py-24 flex flex-col items-center justify-center text-zinc-400 gap-3">
-        <Loader2 className="w-8 h-8 text-purple-500 animate-spin" />
+        <Loader2 className="w-8 h-8 text-brand-500 animate-spin" />
         <p className="text-xs">Loading artist profile...</p>
       </div>
     );
@@ -87,8 +87,8 @@ const ArtistDetail = () => {
       </button>
 
       {/* Artist Hero Header */}
-      <div className="relative rounded-2xl overflow-hidden bg-gradient-to-r from-purple-950/60 to-zinc-900 border border-zinc-800 p-6 md:p-8 flex flex-col sm:flex-row items-center gap-6 shadow-2xl">
-        <div className="w-36 h-36 sm:w-44 sm:h-44 rounded-full overflow-hidden shadow-2xl border-2 border-purple-500/30 flex-shrink-0 bg-zinc-800">
+      <div className="relative rounded-2xl overflow-hidden bg-gradient-to-r from-brand-950/60 to-zinc-900 border border-zinc-800 p-6 md:p-8 flex flex-col sm:flex-row items-center gap-6 shadow-2xl">
+        <div className="w-36 h-36 sm:w-44 sm:h-44 rounded-full overflow-hidden shadow-2xl border-2 border-brand-500/30 flex-shrink-0 bg-zinc-800">
           <img
             src={artist.image || 'https://images.unsplash.com/photo-1511671782779-c97d3d27a1d4?w=500&auto=format&fit=crop&q=80'}
             alt={artist.name}
@@ -102,7 +102,7 @@ const ArtistDetail = () => {
         </div>
 
         <div className="flex-1 text-center sm:text-left space-y-2">
-          <span className="text-[11px] font-bold uppercase tracking-widest text-purple-400">
+          <span className="text-[11px] font-bold uppercase tracking-widest text-brand-400">
             Verified Tamil Artist
           </span>
           <h1 className="text-3xl sm:text-5xl font-black text-white tracking-tight">
@@ -115,9 +115,9 @@ const ArtistDetail = () => {
           <div className="pt-2">
             <button
               onClick={handlePlayTopTracks}
-              className="px-6 py-2.5 rounded-full bg-purple-600 hover:bg-purple-500 text-white text-xs font-bold flex items-center gap-2 shadow-lg shadow-purple-600/30 hover:scale-105 active:scale-95 transition-all mx-auto sm:mx-0"
+              className="px-6 py-2.5 rounded-full bg-brand-500 hover:bg-brand-400 text-black text-xs font-bold flex items-center gap-2 shadow-lg shadow-brand-600/30 hover:scale-105 active:scale-95 transition-all mx-auto sm:mx-0"
             >
-              <Play className="w-4 h-4 fill-white" />
+              <Play className="w-4 h-4 fill-black" />
               <span>Play Popular Tracks</span>
             </button>
           </div>
@@ -128,7 +128,7 @@ const ArtistDetail = () => {
       {artist.topSongs?.length > 0 && (
         <section>
           <div className="flex items-center gap-2 mb-4">
-            <Music2 className="w-5 h-5 text-purple-400" />
+            <Music2 className="w-5 h-5 text-brand-400" />
             <h2 className="text-xl font-bold text-white tracking-tight">Popular Songs</h2>
           </div>
 
@@ -149,7 +149,7 @@ const ArtistDetail = () => {
       {artist.albums?.length > 0 && (
         <section>
           <div className="flex items-center gap-2 mb-4">
-            <Disc className="w-5 h-5 text-violet-400" />
+            <Disc className="w-5 h-5 text-brand-400" />
             <h2 className="text-xl font-bold text-white tracking-tight">Discography & Albums</h2>
           </div>
 

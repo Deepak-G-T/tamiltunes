@@ -63,7 +63,7 @@ const FullScreenPlayer = ({ isOpen, onClose, onToggleFavorite, isFavorite }) => 
   const content = (
     <div
       style={{ zIndex: 99999 }}
-      className="fixed inset-0 bg-[#09090B] flex flex-col justify-between p-4 sm:p-8 select-none overflow-y-auto animate-in fade-in duration-200"
+      className="fixed inset-0 bg-black flex flex-col justify-between p-4 sm:p-8 select-none overflow-y-auto animate-in fade-in duration-200"
     >
       {/* Blurred ambient background effect */}
       <div
@@ -125,7 +125,7 @@ const FullScreenPlayer = ({ isOpen, onClose, onToggleFavorite, isFavorite }) => 
           />
           {isBuffering && (
             <div className="absolute inset-0 bg-black/40 backdrop-blur-sm flex items-center justify-center">
-              <div className="w-10 h-10 border-4 border-purple-500 border-t-transparent rounded-full animate-spin" />
+              <div className="w-10 h-10 border-4 border-brand-500 border-t-transparent rounded-full animate-spin" />
             </div>
           )}
         </div>
@@ -143,7 +143,7 @@ const FullScreenPlayer = ({ isOpen, onClose, onToggleFavorite, isFavorite }) => 
               {currentSong.artist || currentSong.singers}
             </p>
             {currentSong.album && (
-              <p className="text-xs text-purple-400/80 truncate mt-0.5">
+              <p className="text-xs text-brand-400/80 truncate mt-0.5">
                 {currentSong.album}
               </p>
             )}
@@ -193,8 +193,8 @@ const FullScreenPlayer = ({ isOpen, onClose, onToggleFavorite, isFavorite }) => 
           <button
             onClick={toggleShuffle}
             aria-label={`Shuffle ${isShuffle ? 'On' : 'Off'}`}
-            className={`p-2.5 transition-colors active:scale-90 focus-visible:ring-2 focus-visible:ring-purple-500 focus-visible:outline-none ${
-              isShuffle ? 'text-purple-400' : 'text-zinc-500 hover:text-white'
+            className={`p-2.5 transition-colors active:scale-90 focus-visible:ring-2 focus-visible:ring-brand-500 focus-visible:outline-none ${
+              isShuffle ? 'text-brand-400' : 'text-zinc-500 hover:text-white'
             }`}
           >
             <Shuffle className="w-5 h-5" />
@@ -203,7 +203,7 @@ const FullScreenPlayer = ({ isOpen, onClose, onToggleFavorite, isFavorite }) => 
           <button
             onClick={previousTrack}
             aria-label="Previous track"
-            className="p-2.5 text-zinc-300 hover:text-white active:scale-90 focus-visible:ring-2 focus-visible:ring-purple-500 focus-visible:outline-none transition-all"
+            className="p-2.5 text-zinc-300 hover:text-white active:scale-90 focus-visible:ring-2 focus-visible:ring-brand-500 focus-visible:outline-none transition-all"
           >
             <SkipBack className="w-7 h-7" />
           </button>
@@ -211,7 +211,9 @@ const FullScreenPlayer = ({ isOpen, onClose, onToggleFavorite, isFavorite }) => 
           <button
             onClick={togglePlay}
             aria-label={isPlaying ? 'Pause' : 'Play'}
-            className="w-16 h-16 rounded-full bg-purple-600 hover:bg-purple-500 text-white flex items-center justify-center shadow-lg shadow-purple-600/40 hover:scale-105 active:scale-95 focus-visible:ring-2 focus-visible:ring-purple-400 focus-visible:outline-none transition-all"
+            data-testid="fs-play"
+            aria-label={isPlaying ? 'Pause' : 'Play'}
+            className="w-16 h-16 rounded-full bg-brand-500 hover:bg-brand-400 text-black flex items-center justify-center shadow-lg shadow-brand-600/40 hover:scale-105 active:scale-95 focus-visible:ring-2 focus-visible:ring-brand-400 focus-visible:outline-none transition-all"
           >
             {isPlaying ? <Pause className="w-7 h-7" /> : <Play className="w-7 h-7 ml-1" />}
           </button>
@@ -219,7 +221,7 @@ const FullScreenPlayer = ({ isOpen, onClose, onToggleFavorite, isFavorite }) => 
           <button
             onClick={nextTrack}
             aria-label="Next track"
-            className="p-2.5 text-zinc-300 hover:text-white active:scale-90 focus-visible:ring-2 focus-visible:ring-purple-500 focus-visible:outline-none transition-all"
+            className="p-2.5 text-zinc-300 hover:text-white active:scale-90 focus-visible:ring-2 focus-visible:ring-brand-500 focus-visible:outline-none transition-all"
           >
             <SkipForward className="w-7 h-7" />
           </button>
@@ -227,8 +229,8 @@ const FullScreenPlayer = ({ isOpen, onClose, onToggleFavorite, isFavorite }) => 
           <button
             onClick={toggleRepeat}
             aria-label={`Repeat: ${repeatMode}`}
-            className={`p-2.5 transition-colors active:scale-90 focus-visible:ring-2 focus-visible:ring-purple-500 focus-visible:outline-none ${
-              repeatMode !== 'off' ? 'text-purple-400' : 'text-zinc-500 hover:text-white'
+            className={`p-2.5 transition-colors active:scale-90 focus-visible:ring-2 focus-visible:ring-brand-500 focus-visible:outline-none ${
+              repeatMode !== 'off' ? 'text-brand-400' : 'text-zinc-500 hover:text-white'
             }`}
           >
             {repeatMode === 'one' ? <Repeat1 className="w-5 h-5" /> : <Repeat className="w-5 h-5" />}

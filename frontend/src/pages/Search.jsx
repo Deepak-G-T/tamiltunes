@@ -121,14 +121,14 @@ const Search = () => {
       {/* Search Input Bar */}
       <div className="relative max-w-2xl">
         <div className="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none text-zinc-400">
-          <SearchIcon className="w-5 h-5 text-purple-400" />
+          <SearchIcon className="w-5 h-5 text-brand-400" />
         </div>
         <input
           type="text"
           value={searchTerm}
           onChange={(e) => setSearchTerm(e.target.value)}
           placeholder="Search Tamil songs, movies, singers, music directors, albums..."
-          className="w-full pl-12 pr-10 py-3.5 rounded-full bg-[#18181B] border border-zinc-700/80 text-white placeholder-zinc-500 text-sm focus:outline-none focus:border-purple-500 focus:ring-2 focus:ring-purple-500/20 shadow-lg transition-all"
+          className="w-full pl-12 pr-10 py-3.5 rounded-full bg-surface-2 border border-zinc-700/80 text-white placeholder-zinc-500 text-sm focus:outline-none focus:border-brand-500 focus:ring-2 focus:ring-brand-500/20 shadow-lg transition-all"
         />
         {searchTerm && (
           <button
@@ -149,7 +149,7 @@ const Search = () => {
               onClick={() => setActiveFilter(tab)}
               className={`px-4 py-1.5 rounded-full text-xs font-semibold capitalize transition-all ${
                 activeFilter === tab
-                  ? 'bg-purple-600 text-white shadow-md shadow-purple-600/30'
+                  ? 'bg-brand-500 text-black shadow-md shadow-brand-600/30'
                   : 'bg-zinc-800 text-zinc-400 hover:text-white hover:bg-zinc-700'
               }`}
             >
@@ -162,7 +162,7 @@ const Search = () => {
       {/* Loading state */}
       {loading && (
         <div className="py-16 flex flex-col items-center justify-center text-zinc-400 gap-3">
-          <Loader2 className="w-8 h-8 text-purple-500 animate-spin" />
+          <Loader2 className="w-8 h-8 text-brand-500 animate-spin" />
           <p className="text-xs">Searching Tamil catalog...</p>
         </div>
       )}
@@ -181,7 +181,7 @@ const Search = () => {
           {(activeFilter === 'all' || activeFilter === 'songs') && results.songs?.length > 0 && (
             <div>
               <div className="flex items-center gap-2 mb-3">
-                <Music className="w-4 h-4 text-purple-400" />
+                <Music className="w-4 h-4 text-brand-400" />
                 <h3 className="text-base font-bold text-white">Songs</h3>
               </div>
               <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-4">
@@ -201,7 +201,7 @@ const Search = () => {
           {(activeFilter === 'all' || activeFilter === 'albums') && results.albums?.length > 0 && (
             <div>
               <div className="flex items-center gap-2 mb-3">
-                <Disc className="w-4 h-4 text-violet-400" />
+                <Disc className="w-4 h-4 text-brand-400" />
                 <h3 className="text-base font-bold text-white">Albums</h3>
               </div>
               <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-4">
@@ -270,7 +270,7 @@ const Search = () => {
 
           <div>
             <div className="flex items-center gap-2 mb-3 text-xs font-semibold text-zinc-400 uppercase tracking-wider">
-              <Sparkles className="w-3.5 h-3.5 text-purple-400" />
+              <Sparkles className="w-3.5 h-3.5 text-brand-400" />
               <span>Trending Searches</span>
             </div>
             <div className="flex flex-wrap gap-2">
@@ -278,7 +278,7 @@ const Search = () => {
                 <button
                   key={idx}
                   onClick={() => setSearchTerm(term)}
-                  className="px-3.5 py-1.5 rounded-full bg-zinc-900 hover:bg-purple-600 hover:text-white border border-zinc-800 text-xs text-zinc-300 transition-all"
+                  className="px-3.5 py-1.5 rounded-full bg-zinc-900 hover:bg-brand-500 hover:text-black border border-zinc-800 text-xs text-zinc-300 transition-all"
                 >
                   {term}
                 </button>

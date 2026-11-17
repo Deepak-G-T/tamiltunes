@@ -68,7 +68,7 @@ const AddToPlaylistModal = ({ isOpen, onClose, song, onOpenCreatePlaylist }) => 
 
   return (
     <div className="fixed inset-0 z-50 bg-black/70 backdrop-blur-sm flex items-center justify-center p-4">
-      <div className="bg-[#18181B] rounded-2xl border border-zinc-800 max-w-sm w-full p-5 shadow-2xl relative animate-in fade-in zoom-in-95 duration-150">
+      <div className="bg-surface-2 rounded-2xl border border-zinc-800 max-w-sm w-full p-5 shadow-2xl relative animate-in fade-in zoom-in-95 duration-150">
         <button
           onClick={onClose}
           className="absolute top-4 right-4 p-1.5 rounded-lg text-zinc-400 hover:text-white hover:bg-zinc-800 transition-colors"
@@ -78,12 +78,12 @@ const AddToPlaylistModal = ({ isOpen, onClose, song, onOpenCreatePlaylist }) => 
 
         <h3 className="text-sm font-bold text-white mb-1">Add to Playlist</h3>
         <p className="text-xs text-zinc-400 truncate mb-4">
-          Song: <span className="text-purple-400 font-medium">{song.title}</span>
+          Song: <span className="text-brand-400 font-medium">{song.title}</span>
         </p>
 
         {loading ? (
           <div className="py-8 flex justify-center">
-            <Loader2 className="w-6 h-6 text-purple-500 animate-spin" />
+            <Loader2 className="w-6 h-6 text-brand-500 animate-spin" />
           </div>
         ) : playlists.length === 0 ? (
           <div className="py-6 text-center">
@@ -93,7 +93,7 @@ const AddToPlaylistModal = ({ isOpen, onClose, song, onOpenCreatePlaylist }) => 
                 onClose();
                 onOpenCreatePlaylist();
               }}
-              className="px-4 py-2 bg-purple-600 hover:bg-purple-500 text-white text-xs font-semibold rounded-lg shadow transition-colors inline-flex items-center gap-1.5"
+              className="px-4 py-2 bg-brand-500 hover:bg-brand-400 text-black text-xs font-semibold rounded-lg shadow transition-colors inline-flex items-center gap-1.5"
             >
               <Plus className="w-3.5 h-3.5" />
               <span>Create First Playlist</span>
@@ -121,7 +121,7 @@ const AddToPlaylistModal = ({ isOpen, onClose, song, onOpenCreatePlaylist }) => 
                     className={`px-3 py-1 rounded text-xs font-semibold transition-all flex items-center gap-1 ${
                       isAdded
                         ? 'bg-emerald-500/20 text-emerald-300 border border-emerald-500/30'
-                        : 'bg-zinc-800 hover:bg-purple-600 text-zinc-300 hover:text-white'
+                        : 'bg-zinc-800 hover:bg-brand-500 text-zinc-300 hover:text-black'
                     }`}
                   >
                     {isBusy ? (
@@ -147,7 +147,7 @@ const AddToPlaylistModal = ({ isOpen, onClose, song, onOpenCreatePlaylist }) => 
               onClose();
               onOpenCreatePlaylist();
             }}
-            className="text-xs text-purple-400 hover:text-purple-300 font-semibold flex items-center gap-1"
+            className="text-xs text-brand-400 hover:text-brand-300 font-semibold flex items-center gap-1"
           >
             <Plus className="w-3.5 h-3.5" />
             <span>New Playlist</span>

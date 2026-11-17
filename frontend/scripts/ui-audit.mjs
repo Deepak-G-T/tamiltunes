@@ -189,7 +189,7 @@ async function runViewport(browser, width, height) {
   await page.screenshot({ path: path.join(OUT, `fullscreen-video-${tag}.png`) });
 
   // 7. error 101 -> fall back to audio + toast, toggle hidden for that song, nothing playing
-  await page.locator('button.w-16.h-16').click(); // full-screen play button
+  await page.locator('[data-testid=fs-play]').click(); // full-screen play button
   await page.waitForTimeout(300);
   await page.evaluate(() => window.__ytFail(101));
   await page.waitForSelector('[data-testid=toast]', { timeout: 3000 });

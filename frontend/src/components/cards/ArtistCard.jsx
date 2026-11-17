@@ -10,7 +10,7 @@ const ArtistCard = ({ artist }) => {
   return (
     <div
       onClick={() => navigate(`/artist/${artist.id || encodeURIComponent(artist.name)}`)}
-      className="group relative bg-[#18181B] hover:bg-[#27272A] p-4 rounded-xl transition-all duration-200 cursor-pointer border border-zinc-800/40 hover:border-zinc-700/60 shadow-sm hover:shadow-xl flex flex-col items-center text-center select-none"
+      className="group relative bg-surface-2 hover:bg-surface-4 p-4 rounded-xl transition-all duration-200 cursor-pointer border border-zinc-800/40 hover:border-zinc-700/60 shadow-sm hover:shadow-xl flex flex-col items-center text-center select-none"
     >
       <div className="relative w-28 h-28 sm:w-32 sm:h-32 rounded-full overflow-hidden mb-3 bg-zinc-900 shadow-lg">
         <img
@@ -26,7 +26,7 @@ const ArtistCard = ({ artist }) => {
         />
       </div>
 
-      <h4 className="text-sm font-semibold text-white truncate w-full group-hover:text-purple-400 transition-colors">
+      <h4 className="text-sm font-semibold text-white truncate w-full group-hover:text-brand-400 transition-colors">
         {artist.name}
       </h4>
       <p className="text-xs text-zinc-400 capitalize mt-0.5">

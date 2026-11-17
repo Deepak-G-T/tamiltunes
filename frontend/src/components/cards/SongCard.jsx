@@ -22,7 +22,7 @@ const SongCard = ({ song, playlist, onAddToPlaylist, onToggleFavorite, isFavorit
       onClick={() => {
         if (!isCurrent) playSong(song, playlist);
       }}
-      className="group relative bg-[#18181B] hover:bg-[#27272A] p-3 rounded-xl transition-all duration-200 cursor-pointer border border-zinc-800/40 hover:border-zinc-700/60 shadow-sm hover:shadow-xl select-none"
+      className="group relative bg-surface-2 hover:bg-surface-4 p-3 rounded-xl transition-all duration-200 cursor-pointer border border-zinc-800/40 hover:border-zinc-700/60 shadow-sm hover:shadow-xl select-none"
     >
       {/* Artwork */}
       <div className="relative aspect-square w-full rounded-lg overflow-hidden mb-3 bg-zinc-900 shadow-inner">
@@ -42,7 +42,7 @@ const SongCard = ({ song, playlist, onAddToPlaylist, onToggleFavorite, isFavorit
         <button
           onClick={handlePlayClick}
           title={isCurrent && isPlaying ? 'Pause' : 'Play'}
-          className={`absolute bottom-2 right-2 w-10 h-10 rounded-full bg-purple-600 hover:bg-purple-500 text-white flex items-center justify-center shadow-lg shadow-purple-900/50 transition-all duration-200 transform ${
+          className={`absolute bottom-2 right-2 w-10 h-10 rounded-full bg-brand-500 hover:bg-brand-400 text-black flex items-center justify-center shadow-lg shadow-brand-900/50 transition-all duration-200 transform ${
             isCurrent
               ? 'opacity-100 scale-100'
               : 'opacity-0 translate-y-2 group-hover:opacity-100 group-hover:translate-y-0 scale-95 hover:scale-105'
@@ -58,7 +58,7 @@ const SongCard = ({ song, playlist, onAddToPlaylist, onToggleFavorite, isFavorit
 
       {/* Info */}
       <div className="min-w-0">
-        <h4 className={`text-sm font-semibold truncate ${isCurrent ? 'text-purple-400' : 'text-white'}`}>
+        <h4 className={`text-sm font-semibold truncate ${isCurrent ? 'text-brand-400' : 'text-white'}`}>
           {song.title}
         </h4>
         <p className="text-xs text-zinc-400 truncate mt-0.5">
@@ -87,7 +87,7 @@ const SongCard = ({ song, playlist, onAddToPlaylist, onToggleFavorite, isFavorit
             <button
               onClick={() => onAddToPlaylist(song)}
               title="Add to playlist"
-              className="p-1 hover:text-purple-400 transition-colors"
+              className="p-1 hover:text-brand-400 transition-colors"
             >
               <PlusCircle className="w-3.5 h-3.5" />
             </button>

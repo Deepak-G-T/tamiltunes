@@ -31,7 +31,7 @@ const MiniPlayer = () => {
   return (
     <div className="md:hidden fixed bottom-16 left-0 right-0 z-40 px-2 pb-1 pointer-events-auto">
       <div
-        className="bg-[#18181B]/95 backdrop-blur-md rounded-xl p-2.5 border border-zinc-800/80 shadow-2xl flex items-center justify-between cursor-pointer active:scale-[0.98] transition-transform select-none touch-manipulation"
+        className="bg-surface-2/95 backdrop-blur-md rounded-xl p-2.5 border border-zinc-800/80 shadow-2xl flex items-center justify-between cursor-pointer active:scale-[0.98] transition-transform select-none touch-manipulation"
         onClick={handleOpenFull}
         role="button"
         tabIndex={0}
@@ -64,15 +64,15 @@ const MiniPlayer = () => {
           <VideoModeToggle compact />
           <button
             onClick={togglePlay}
-            className="w-9 h-9 rounded-full bg-purple-600 hover:bg-purple-500 text-white flex items-center justify-center shadow-md active:scale-90 transition-transform"
+            className="w-9 h-9 rounded-full bg-brand-500 hover:bg-brand-400 text-black flex items-center justify-center shadow-md active:scale-90 transition-transform"
             aria-label={isPlaying ? 'Pause' : 'Play'}
           >
             {isBuffering ? (
               <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
             ) : isPlaying ? (
-              <Pause className="w-4 h-4 fill-white" />
+              <Pause className="w-4 h-4 fill-black" />
             ) : (
-              <Play className="w-4 h-4 fill-white ml-0.5" />
+              <Play className="w-4 h-4 fill-black ml-0.5" />
             )}
           </button>
 
@@ -86,7 +86,7 @@ const MiniPlayer = () => {
 
           <button
             onClick={handleOpenFull}
-            className="p-1.5 text-purple-400 hover:text-purple-300 active:scale-90 transition-transform"
+            className="p-1.5 text-brand-400 hover:text-brand-300 active:scale-90 transition-transform"
             title="Expand player"
             aria-label="Expand player"
           >
@@ -98,7 +98,7 @@ const MiniPlayer = () => {
       {/* Mini bottom progress bar */}
       <div className="w-full h-0.5 bg-zinc-800 rounded-full overflow-hidden mt-0.5">
         <div
-          className="h-full bg-purple-500 transition-all duration-100"
+          className="h-full bg-brand-500 transition-all duration-100"
           style={{ width: `${progressPercent}%` }}
         />
       </div>

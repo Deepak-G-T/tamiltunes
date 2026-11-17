@@ -44,22 +44,22 @@ const Sidebar = ({ onOpenCreatePlaylist }) => {
   const navLinkClass = ({ isActive }) =>
     `flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-all duration-200 ${
       isActive
-        ? 'bg-purple-600/15 text-purple-400 font-semibold border-l-2 border-purple-500'
+        ? 'bg-brand-500/15 text-brand-400 font-semibold border-l-2 border-brand-500'
         : 'text-zinc-400 hover:text-white hover:bg-zinc-800/40'
     }`;
 
   return (
-    <aside className="w-64 bg-[#111114] border-r border-zinc-800/60 flex flex-col h-full select-none">
+    <aside className="w-64 bg-surface-1 border-r border-zinc-800/60 flex flex-col h-full select-none">
       {/* Brand Header */}
       <div className="p-5 flex items-center justify-between">
         <NavLink to="/" className="flex items-center gap-2.5 group">
-          <div className="w-10 h-10 rounded-xl bg-gradient-to-tr from-purple-600 to-violet-400 flex items-center justify-center shadow-lg shadow-purple-600/25 group-hover:scale-105 transition-transform duration-200">
+          <div className="w-10 h-10 rounded-xl bg-gradient-to-tr from-brand-600 to-brand-400 flex items-center justify-center shadow-lg shadow-brand-600/25 group-hover:scale-105 transition-transform duration-200">
             <Music2 className="w-5 h-5 text-white" />
           </div>
           <div>
             <div className="flex items-center gap-1.5">
               <span className="font-bold text-lg text-white tracking-tight">TamilTunes</span>
-              <span className="text-[10px] uppercase font-bold tracking-wider px-1.5 py-0.5 rounded bg-purple-500/20 text-purple-300 border border-purple-500/30">தமிழ்</span>
+              <span className="text-[10px] uppercase font-bold tracking-wider px-1.5 py-0.5 rounded bg-brand-500/20 text-brand-300 border border-brand-500/30">தமிழ்</span>
             </div>
             <p className="text-[11px] text-zinc-400">Pure Tamil Streaming</p>
           </div>
@@ -130,7 +130,7 @@ const Sidebar = ({ onOpenCreatePlaylist }) => {
                     className={({ isActive }) =>
                       `flex items-center gap-2.5 px-3 py-1.5 rounded-md text-xs font-medium transition-colors ${
                         isActive
-                          ? 'text-purple-400 bg-purple-500/10'
+                          ? 'text-brand-400 bg-brand-500/10'
                           : 'text-zinc-400 hover:text-white hover:bg-zinc-800/30'
                       }`
                     }
@@ -146,7 +146,7 @@ const Sidebar = ({ onOpenCreatePlaylist }) => {
       </div>
 
       {/* Trust & License Footer */}
-      <div className="p-3 m-3 bg-[#18181B] rounded-xl border border-zinc-800/80">
+      <div className="p-3 m-3 bg-surface-2 rounded-xl border border-zinc-800/80">
         <div className="flex items-center gap-2 text-xs font-medium text-emerald-400 mb-1">
           <ShieldCheck className="w-4 h-4 text-emerald-400" />
           <span>Zero Ads & Compliant</span>

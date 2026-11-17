@@ -16,11 +16,11 @@ const QueueDrawer = ({ isOpen, onClose }) => {
   if (!isOpen) return null;
 
   return (
-    <div className="fixed inset-y-0 right-0 w-80 sm:w-96 bg-[#111114] border-l border-zinc-800/80 shadow-2xl z-50 flex flex-col animate-in slide-in-from-right duration-200">
+    <div className="fixed inset-y-0 right-0 w-80 sm:w-96 bg-surface-1 border-l border-zinc-800/80 shadow-2xl z-50 flex flex-col animate-in slide-in-from-right duration-200">
       {/* Header */}
       <div className="p-4 border-b border-zinc-800/80 flex items-center justify-between">
         <div className="flex items-center gap-2">
-          <Music className="w-4 h-4 text-purple-400" />
+          <Music className="w-4 h-4 text-brand-400" />
           <h3 className="font-semibold text-sm text-white">Play Queue</h3>
           <span className="text-xs text-zinc-500">({queue.length} tracks)</span>
         </div>
@@ -49,10 +49,10 @@ const QueueDrawer = ({ isOpen, onClose }) => {
         {/* Currently Playing Card */}
         {currentSong && (
           <div>
-            <h4 className="text-[11px] uppercase tracking-wider font-semibold text-purple-400 mb-2 px-1">
+            <h4 className="text-[11px] uppercase tracking-wider font-semibold text-brand-400 mb-2 px-1">
               Now Playing
             </h4>
-            <div className="flex items-center gap-3 p-2 rounded-xl bg-purple-950/20 border border-purple-500/20">
+            <div className="flex items-center gap-3 p-2 rounded-xl bg-brand-950/20 border border-brand-500/20">
               <img
                 src={currentSong.image || 'https://images.unsplash.com/photo-1511671782779-c97d3d27a1d4?w=100&auto=format&fit=crop&q=80'}
                 alt={currentSong.title}
@@ -60,9 +60,9 @@ const QueueDrawer = ({ isOpen, onClose }) => {
               />
               <div className="flex-1 min-w-0">
                 <p className="text-sm font-semibold text-white truncate">{currentSong.title}</p>
-                <p className="text-xs text-purple-300 truncate">{currentSong.artist || currentSong.singers}</p>
+                <p className="text-xs text-brand-300 truncate">{currentSong.artist || currentSong.singers}</p>
               </div>
-              <div className="w-2 h-2 rounded-full bg-purple-500 animate-pulse mr-2" />
+              <div className="w-2 h-2 rounded-full bg-brand-500 animate-pulse mr-2" />
             </div>
           </div>
         )}
@@ -85,7 +85,7 @@ const QueueDrawer = ({ isOpen, onClose }) => {
                     key={`${song.id}-${idx}`}
                     className={`flex items-center justify-between p-2 rounded-lg group transition-colors ${
                       isCurrent
-                        ? 'bg-zinc-800/60 border border-purple-500/30'
+                        ? 'bg-zinc-800/60 border border-brand-500/30'
                         : 'hover:bg-zinc-800/30'
                     }`}
                   >
@@ -99,7 +99,7 @@ const QueueDrawer = ({ isOpen, onClose }) => {
                         className="w-9 h-9 rounded-md object-cover"
                       />
                       <div className="flex-1 min-w-0">
-                        <p className={`text-xs font-medium truncate ${isCurrent ? 'text-purple-400 font-semibold' : 'text-zinc-200'}`}>
+                        <p className={`text-xs font-medium truncate ${isCurrent ? 'text-brand-400 font-semibold' : 'text-zinc-200'}`}>
                           {song.title}
                         </p>
                         <p className="text-[11px] text-zinc-400 truncate">

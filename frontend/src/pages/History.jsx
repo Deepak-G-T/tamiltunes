@@ -95,7 +95,7 @@ const History = () => {
   if (!isAuthenticated) {
     return (
       <div className="py-20 text-center max-w-md mx-auto space-y-4 animate-in fade-in">
-        <div className="w-16 h-16 rounded-full bg-purple-600/20 text-purple-400 flex items-center justify-center mx-auto">
+        <div className="w-16 h-16 rounded-full bg-brand-500/20 text-brand-400 flex items-center justify-center mx-auto">
           <HistoryIcon className="w-8 h-8 text-sky-400" />
         </div>
         <h2 className="text-xl font-bold text-white">Listening History</h2>
@@ -104,7 +104,7 @@ const History = () => {
         </p>
         <button
           onClick={() => navigate('/login')}
-          className="px-6 py-2.5 rounded-full bg-purple-600 hover:bg-purple-500 text-white text-xs font-bold shadow-lg transition-all"
+          className="px-6 py-2.5 rounded-full bg-brand-500 hover:bg-brand-400 text-black text-xs font-bold shadow-lg transition-all"
         >
           Sign In
         </button>
@@ -115,7 +115,7 @@ const History = () => {
   if (loading) {
     return (
       <div className="py-24 flex flex-col items-center justify-center text-zinc-400 gap-3">
-        <Loader2 className="w-8 h-8 text-purple-500 animate-spin" />
+        <Loader2 className="w-8 h-8 text-brand-500 animate-spin" />
         <p className="text-xs">Loading listening history...</p>
       </div>
     );
@@ -157,7 +157,7 @@ const History = () => {
                 key={item.id || idx}
                 onClick={() => playSong(song, songsList)}
                 className={`flex items-center justify-between p-3 rounded-xl hover:bg-zinc-800/40 cursor-pointer group transition-colors ${
-                  isThisSong ? 'bg-purple-500/10 border border-purple-500/20' : ''
+                  isThisSong ? 'bg-brand-500/10 border border-brand-500/20' : ''
                 }`}
               >
                 <div className="flex items-center gap-3 min-w-0 flex-1">
@@ -174,7 +174,7 @@ const History = () => {
                   </div>
 
                   <div className="min-w-0 flex-1">
-                    <h4 className={`text-sm font-semibold truncate ${isThisSong ? 'text-purple-400' : 'text-white'}`}>
+                    <h4 className={`text-sm font-semibold truncate ${isThisSong ? 'text-brand-400' : 'text-white'}`}>
                       {song.title}
                     </h4>
                     <p className="text-xs text-zinc-400 truncate mt-0.5">
@@ -199,7 +199,7 @@ const History = () => {
             disabled={loadingMore}
             className="px-6 py-2 rounded-full bg-zinc-800 hover:bg-zinc-700 text-zinc-300 hover:text-white text-xs font-semibold transition-all inline-flex items-center gap-2 border border-zinc-700/60"
           >
-            {loadingMore && <Loader2 className="w-3.5 h-3.5 animate-spin text-purple-400" />}
+            {loadingMore && <Loader2 className="w-3.5 h-3.5 animate-spin text-brand-400" />}
             <span>{loadingMore ? 'Loading more...' : 'Load more history'}</span>
           </button>
         </div>
