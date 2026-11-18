@@ -8,7 +8,7 @@
     "start": "node src/index.js",
     "build": "prisma generate",
     "dev": "nodemon src/index.js",
-    "test": "node test/api.test.js && node test/golden.test.js && node test/stream.test.js && node test/config.test.js && node test/video.test.js && node test/community.test.js && node test/community-api.test.js",
+    "test": "node test/api.test.js && node test/golden.test.js && node test/stream.test.js && node test/config.test.js && node test/video.test.js && node test/community.test.js && node test/community-api.test.js && node test/related.test.js && node test/related-api.test.js",
     "test:golden": "node test/golden.test.js",
     "seed": "node src/prisma/seed.js",
     "seed:community": "node src/prisma/seedCommunity.js",

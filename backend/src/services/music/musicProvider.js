@@ -47,6 +47,16 @@ export class MusicProvider {
     return null;
   }
 
+  /**
+   * Songs the provider itself considers related to this one ("radio" candidates). Optional: default none.
+   * @param {string} id Song ID
+   * @param {number} limit Maximum songs to return
+   * @returns {Promise<Array>} Standardized song objects
+   */
+  async getRecommendations(id, limit = 30) {
+    return [];
+  }
+
   async healthCheck() {
     return { status: 'healthy', provider: this.name };
   }

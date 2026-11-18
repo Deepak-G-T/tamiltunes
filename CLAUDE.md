@@ -82,3 +82,8 @@ Songs may carry an optional `videoId`. It comes from the curated map `backend/sr
 - Verified on real PostgreSQL (Neon): the Prisma store and the migration. UNTESTED: `frontend/api/og.js` + the bot rewrite on Vercel, real-phone crop/gestures.
 - `npm run test:ui` runs two suites; the older `runPlaywrightAudit.mjs` needs real network (YouTube iframe) and also rewrites
   tracked files in `audit/screenshots/` (restore them with `git checkout -- audit/screenshots` before committing).
+
+## Radio (feature/player-radio)
+- `GET /api/songs/:id/related` ranks related songs; weights and tuning guide: `docs/RADIO.md`, knobs in
+  `backend/src/services/related/weights.js`. Migration `20261119000000_radio_foundation` adds song metadata columns and `play_events`.
+- UNTESTED: `reco.getreco` against live JioSaavn, the Prisma signals queries on real Postgres (run the suite with TEST_DATABASE_URL).

@@ -339,6 +339,36 @@ export class MusicProviderManager {
     return null;
   }
 
+  /**
+   * Provider-side related songs for the radio. Merges the active provider's recommendations with the curated
+   * catalogue's, tolerating any single provider failing. Cached briefly.
+   */
+  async getRecommendations(id, limit = 30) {
+    const cacheKey = `reco_${this.providerName}_${id}_${limit}`;
+    const cached = musicCache.get(cacheKey);
+    if (cached) return cached;
+
+    const sources = [this.activeProvider, this.curated].filter((p) => typeof p?.getRecommendations === 'function');
+    const settled = await Promise.allSettled(sources.map((p) => p.getRecommendations(id, limit)));
+    const seen = new Set();
+    const merged = [];
+    for (const r of settled) {
+      if (r.status !== 'fulfilled') {
+        console.warn(`getRecommendations error [${id}]:`, r.reason?.message);
+        continue;
+      }
+      for (const song of r.value || []) {
+        if (song?.id && song.id !== id && !seen.has(song.id)) {
+          seen.add(song.id);
+          merged.push(song);
+        }
+      }
+    }
+    const out = merged.slice(0, limit);
+    musicCache.set(cacheKey, out, 300);
+    return out;
+  }
+
   async getAlbum(id) {
     const curatedMatch = CURATED_ALBUMS.find((a) => a.id === id);
     if (curatedMatch) return curatedMatch;
