@@ -23,9 +23,13 @@ const Shelf = ({ title, onShowAll, loading = false, children }) => {
     <section aria-label={title}>
       <div className="flex items-end justify-between mb-3 md:mb-4">
         <div className="min-w-0">
-          <h2 className="text-xl md:text-2xl font-bold text-white tracking-tight hover:underline decoration-2 underline-offset-4">
-            {title}
-          </h2>
+          {loading && !title ? (
+            <div aria-hidden="true" className="h-7 md:h-8 w-44 rounded shimmer" /> // same height as a real title: no jump when the shelf loads
+          ) : (
+            <h2 className="text-xl md:text-2xl font-bold text-white tracking-tight hover:underline decoration-2 underline-offset-4">
+              {title}
+            </h2>
+          )}
         </div>
         {onShowAll && (
           <button onClick={onShowAll} className="text-sm font-bold text-zinc-400 hover:text-white hover:underline">
