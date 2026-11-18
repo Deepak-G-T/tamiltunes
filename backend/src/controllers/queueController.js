@@ -83,3 +83,25 @@ export const resolveSongsRoute = async (req, res, next) => {
     res.json({ success: true, songs: await resolveMany(req.body.ids) });
   } catch (err) { next(err); }
 };
+
+// "Save queue as playlist": the client sends song ids (nothing else); songs are looked up again here
+export const fromQueueSchema = z.object({
+  name: z.string().trim().min(1, 'Playlist name is required').max(100),
+  songIds: z.array(songId).min(1).max(MAX_UPCOMING + 1),
+}).strict();
+
+export const saveQueueAsPlaylist = async (req, res, next) => {
+  try {
+    const ids = [...new Set(req.body.songIds)];
+    const found = await resolveMany(ids);
+    const ordered = ids.filter((id) => found[id]);
+    if (!ordered.length) return res.status(422).json({ success: false, message: 'None of those songs are available any more.' });
+
+    const playlist = await db.playlist.create({ data: { name: req.body.name, isPublic: false, userId: req.user.id } });
+    const rows = ordered.map((songId, position) => ({ playlistId: playlist.id, songId, position }));
+    if (typeof db.playlistSong.createMany === 'function') await db.playlistSong.createMany({ data: rows, skipDuplicates: true });
+    else for (const data of rows) await db.playlistSong.create({ data });
+
+    res.status(201).json({ success: true, playlist, added: ordered.length, skipped: ids.length - ordered.length });
+  } catch (err) { next(err); }
+};

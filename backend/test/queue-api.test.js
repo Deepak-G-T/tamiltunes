@@ -115,6 +115,20 @@ try {
   const capped = await resolveSongs(['m1', 'm2', 'm3', 'm4', 'm5'], { byIds: async () => [], fetchOne: async (id) => ({ id, title: id }), maxLookups: 2 });
   assert.equal(Object.keys(capped).length, 2, 'provider lookups are capped');
 
+  // save the queue as a playlist: ids only, unknown songs skipped, order kept, private by default
+  assert.equal((await call('POST', '/playlists/from-queue', { body: { name: 'x', songIds: [s1] } })).status, 401);
+  assert.equal((await call('POST', '/playlists/from-queue', { token: A, body: { name: '', songIds: [s1] } })).status, 400);
+  assert.equal((await call('POST', '/playlists/from-queue', { token: A, body: { name: 'x', songIds: [] } })).status, 400);
+  assert.equal((await call('POST', '/playlists/from-queue', { token: A, body: { name: 'x', songIds: [s1], title: 'nope' } })).status, 400);
+  assert.equal((await call('POST', '/playlists/from-queue', { token: A, body: { name: 'x', songIds: [`gone-${tag}`] } })).status, 422);
+  const made = await call('POST', '/playlists/from-queue', { token: A, body: { name: 'From my queue', songIds: [s3, s1, `gone-${tag}`, s3, s2] } });
+  assert.equal(made.status, 201);
+  assert.equal(made.json.added, 3);
+  assert.equal(made.json.skipped, 1);
+  const pl = await call('GET', `/playlists/${made.json.playlist.id}`, { token: A });
+  assert.deepEqual((pl.json.playlist?.songs || pl.json.songs || []).map((x) => x.songId || x.id || x.song?.id), [s3, s1, s2]);
+  assert.equal(made.json.playlist.isPublic, false);
+
   console.log('✓ queue: auth, validation, id-only storage, isolation, last-write-wins, dropped songs, guest resolve, resolver caps');
 } finally {
   server.close();

@@ -98,3 +98,10 @@ export const resolveLimiter = perUser({
   max: 12,
   message: 'Too many requests, please slow down.',
 });
+
+// Saving a whole queue as a playlist
+export const playlistBulkLimiter = perUser({
+  windowMs: 60 * 1000,
+  max: 6,
+  message: 'Too many playlists created, please slow down.',
+});

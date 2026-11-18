@@ -39,6 +39,7 @@ export function createQueueState(overrides = {}) {
     repeat: 'off', // 'off' | 'all' | 'one'
     refill: { pending: false, failures: 0, retryAt: 0 },
     fallback: [], // songs to queue if the radio returns nothing (e.g. the other Speed Dial tiles)
+    stopAfter: false, // "Stop after this song": pause when the current song ends
     ended: false, // nothing left to play
     offerRadio: false, // a playlist / album finished: the UI may offer to continue with radio
     ...overrides,
@@ -284,6 +285,67 @@ export function reorderUpcoming(state, from, to) {
   const origin = sourceOrigin(state);
   return { ...state, userCount, upcoming: list.map((e, i) => entry(e.song, i < userCount ? 'user' : origin, e.uid)) };
 }
+
+/**
+ * Remove several queued songs at once (by uid). Returns what was removed (with each song's old position) so the UI can offer Undo.
+ * @returns {{ state: QueueState, removed: { index: number, entry: Entry }[] }}
+ */
+export function removeByUids(state, uids) {
+  const drop = new Set(uids);
+  const removed = [];
+  const upcoming = [];
+  let userCount = state.userCount;
+  state.upcoming.forEach((e, index) => {
+    if (drop.has(e.uid)) {
+      removed.push({ index, entry: e });
+      if (index < state.userCount) userCount -= 1;
+    } else upcoming.push(e);
+  });
+  if (!removed.length) return { state, removed };
+  return { state: { ...state, upcoming, userCount }, removed };
+}
+
+/** Undo a removal: put the songs back where they were (the list must not have been reshuffled in between). */
+export function restoreRemoved(state, removed) {
+  if (!removed?.length) return state;
+  const upcoming = [...state.upcoming];
+  let userCount = state.userCount;
+  for (const { index, entry: e } of [...removed].sort((a, b) => a.index - b.index)) {
+    if (upcoming.length >= MAX_QUEUE || upcoming.some((x) => x.uid === e.uid)) continue;
+    const at = Math.min(index, upcoming.length);
+    upcoming.splice(at, 0, e);
+    if (e.origin === 'user' && at <= userCount) userCount += 1;
+    else if (e.origin !== 'user' && at < userCount) upcoming[at] = { ...e, origin: 'user' }, userCount += 1; // landed inside the user block
+  }
+  return { ...state, upcoming, userCount };
+}
+
+/** Move several queued songs into the user's block, keeping their relative order: 'next' = front, 'end' = after the other added songs. */
+export function moveManyToQueue(state, uids, where = 'next') {
+  const set = new Set(uids);
+  const picked = state.upcoming.filter((e) => set.has(e.uid));
+  if (!picked.length) return state;
+  const rest = state.upcoming.filter((e) => !set.has(e.uid));
+  const restUser = state.upcoming.slice(0, state.userCount).filter((e) => !set.has(e.uid)).length;
+  const at = where === 'next' ? 0 : restUser;
+  const moved = picked.map((e) => entry(e.song, 'user', e.uid));
+  return { ...state, upcoming: [...rest.slice(0, at), ...moved, ...rest.slice(at)], userCount: restUser + moved.length };
+}
+
+/** "Refresh recommendations": drop the auto-added songs so the radio fetches a new set. Added songs stay. Not for playlists / albums. */
+export function clearRadio(state) {
+  if (state.mode !== 'radio') return state;
+  return { ...state, upcoming: userEntries(state), refill: { pending: false, failures: 0, retryAt: 0 }, ended: false };
+}
+
+/** Remove the playing song from the queue and play the next one. The removed song does not go to history. */
+export function removeCurrent(state, opts) {
+  const r = advance(state, { reason: 'skip', ...opts });
+  if (r.status !== 'playing') return r;
+  return { ...r, state: { ...r.state, history: r.state.history.slice(0, -1) } };
+}
+
+export const setStopAfter = (state, on) => ({ ...state, stopAfter: Boolean(on) });
 
 export function clearUserQueue(state) {
   return { ...state, upcoming: sourceEntries(state), userCount: 0 };
