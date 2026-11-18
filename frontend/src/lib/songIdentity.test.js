@@ -21,7 +21,7 @@ describe('same song: different id, cover or singer order', () => {
     expect(songFingerprint({ title: 'ｐａｖａｚｈａ malli', singers: 'A' })).toBe(songFingerprint({ title: 'pavazha malli', singers: 'A' }));
   });
   it('a different film and different singers is a different song with the same title', () => {
-    expect(sameSong(pm(), pm({ id: 'x', album: 'Another Film', singers: 'Someone Else' }))).toBe(false);
+    expect(sameSong(pm(), pm({ id: 'x', album: 'Another Film', singers: 'Someone Else', artist: 'Someone Else' }))).toBe(false);
   });
   it('a missing film or singer list does not make two copies different', () => {
     expect(sameSong(pm(), pm({ id: 'x', album: '', singers: '' }))).toBe(true);
