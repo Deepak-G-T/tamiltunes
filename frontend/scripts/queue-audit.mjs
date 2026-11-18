@@ -66,6 +66,15 @@ const songMenu = async (page, title, item) => {
   await page.getByRole('menuitem', { name: item, exact: true }).click();
 };
 const sleep = (page, ms) => page.waitForTimeout(ms);
+// Wait for a condition instead of a fixed pause, so a slow computer only makes the audit slower, not flaky.
+const until = async (page, test, ms = 4000) => {
+  const end = Date.now() + ms;
+  for (;;) {
+    if (await test()) return true;
+    if (Date.now() > end) return false;
+    await page.waitForTimeout(100);
+  }
+};
 
 async function swipeLeft(page, el) {
   const b = await el.boundingBox();
@@ -414,6 +423,7 @@ async function phone(browser, width, height) {
   page.on('pageerror', (e) => errors.push(e.message));
   await setup(page);
   currentPage = page;
+  if (process.env.QUEUE_AUDIT_THROTTLE) { const t = await ctx.newCDPSession(page); await t.send('Emulation.setCPUThrottlingRate', { rate: Number(process.env.QUEUE_AUDIT_THROTTLE) }); } // simulate a slower computer
   await page.goto(`${BASE}/`);
   await page.waitForSelector('text=Queue Song 1');
   await songMenu(page, 'Queue Song 1', 'Start radio from this song').catch(async () => { await page.locator(`button[aria-label="More actions for Queue Song 1"]`).last().tap(); await page.getByRole('menuitem', { name: 'Start radio from this song', exact: true }).tap(); });
@@ -435,13 +445,15 @@ async function phone(browser, width, height) {
 
   const before = await titles(page);
   await swipeLeft(page, page.locator('[data-testid=queue-row]').first());
-  await sleep(page, 300);
+  await until(page, async () => (await titles(page)).length === before.length - 1);
   const after = await titles(page);
   check(`${tag} swiping a row left removes it`, after.length === before.length - 1 && after[0] === before[1], `${before.slice(0, 2)} -> ${after.slice(0, 2)}`);
+  await sleep(page, 700);
+  check(`${tag} one swipe removes exactly one song (no second removal a moment later)`, (await titles(page)).length === before.length - 1, `${before.length} -> ${(await titles(page)).length}`);
   check(`${tag} the Undo toast is there`, await page.getByRole('button', { name: 'Undo' }).count() === 1);
   await page.getByRole('button', { name: 'Undo' }).tap();
-  await sleep(page, 300);
-  check(`${tag} Undo restores the swiped song`, (await titles(page)).join('|') === before.join('|'));
+  const restored = await until(page, async () => (await titles(page)).join('|') === before.join('|'));
+  check(`${tag} Undo restores the swiped song`, restored, `${before.slice(0, 4)} -> ${(await titles(page)).slice(0, 4)}`);
 
   // touch drag with the handle
   await page.locator('[data-testid=queue-row]').nth(1).scrollIntoViewIfNeeded();
@@ -452,7 +464,7 @@ async function phone(browser, width, height) {
   for (let i = 1; i <= 10; i++) { await cdp.send('Input.dispatchTouchEvent', { type: 'touchMove', touchPoints: [{ x, y: y - i * 8 }] }); await sleep(page, 20); }
   await cdp.send('Input.dispatchTouchEvent', { type: 'touchEnd', touchPoints: [] });
   await cdp.detach();
-  await sleep(page, 400);
+  await until(page, async () => (await titles(page))[0] === before[1], 3000);
   const dragged = await titles(page);
   check(`${tag} dragging the handle with a finger reorders`, dragged[0] === before[1] && dragged[1] === before[0], `${before.slice(0, 3)} -> ${dragged.slice(0, 3)}`);
 
@@ -465,7 +477,9 @@ async function phone(browser, width, height) {
   await c2.detach();
   await sleep(page, 400);
   check(`${tag} swiping the sheet handle down closes the queue`, (await sheet.count()) === 0);
+  await until(page, async () => (await sheet.count()) === 0); // wait for the sheet to be gone before tapping the mini player
   await page.locator('[aria-label="Open now playing full screen"]').tap();
+  if (!(await until(page, async () => (await page.locator('[aria-label="Close now playing"]').count()) > 0, 3000))) await page.locator('[aria-label="Open now playing full screen"]').tap(); // one retry
   await page.waitForSelector('[aria-label="Close now playing"]');
   await page.locator('[aria-label="Open queue"]').tap();
   await page.locator('[data-testid=fs-queue]').waitFor();
