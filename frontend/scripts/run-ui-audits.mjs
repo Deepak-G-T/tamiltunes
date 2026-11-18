@@ -6,7 +6,8 @@ import { spawnSync } from 'node:child_process';
 const suites = [
   ['fix/youtube-feed audit', 'src/test/runPlaywrightAudit.mjs'],
   ['video toggle audit', 'scripts/ui-audit.mjs'],
-  ['play queue audit', 'scripts/queue-audit.mjs']
+  ['play queue audit', 'scripts/queue-audit.mjs'],
+  ['recent searches audit', 'scripts/search-audit.mjs']
 ];
 
 const failed = [];
