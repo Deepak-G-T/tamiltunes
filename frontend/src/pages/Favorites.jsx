@@ -135,7 +135,6 @@ const Favorites = () => {
         <div className="flex-1 text-center md:text-left space-y-2">
           <span className="text-xs font-bold text-white">
             Playlist
-            <span lang="ta" className="ml-2 font-semibold text-accent-300">· பிடித்த பாடல்கள்</span>
           </span>
           <h1 className="text-3xl sm:text-5xl font-black text-white tracking-tight">
             Favourite Songs

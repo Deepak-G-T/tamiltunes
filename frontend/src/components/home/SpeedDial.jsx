@@ -61,7 +61,6 @@ const SpeedDial = ({ items, status, error, reload, isAuthenticated, noPlays, act
     <section aria-label="Speed dial" className="space-y-3">
       <div>
         <h2 className="text-xl md:text-2xl font-bold text-white tracking-tight">Speed dial</h2>
-        <p lang="ta" className="text-xs md:text-sm font-medium text-accent-400/90 mt-0.5">அடிக்கடி கேட்டவை</p>
       </div>
 
       {status === 'error' && <ErrorState compact message={error || 'Could not load your Speed Dial.'} onRetry={reload} />}

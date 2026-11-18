@@ -70,7 +70,6 @@ const Sidebar = ({ onOpenCreatePlaylist }) => {
           <div className="min-w-0">
             <div className="flex items-center gap-1.5">
               <span className="font-extrabold text-lg text-white tracking-tight">TamilTunes</span>
-              <span className="text-[10px] font-bold px-1.5 py-0.5 rounded bg-brand-500/15 text-brand-300">தமிழ்</span>
             </div>
           </div>
         </NavLink>

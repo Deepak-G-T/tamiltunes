@@ -134,7 +134,6 @@ const History = () => {
             <HistoryIcon className="w-7 h-7 text-brand-400" />
             <h1 className="text-3xl md:text-5xl font-black text-white tracking-tight">Listening History</h1>
           </div>
-          <p lang="ta" className="text-sm font-semibold text-accent-400 mt-1">கேட்ட பாடல்கள்</p>
         </div>
 
         {historyList.length > 0 && (

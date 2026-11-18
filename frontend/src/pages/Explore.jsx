@@ -66,7 +66,6 @@ const Explore = () => {
           <Compass className="w-6 h-6 text-brand-400" />
           <h1 className="text-2xl md:text-3xl font-extrabold text-white tracking-tight">Explore Tamil music</h1>
         </div>
-        <p lang="ta" className="text-sm font-semibold text-accent-400 mt-1">தமிழ் இசையை ஆராயுங்கள்</p>
         <p className="text-xs md:text-sm text-zinc-400 max-w-xl mt-2">
           Browse by legendary composers, musical eras, high-energy dance numbers, and serene Tamil acoustics.
         </p>
