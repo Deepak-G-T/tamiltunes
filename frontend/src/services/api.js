@@ -1,10 +1,11 @@
 import axios from 'axios';
+import { API_TIMEOUT_MS, coldStartRetryDelay } from '../lib/coldStart';
 
 const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || '/api';
 
 const api = axios.create({
   baseURL: API_BASE_URL,
-  timeout: 35000, // accommodate Render cold starts
+  timeout: API_TIMEOUT_MS, // a sleeping Render server needs 30 to 60 seconds to wake up
   headers: {
     'Content-Type': 'application/json',
   },
@@ -63,20 +64,13 @@ api.interceptors.response.use(
       }
     }
 
-    // If GET request timed out or network error on cold start, retry automatically once after 2.5s
-    // Never retry mutating requests (POST, PUT, DELETE, PATCH)
-    const method = (config?.method || 'get').toLowerCase();
-    const isGet = method === 'get';
-
-    if (
-      isGet &&
-      config &&
-      !config._hasColdStartRetried &&
-      (error.code === 'ECONNABORTED' || (!error.response && error.message && error.message.includes('Network Error')))
-    ) {
-      config._hasColdStartRetried = true;
-      notifySlowStatus(true);
-      await new Promise((resolve) => setTimeout(resolve, 2500));
+    // The server may still be waking up (free Render sleeps when idle). Reads are retried quietly, up to twice; writes never are.
+    const retryDelay = coldStartRetryDelay(config, error);
+    if (retryDelay !== null) {
+      config._coldStartRetries = (config._coldStartRetries || 0) + 1;
+      config._hasColdStartRetried = true; // kept for older callers: "this request was retried at least once"
+      notifySlowStatus(true); // shows the "server is waking up" notice
+      await new Promise((resolve) => setTimeout(resolve, retryDelay));
       return api(config);
     }
 
