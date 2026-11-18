@@ -1,151 +1,126 @@
-import React from 'react';
-import { X, Trash2, Music, Play, Disc, ChevronUp, ChevronDown } from 'lucide-react';
+import React, { useState } from 'react';
+import { Trash2, Radio, ListMusic } from 'lucide-react';
+import BottomSheet from '../common/BottomSheet';
+import SafeImage from '../common/SafeImage';
+import Equalizer from '../common/Equalizer';
+import QueueRow from './QueueRow';
 import { useAudio } from '../../context/AudioContext';
 
+const Section = ({ title, action, children, empty }) => (
+  <section className="py-2">
+    <div className="flex items-center justify-between px-1 mb-1.5">
+      <h3 className="text-[11px] uppercase tracking-wider font-bold text-zinc-400">{title}</h3>
+      {action}
+    </div>
+    {children}
+    {empty}
+  </section>
+);
+
+/**
+ * The play queue: Now playing, Next in queue (songs you added, they play first), then Next from radio / the list.
+ * Drag rows (desktop), use the arrows, or swipe a row left to remove it.
+ */
 const QueueDrawer = ({ isOpen, onClose }) => {
   const {
-    queue,
-    queueIndex,
-    currentSong,
-    playSong,
-    removeFromQueue,
-    clearQueue,
-    moveInQueue
+    queueSections, autoplay, setAutoplay, offerRadio, continueWithRadio, isPlaying,
+    jumpToUpcoming, removeFromUpcomingAt, reorderUpcomingAt, playNext, clearQueue,
   } = useAudio();
+  const [dragFrom, setDragFrom] = useState(null);
+  const [dragOver, setDragOver] = useState(null);
 
-  if (!isOpen) return null;
+  const { nowPlaying, nextInQueue, nextFrom } = queueSections;
+  const userCount = nextInQueue.length;
+  const total = userCount + nextFrom.items.length;
+  const finishDrag = () => { setDragFrom(null); setDragOver(null); };
+  const drop = (to) => { if (dragFrom != null && dragFrom !== to) reorderUpcomingAt(dragFrom, to); finishDrag(); };
+  const promote = (i, list) => { const song = list[i - (list === nextInQueue ? 0 : userCount)]; removeFromUpcomingAt(i); playNext(song); }; // "Play next" for a radio song
+
+  const rowProps = (list, offset) => (song, i) => {
+    const index = offset + i;
+    return (
+      <QueueRow
+        key={`${song.id}-${index}`}
+        song={song}
+        index={index}
+        last={index === total - 1}
+        dragOver={dragOver === index && dragFrom !== index}
+        onPlay={jumpToUpcoming}
+        onRemove={removeFromUpcomingAt}
+        onMove={reorderUpcomingAt}
+        onPlayNext={offset > 0 || list === nextFrom.items ? (idx) => promote(idx, nextFrom.items) : undefined}
+        onDragStart={setDragFrom}
+        onDragOver={setDragOver}
+        onDrop={drop}
+        onDragEnd={finishDrag}
+      />
+    );
+  };
+
+  const footer = (
+    <div className="flex items-center justify-between gap-4 py-1">
+      <div className="min-w-0">
+        <p id="autoplay-label" className="text-sm font-semibold text-white">Autoplay similar songs</p>
+        <p className="text-xs text-zinc-400">When your songs run out, keep playing songs like them.</p>
+      </div>
+      <button
+        type="button" role="switch" aria-checked={autoplay} aria-labelledby="autoplay-label" onClick={() => setAutoplay(!autoplay)}
+        className={`relative w-12 h-7 rounded-full flex-shrink-0 transition-colors focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand-400 ${autoplay ? 'bg-brand-500' : 'bg-zinc-600'}`}
+      >
+        <span className={`absolute top-1 left-1 w-5 h-5 rounded-full bg-white transition-transform ${autoplay ? 'translate-x-5' : ''}`} />
+      </button>
+    </div>
+  );
 
   return (
-    <div className="fixed inset-y-0 right-0 w-80 sm:w-96 bg-surface-1 border-l border-zinc-800/80 shadow-2xl z-50 flex flex-col animate-in slide-in-from-right duration-200">
-      {/* Header */}
-      <div className="p-4 border-b border-zinc-800/80 flex items-center justify-between">
-        <div className="flex items-center gap-2">
-          <Music className="w-4 h-4 text-brand-400" />
-          <h3 className="font-semibold text-sm text-white">Play Queue</h3>
-          <span className="text-xs text-zinc-500">({queue.length} tracks)</span>
-        </div>
-        <div className="flex items-center gap-1">
-          {queue.length > 0 && (
-            <button
-              onClick={clearQueue}
-              title="Clear queue"
-              className="p-1.5 rounded-md text-zinc-400 hover:text-rose-400 hover:bg-zinc-800/60 transition-colors"
-            >
-              <Trash2 className="w-4 h-4" />
-            </button>
-          )}
-          <button
-            onClick={onClose}
-            title="Close queue"
-            className="p-1.5 rounded-md text-zinc-400 hover:text-white hover:bg-zinc-800/60 transition-colors"
-          >
-            <X className="w-4 h-4" />
-          </button>
-        </div>
-      </div>
-
-      {/* Queue List */}
-      <div className="flex-1 overflow-y-auto p-3 space-y-4">
-        {/* Currently Playing Card */}
-        {currentSong && (
-          <div>
-            <h4 className="text-[11px] uppercase tracking-wider font-semibold text-brand-400 mb-2 px-1">
-              Now Playing
-            </h4>
-            <div className="flex items-center gap-3 p-2 rounded-xl bg-brand-950/20 border border-brand-500/20">
-              <img
-                src={currentSong.image || 'https://images.unsplash.com/photo-1511671782779-c97d3d27a1d4?w=100&auto=format&fit=crop&q=80'}
-                alt={currentSong.title}
-                className="w-12 h-12 rounded-lg object-cover shadow"
-              />
-              <div className="flex-1 min-w-0">
-                <p className="text-sm font-semibold text-white truncate">{currentSong.title}</p>
-                <p className="text-xs text-brand-300 truncate">{currentSong.artist || currentSong.singers}</p>
+    <BottomSheet open={isOpen} onClose={onClose} tall title="Play queue" subtitle={total ? `${total} coming up` : 'Nothing queued'} footer={footer}>
+      <div className="pb-2">
+        {nowPlaying && (
+          <Section title="Now playing">
+            <div className="flex items-center gap-3 p-2 rounded-xl bg-brand-500/10 border border-brand-500/20" data-testid="queue-now-playing">
+              <SafeImage src={nowPlaying.image} alt="" className="w-12 h-12 rounded-lg object-cover bg-surface-4" />
+              <div className="min-w-0 flex-1">
+                <p dir="auto" className="text-sm font-bold text-white truncate leading-[1.4]">{nowPlaying.title}</p>
+                <p dir="auto" className="text-xs text-brand-300 truncate leading-[1.4]">{nowPlaying.artist || nowPlaying.singers}</p>
               </div>
-              <div className="w-2 h-2 rounded-full bg-brand-500 animate-pulse mr-2" />
+              {isPlaying && <Equalizer />}
             </div>
+          </Section>
+        )}
+
+        {offerRadio && (
+          <div className="my-2 flex items-center gap-3 rounded-xl bg-white/5 p-3">
+            <Radio className="w-5 h-5 text-brand-400 flex-shrink-0" aria-hidden="true" />
+            <p className="flex-1 text-sm text-zinc-200">That list has finished. Keep going with similar songs?</p>
+            <button type="button" onClick={continueWithRadio} className="press px-3 py-1.5 rounded-full bg-brand-500 text-black text-xs font-bold">Start radio</button>
           </div>
         )}
 
-        {/* Next Up Section */}
-        <div>
-          <h4 className="text-[11px] uppercase tracking-wider font-semibold text-zinc-400 mb-2 px-1">
-            Next Up
-          </h4>
-          {queue.length === 0 ? (
-            <div className="text-center py-8 text-zinc-500 text-xs italic">
-              Queue is empty. Click any Tamil song to start listening!
-            </div>
-          ) : (
-            <div className="space-y-1">
-              {queue.map((song, idx) => {
-                const isCurrent = idx === queueIndex;
-                return (
-                  <div
-                    key={`${song.id}-${idx}`}
-                    className={`flex items-center justify-between p-2 rounded-lg group transition-colors ${
-                      isCurrent
-                        ? 'bg-zinc-800/60 border border-brand-500/30'
-                        : 'hover:bg-zinc-800/30'
-                    }`}
-                  >
-                    <div
-                      className="flex items-center gap-2.5 flex-1 min-w-0 cursor-pointer"
-                      onClick={() => playSong(song)}
-                    >
-                      <img
-                        src={song.image || 'https://images.unsplash.com/photo-1511671782779-c97d3d27a1d4?w=80&auto=format&fit=crop&q=80'}
-                        alt={song.title}
-                        className="w-9 h-9 rounded-md object-cover"
-                      />
-                      <div className="flex-1 min-w-0">
-                        <p className={`text-xs font-medium truncate ${isCurrent ? 'text-brand-400 font-semibold' : 'text-zinc-200'}`}>
-                          {song.title}
-                        </p>
-                        <p className="text-[11px] text-zinc-400 truncate">
-                          {song.artist || song.singers}
-                        </p>
-                      </div>
-                    </div>
-
-                    <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity ml-2">
-                      {idx > 0 && (
-                        <button
-                          onClick={() => moveInQueue && moveInQueue(idx, idx - 1)}
-                          title="Move up"
-                          aria-label="Move track up"
-                          className="p-1 rounded text-zinc-500 hover:text-white hover:bg-zinc-700/50 transition-colors"
-                        >
-                          <ChevronUp className="w-3.5 h-3.5" />
-                        </button>
-                      )}
-                      {idx < queue.length - 1 && (
-                        <button
-                          onClick={() => moveInQueue && moveInQueue(idx, idx + 1)}
-                          title="Move down"
-                          aria-label="Move track down"
-                          className="p-1 rounded text-zinc-500 hover:text-white hover:bg-zinc-700/50 transition-colors"
-                        >
-                          <ChevronDown className="w-3.5 h-3.5" />
-                        </button>
-                      )}
-                      <button
-                        onClick={() => removeFromQueue(idx)}
-                        title="Remove from queue"
-                        aria-label="Remove from queue"
-                        className="p-1 rounded text-zinc-500 hover:text-rose-400 hover:bg-zinc-700/50 transition-colors"
-                      >
-                        <X className="w-3.5 h-3.5" />
-                      </button>
-                    </div>
-                  </div>
-                );
-              })}
-            </div>
+        <Section
+          title="Next in queue"
+          action={userCount > 0 && (
+            <button type="button" onClick={clearQueue} className="inline-flex items-center gap-1 text-[11px] font-semibold text-zinc-400 hover:text-rose-400">
+              <Trash2 className="w-3 h-3" aria-hidden="true" /> Clear
+            </button>
           )}
-        </div>
+          empty={userCount === 0 && <p className="px-1 py-2 text-xs text-zinc-500">Songs you add with "Add to queue" or "Play next" appear here and play first.</p>}
+        >
+          {userCount > 0 && <ul>{nextInQueue.map(rowProps(nextInQueue, 0))}</ul>}
+        </Section>
+
+        <Section
+          title={nextFrom.label}
+          empty={nextFrom.items.length === 0 && (
+            <p className="px-1 py-2 text-xs text-zinc-500 flex items-center gap-2">
+              <ListMusic className="w-4 h-4" aria-hidden="true" />
+              {nowPlaying ? (autoplay ? 'Finding songs like this one…' : 'Autoplay is off. Turn it on to keep the music going.') : 'Play a song to start.'}
+            </p>
+          )}
+        >
+          {nextFrom.items.length > 0 && <ul>{nextFrom.items.map(rowProps(nextFrom.items, userCount))}</ul>}
+        </Section>
       </div>
-    </div>
+    </BottomSheet>
   );
 };
 

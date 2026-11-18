@@ -94,3 +94,7 @@ Songs may carry an optional `videoId`. It comes from the curated map `backend/sr
 - Migration `20261120000000_speed_dial` (play_events columns + `speed_dial_overrides`). Needs the radio migration first.
 - UNTESTED: the ranking SQL on real Postgres (run the backend suite with TEST_DATABASE_URL: the same tests compare it with the
   JavaScript reference), the 30 s counting with real audio on a phone, long-press on real devices.
+
+## Player queue (feature/player-queue, stacked on feature/speed-dial)
+- Engine `frontend/src/lib/radioQueue.js` (tests in `radioQueue.test.js`), notes in `docs/PLAYER_QUEUE.md`. Search returns `playlists` (public only).
+- UNTESTED: drawer drag/swipe on real devices, playlist search on real Postgres.

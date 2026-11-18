@@ -403,7 +403,7 @@ export function getSections(state) {
     nextInQueue: userEntries(state).map((e) => e.song),
     nextFrom: {
       kind: state.mode,
-      label: state.mode === 'context' ? `Next from ${state.context?.label || state.context?.type || 'playlist'}` : 'Next from radio',
+      label: state.mode === 'context' ? (state.context?.label ? `Next from ${state.context.label}` : 'Next in this list') : 'Next from radio',
       items: source,
     },
   };

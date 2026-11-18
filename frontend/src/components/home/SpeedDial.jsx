@@ -1,6 +1,6 @@
 import React, { useCallback, useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
-import { Play, Pause, ListPlus, Pin, PinOff, Trash2, ChevronLeft, ChevronRight, User as UserIcon, Info } from 'lucide-react';
+import { Play, Pause, ListPlus, ListStart, Pin, PinOff, Trash2, ChevronLeft, ChevronRight, User as UserIcon, Info } from 'lucide-react';
 import SpeedDialTile from './SpeedDialTile';
 import BottomSheet from '../common/BottomSheet';
 import { ErrorState } from '../common/StateViews';
@@ -36,7 +36,7 @@ const Row = ({ icon: Icon, children, onClick, disabled, danger = false }) => (
  */
 const SpeedDial = ({ items, status, error, reload, isAuthenticated, noPlays, actions, loadingHome = false }) => {
   const navigate = useNavigate();
-  const { currentSong, isPlaying, togglePlay, addToQueue } = useAudio();
+  const { currentSong, isPlaying, togglePlay, addToQueue, playNext } = useAudio();
   const startRadio = useStartRadio();
   const [menu, setMenu] = useState(null); // { item, index }
   const [dragFrom, setDragFrom] = useState(null);
@@ -110,6 +110,7 @@ const SpeedDial = ({ items, status, error, reload, isAuthenticated, noPlays, act
             <Row icon={currentSong?.id === menu.item.id && isPlaying ? Pause : Play} onClick={() => { close(); play(menu.item); }}>
               {currentSong?.id === menu.item.id && isPlaying ? 'Pause' : 'Play'}
             </Row>
+            <Row icon={ListStart} onClick={() => { close(); playNext(menu.item); }}>Play next</Row>
             <Row icon={ListPlus} onClick={() => { close(); addToQueue(menu.item); }}>Add to queue</Row>
             <Row icon={UserIcon} onClick={() => { close(); navigate(`/search?q=${encodeURIComponent(String(menu.item.artist).split(',')[0].trim())}`); }}>Go to artist</Row>
             {actions ? (
