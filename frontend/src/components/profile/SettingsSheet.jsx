@@ -4,6 +4,7 @@ import { LogOut, Trash2, Loader2 } from 'lucide-react';
 import BottomSheet from '../common/BottomSheet';
 import { profileApi } from '../../lib/communityApi';
 import { useAuth } from '../../context/AuthContext';
+import { useAudio } from '../../context/AudioContext';
 
 const Toggle = ({ label, hint, checked, onChange, disabled }) => {
   const id = useId();
@@ -27,6 +28,7 @@ const Toggle = ({ label, hint, checked, onChange, disabled }) => {
  */
 const SettingsSheet = ({ profile, open, onClose, onChange }) => {
   const { logout } = useAuth();
+  const { autoplay, setAutoplay } = useAudio();
   const navigate = useNavigate();
   const [error, setError] = useState('');
   const [deleting, setDeleting] = useState(false);
@@ -71,6 +73,7 @@ const SettingsSheet = ({ profile, open, onClose, onChange }) => {
       <div className="py-2 divide-y divide-white/10">
         <Toggle label="Public profile" hint="Anyone with your link can see your profile. Off shows only your name and photo." checked={profile.isPublicProfile} onChange={(v) => update({ isPublicProfile: v })} />
         <Toggle label="Show listening history" hint="Let visitors see your recently played songs." checked={profile.showHistory} disabled={!profile.isPublicProfile} onChange={(v) => update({ showHistory: v })} />
+        <Toggle label="Autoplay similar songs" hint="When your songs run out, keep playing songs like them. Also in the play queue." checked={autoplay} onChange={setAutoplay} />
       </div>
       {error && <p role="alert" className="text-xs text-rose-400 mt-2">{error}</p>}
 

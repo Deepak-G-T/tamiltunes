@@ -4,6 +4,7 @@ import { AuthProvider } from './context/AuthContext';
 import { AudioProvider } from './context/AudioContext';
 import MainLayout from './components/layout/MainLayout';
 import PlayTracker from './components/player/PlayTracker';
+import { SongActionsProvider } from './components/common/SongActionsSheet';
 import { Loader2 } from 'lucide-react';
 
 const PageLoader = () => (
@@ -32,6 +33,7 @@ function App() {
       <AuthProvider>
         <AudioProvider>
           <PlayTracker />
+          <SongActionsProvider>
           <Suspense fallback={<PageLoader />}>
             <Routes>
               <Route path="/" element={<MainLayout />}>
@@ -51,6 +53,7 @@ function App() {
               </Route>
             </Routes>
           </Suspense>
+          </SongActionsProvider>
         </AudioProvider>
       </AuthProvider>
     </BrowserRouter>

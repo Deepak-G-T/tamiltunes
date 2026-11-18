@@ -3,6 +3,7 @@ import {
   createQueueState, playFromSearch, playFromContext, switchToRadio, advance, previous, jumpTo, addToQueue, playNext,
   removeFromUpcoming, reorderUpcoming, clearUserQueue, setShuffle, setRepeat, nextRepeat, setAutoplay, needsRefill,
   startRefill, applyRefill, refillFailed, runRefill, getSections, peekNext, toSnapshot, fromSnapshot, shuffled,
+  applyFallback, toFlatQueue, removeFromHistory,
   REFILL_THRESHOLD, MAX_EXCLUDE, REFILL_BACKOFF_MS,
 } from './radioQueue';
 
@@ -345,5 +346,64 @@ describe('sections, snapshot and helpers', () => {
     const out = shuffled(src, seeded(11));
     expect([...out].sort()).toEqual(src);
     expect(src).toEqual([1, 2, 3, 4, 5, 6]);
+  });
+});
+
+describe('fallback, flat view and history', () => {
+  it('queues the fallback songs when the radio fails or has nothing new', async () => {
+    let state = playFromSearch(createQueueState(), S('seed'), { fallback: list('t1', 'seed', 't2', 't3') });
+    expect(state.fallback.map((x) => x.id)).toEqual(['t1', 't2', 't3']); // never the seed itself
+    const io = { get: () => state, update: (fn) => { state = fn(state); }, fetchRelated: async () => { throw new Error('offline'); }, now: () => 1000 };
+    expect(await runRefill(io)).toBe(false);
+    expect(ids(state.upcoming)).toEqual(['t1', 't2', 't3']);
+    expect(state.fallback).toEqual([]); // used once
+    expect(state.refill.failures).toBe(1); // and the radio still backs off
+
+    let s2 = playFromSearch(createQueueState(), S('seed'), { fallback: list('t1') });
+    const io2 = { get: () => s2, update: (fn) => { s2 = fn(s2); }, fetchRelated: async () => [], now: () => 1000 };
+    await runRefill(io2);
+    expect(ids(s2.upcoming)).toEqual(['t1']);
+  });
+
+  it('does not use the fallback when the radio delivers', async () => {
+    let state = playFromSearch(createQueueState(), S('seed'), { fallback: list('t1') });
+    const io = { get: () => state, update: (fn) => { state = fn(state); }, fetchRelated: async () => list('r1', 'r2', 'r3') };
+    await runRefill(io);
+    expect(ids(state.upcoming)).toEqual(['r1', 'r2', 'r3']);
+    expect(state.fallback.map((x) => x.id)).toEqual(['t1']);
+  });
+
+  it('applyFallback skips songs already played or queued', () => {
+    let s = playFromSearch(createQueueState(), S('seed'), { fallback: list('a', 'b') });
+    s = advance(applyRefill(s, list('a'))).state; // a is now playing
+    expect(ids(applyFallback(s).upcoming)).toEqual(['b']);
+    expect(applyFallback(createQueueState())).toEqual(createQueueState());
+  });
+
+  it('starting a playlist mid-way lets Previous walk back through the earlier songs', () => {
+    const songs = list('p1', 'p2', 'p3', 'p4');
+    const s = playFromContext(createQueueState(), { songs, index: 2 });
+    expect(s.history.map((x) => x.id)).toEqual(['p1', 'p2']);
+    expect(s.played).toEqual(['p3']); // the earlier songs were not actually played
+    const back = previous(s, { currentTime: 0 });
+    expect(back.song.id).toBe('p2');
+    expect(advance(back.state).song.id).toBe('p3'); // and forward again
+  });
+
+  it('exposes one flat list: history, the current song, then the queue', () => {
+    expect(toFlatQueue(createQueueState())).toEqual({ queue: [], queueIndex: -1 });
+    let s = radio('a', 'b', 'c');
+    s = advance(s).state; // a in history, b playing, c next
+    s = addToQueue(s, S('u'));
+    const flat = toFlatQueue(s);
+    expect(flat.queue.map((x) => x.id)).toEqual(['a', 'b', 'u', 'c']);
+    expect(flat.queueIndex).toBe(1);
+    expect(flat.queue[flat.queueIndex].id).toBe('b');
+  });
+
+  it('can remove a song from history', () => {
+    const s = advance(advance(radio('a', 'b', 'c')).state).state; // history a b, playing c
+    expect(removeFromHistory(s, 0).history.map((x) => x.id)).toEqual(['b']);
+    expect(removeFromHistory(s, 5)).toBe(s);
   });
 });

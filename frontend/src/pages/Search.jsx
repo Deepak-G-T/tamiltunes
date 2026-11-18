@@ -1,9 +1,10 @@
 import React, { useState, useEffect } from 'react';
 import { useSearchParams, useOutletContext, useNavigate } from 'react-router-dom';
-import { Search as SearchIcon, X, Loader2, Music, Disc, User, Clock } from 'lucide-react';
+import { Search as SearchIcon, X, Loader2, Music, Disc, User, Clock, ListMusic } from 'lucide-react';
 import SongCard from '../components/cards/SongCard';
 import AlbumCard from '../components/cards/AlbumCard';
 import ArtistCard from '../components/cards/ArtistCard';
+import PlaylistResultCard from '../components/cards/PlaylistResultCard';
 import api from '../services/api';
 import { useAuth } from '../context/AuthContext';
 
@@ -29,7 +30,7 @@ const Search = () => {
   const [debouncedTerm, setDebouncedTerm] = useState(queryParam);
   const [activeFilter, setActiveFilter] = useState('all'); // 'all' | 'songs' | 'albums' | 'artists'
   const [loading, setLoading] = useState(false);
-  const [results, setResults] = useState({ songs: [], albums: [], artists: [] });
+  const [results, setResults] = useState({ songs: [], albums: [], artists: [], playlists: [] });
   const [error, setError] = useState(null);
   const [recentSearches, setRecentSearches] = useState(() => {
     try {
@@ -57,7 +58,7 @@ const Search = () => {
   // Execute search when debounced term changes
   useEffect(() => {
     if (!debouncedTerm.trim()) {
-      setResults({ songs: [], albums: [], artists: [] });
+      setResults({ songs: [], albums: [], artists: [], playlists: [] });
       setLoading(false);
       return;
     }
@@ -83,7 +84,7 @@ const Search = () => {
       .then(({ data }) => {
         if (isMounted) {
           if (data.success) {
-            setResults(data.data || { songs: [], albums: [], artists: [] });
+            setResults(data.data || { songs: [], albums: [], artists: [], playlists: [] });
           } else {
             setError(data.message || 'No results found');
           }
@@ -107,7 +108,7 @@ const Search = () => {
     setSearchTerm('');
     setDebouncedTerm('');
     setSearchParams({});
-    setResults({ songs: [], albums: [], artists: [] });
+    setResults({ songs: [], albums: [], artists: [], playlists: [] });
   };
 
   const removeRecentSearch = (itemToRemove, e) => {
@@ -120,7 +121,8 @@ const Search = () => {
   const hasResults =
     (results.songs && results.songs.length > 0) ||
     (results.albums && results.albums.length > 0) ||
-    (results.artists && results.artists.length > 0);
+    (results.artists && results.artists.length > 0) ||
+    (results.playlists && results.playlists.length > 0);
 
   return (
     <div className="space-y-6 animate-in fade-in duration-300">
@@ -149,7 +151,7 @@ const Search = () => {
       {/* Filter Tabs */}
       {debouncedTerm && (
         <div className="flex items-center gap-2">
-          {['all', 'songs', 'albums', 'artists'].map((tab) => (
+          {['all', 'songs', 'albums', 'artists', 'playlists'].map((tab) => (
             <button
               key={tab}
               onClick={() => setActiveFilter(tab)}
@@ -196,6 +198,7 @@ const Search = () => {
                   <SongCard
                     key={song.id}
                     song={song}
+                    radio
                     playlist={results.songs}
                     onAddToPlaylist={onOpenAddToPlaylist}
                   />
@@ -214,6 +217,21 @@ const Search = () => {
               <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-4">
                 {results.albums.map((album) => (
                   <AlbumCard key={album.id} album={album} />
+                ))}
+              </div>
+            </div>
+          )}
+
+          {/* Playlists Section: public playlists from other listeners */}
+          {(activeFilter === 'all' || activeFilter === 'playlists') && results.playlists?.length > 0 && (
+            <div>
+              <div className="flex items-center gap-2 mb-3">
+                <ListMusic className="w-4 h-4 text-accent-400" />
+                <h3 className="text-xl font-bold text-white">Playlists</h3>
+              </div>
+              <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-4">
+                {results.playlists.map((pl) => (
+                  <PlaylistResultCard key={pl.id} playlist={pl} />
                 ))}
               </div>
             </div>
