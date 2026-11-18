@@ -21,7 +21,7 @@ const Row = ({ icon: Icon, children, onClick }) => (
 
 const SongActionsSheet = ({ target, onClose }) => {
   const navigate = useNavigate();
-  const { startRadio, playNext, addToQueue, showToast } = useAudio();
+  const { startRadio, playNext, addToQueue } = useAudio();
   if (!target) return null;
   const { song, onAddToPlaylist } = target;
   const go = (fn) => () => { onClose(); fn(); };
@@ -31,8 +31,8 @@ const SongActionsSheet = ({ target, onClose }) => {
       <div role="menu" aria-label={`Actions for ${song.title}`} className="py-2">
         <Row icon={Play} onClick={go(() => startRadio(song))}>Play now</Row>
         <Row icon={Radio} onClick={go(() => startRadio(song))}>Start radio from this song</Row>
-        <Row icon={ListStart} onClick={go(() => { if (playNext(song) === 'added') showToast?.('Playing next.'); })}>Play next</Row>
-        <Row icon={ListPlus} onClick={go(() => { if (addToQueue(song) === 'added') showToast?.('Added to your queue.'); })}>Add to queue</Row>
+        <Row icon={ListStart} onClick={go(() => { playNext(song); })}>Play next</Row>
+        <Row icon={ListPlus} onClick={go(() => { addToQueue(song); })}>Add to queue</Row>
         {onAddToPlaylist && <Row icon={ListMusic} onClick={go(() => onAddToPlaylist(song))}>Add to playlist</Row>}
         <Row icon={UserIcon} onClick={go(() => navigate(`/search?q=${encodeURIComponent(String(song.artist || song.singers || '').split(',')[0].trim())}`))}>Go to artist</Row>
       </div>

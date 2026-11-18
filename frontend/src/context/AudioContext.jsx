@@ -10,6 +10,9 @@ import {
   removeByUids, restoreRemoved, moveManyToQueue, clearRadio, removeCurrent, setStopAfter, playFromHistory
 } from '../lib/radioQueue';
 import { startSleep } from '../lib/sleepTimer';
+import { getShownOnHome } from '../lib/shownOnHome';
+import { haptic } from '../lib/haptics';
+import { peekNext } from '../lib/radioQueue';
 import { fetchRelated } from '../lib/radioApi';
 import { useAuth } from './AuthContext';
 import { toSaved, fromSaved, sameQueue, savedIds, readGuestQueue, writeGuestQueue, getDeviceId, shouldAskToContinue, SAVE_DEBOUNCE_MS, SYNC_CHECK_MIN_MS } from '../lib/queuePersist';
@@ -20,6 +23,8 @@ import { getCoverColor, rgbVar } from '../lib/coverColor';
 import { engineFor, canToggleVideo, getVideoId, planSwitch, planEmbedError } from '../lib/playbackLogic';
 
 const AudioContext = createContext();
+const QUEUE_ACTIONS = ['jumpToUid', 'removeUids', 'moveUidsToQueue', 'reorderByUid', 'clearQueue', 'refreshRecommendations', 'removeCurrentSong', 'playFromHistoryAt', 'saveQueueAsPlaylist', 'toggleStopAfter', 'startSleepTimer', 'cancelSleepTimer', 'setAutoplay', 'continueWithRadio', 'startRadio', 'addToQueue', 'playNext'];
+const QueueContext = createContext(null); // the queue panel's own, steadier view of the player (see useQueue)
 const AUTOPLAY_KEY = 'tamiltunes_autoplay';
 const FADE_IN_SECONDS = 0.6; // soft start / end of each track (HTML5 engine only)
 const FADE_OUT_SECONDS = 1.2;
@@ -831,7 +836,7 @@ export const AudioProvider = ({ children }) => {
     }
     if (r.status === 'waiting') {
       // radio queue ran dry: fetch more, then try again
-      await runRefill({ get: () => qsRef.current, update: updateQs, fetchRelated });
+      await runRefill({ get: () => qsRef.current, update: updateQs, fetchRelated, avoid: getShownOnHome, onAdded: announceAdded });
       r = advance(qsRef.current, { reason });
     }
     if (r.status === 'playing') {
@@ -908,13 +913,30 @@ export const AudioProvider = ({ children }) => {
 
   // Add a song to the user's queue block. A song that is already queued asks first: add it again, or move it.
   const [dupPrompt, setDupPrompt] = useState(null); // { song, where: 'next' | 'end', uid }
+  // Autoplay says what it did instead of changing the queue silently
+  const announceAdded = (n) => showToast(`Added ${n} similar song${n === 1 ? '' : 's'}.`);
+
+  // Run a change to the upcoming list, show a short message with Undo. Undo only works while nothing else has changed the list.
+  const withUndo = (message, change) => {
+    const before = qsRef.current;
+    const after = updateQs(change);
+    if (after === before) return after;
+    haptic(10);
+    const sameOrder = (a, b) => a.length === b.length && a.every((e, i) => e.uid === b[i].uid);
+    showToast(message, {
+      label: 'Undo',
+      onClick: () => updateQs((q) => (sameOrder(q.upcoming, after.upcoming) ? { ...q, upcoming: before.upcoming, userCount: before.userCount } : q)),
+    });
+    return after;
+  };
+
   const requestQueueAdd = (song, where) => {
     if (!song) return 'none';
     const q = qsRef.current;
     if (isQueueFull(q)) { showToast(`The queue is full (${MAX_QUEUE} songs). Remove some to add more.`); return 'full'; }
     const at = findQueued(q, song.id);
     if (at >= 0) { setDupPrompt({ song, where, uid: q.upcoming[at].uid }); return 'prompt'; }
-    updateQs((s) => (where === 'next' ? queuePlayNext(s, song) : queueAdd(s, song)));
+    withUndo(where === 'next' ? 'Playing next.' : 'Added to queue.', (s) => (where === 'next' ? queuePlayNext(s, song) : queueAdd(s, song)));
     return 'added';
   };
   const addToQueue = (song) => requestQueueAdd(song, 'end');
@@ -923,8 +945,8 @@ export const AudioProvider = ({ children }) => {
     const p = dupPrompt;
     setDupPrompt(null);
     if (!p || choice === 'cancel') return;
-    if (choice === 'again') updateQs((s) => (p.where === 'next' ? queuePlayNext(s, p.song) : queueAdd(s, p.song)));
-    else updateQs((s) => { const i = indexOfUid(s, p.uid); return i >= 0 ? moveToQueue(s, i, p.where) : s; });
+    if (choice === 'again') withUndo(p.where === 'next' ? 'Playing next.' : 'Added to queue.', (s) => (p.where === 'next' ? queuePlayNext(s, p.song) : queueAdd(s, p.song)));
+    else withUndo(p.where === 'next' ? 'Moved to play next.' : 'Moved to the end of your queue.', (s) => { const i = indexOfUid(s, p.uid); return i >= 0 ? moveToQueue(s, i, p.where) : s; });
   };
   const clearQueue = () => {
     const before = qsRef.current;
@@ -938,12 +960,16 @@ export const AudioProvider = ({ children }) => {
   const removeUids = (uids) => {
     const r = removeByUids(qsRef.current, uids);
     if (!r.removed.length) return;
+    haptic(12);
     updateQs(() => r.state);
     undoToast(r.removed.length === 1 ? `Removed "${r.removed[0].entry.song.title}".` : `Removed ${r.removed.length} songs.`, r.removed);
   };
-  const moveUidsToQueue = (uids, where) => updateQs((q) => moveManyToQueue(q, uids, where));
-  const reorderByUid = (activeUid, overUid) => updateQs((q) => reorderUpcoming(q, indexOfUid(q, activeUid), indexOfUid(q, overUid)));
-  const jumpToUid = (uid) => { const i = indexOfUid(qsRef.current, uid); if (i >= 0) jumpToUpcoming(i); };
+  const moveUidsToQueue = (uids, where) => withUndo(uids.length === 1 ? (where === 'next' ? 'Playing next.' : 'Moved to the end of your queue.') : `Moved ${uids.length} songs ${where === 'next' ? 'to play next' : 'to the end of your queue'}.`, (q) => moveManyToQueue(q, uids, where));
+  const reorderByUid = (activeUid, overUid) => {
+    const title = qsRef.current.upcoming.find((e) => e.uid === activeUid)?.song.title;
+    withUndo(`Moved ${title ? `"${title}"` : 'song'}.`, (q) => reorderUpcoming(q, indexOfUid(q, activeUid), indexOfUid(q, overUid)));
+  };
+  const jumpToUid = (uid) => { const i = indexOfUid(qsRef.current, uid); if (i >= 0) { haptic(10); jumpToUpcoming(i); } };
   const removeCurrentSong = async () => {
     const r = removeCurrent(qsRef.current);
     if (r.status === 'playing') { updateQs(() => r.state); showToast('Removed from the queue.'); return startPlayback(r.song); }
@@ -980,9 +1006,33 @@ export const AudioProvider = ({ children }) => {
     else updateQs((q) => removeFromUpcoming(q, index - h - 1));
   };
 
+  // What the queue panel shows. Rebuilt only when the queue changes, so the panel is not redrawn on every tick of the song clock.
+  const queueSections = useMemo(() => ({
+    ...getSections(qs),
+    history: [...qs.history].reverse(), // newest first
+    refill: { pending: qs.refill.pending, failed: qs.refill.failures > 0 },
+    mode: qs.mode,
+    stopAfter: qs.stopAfter,
+    full: isQueueFull(qs),
+    nextUp: peekNext(qs),
+  }), [qs]);
+
+  // The panel gets its own context with stable action functions: it does not re-render when the song position moves.
+  const latestActions = useRef({});
+  useEffect(() => {
+    latestActions.current = {
+      jumpToUid, removeUids, moveUidsToQueue, reorderByUid, clearQueue, refreshRecommendations, removeCurrentSong, playFromHistoryAt,
+      saveQueueAsPlaylist, toggleStopAfter, startSleepTimer, cancelSleepTimer, setAutoplay, continueWithRadio, startRadio, addToQueue, playNext,
+    };
+  });
+  const stableActions = useMemo(() => Object.fromEntries(QUEUE_ACTIONS.map((name) => [name, (...args) => latestActions.current[name]?.(...args)])), []);
+  const queueValue = useMemo(() => ({
+    ...stableActions, queueSections, autoplay: qs.autoplay, offerRadio: qs.offerRadio, currentSong, isPlaying, sleepTimer, showToast,
+  }), [stableActions, queueSections, qs.autoplay, qs.offerRadio, currentSong, isPlaying, sleepTimer, showToast]);
+
   // ---- radio refill: keep the queue topped up so the music never stops ----
   useEffect(() => {
-    if (needsRefill(qs)) runRefill({ get: () => qsRef.current, update: updateQs, fetchRelated });
+    if (needsRefill(qs)) runRefill({ get: () => qsRef.current, update: updateQs, fetchRelated, avoid: getShownOnHome, onAdded: announceAdded });
   }, [qs, refillTick, updateQs]);
 
   // after a failed refill the engine waits (1 s ... 30 s); wake up when the wait is over
@@ -1131,14 +1181,7 @@ export const AudioProvider = ({ children }) => {
         playbackError,
         queue,
         queueIndex,
-        queueSections: {
-          ...getSections(qs),
-          history: [...qs.history].reverse(), // newest first
-          refill: { pending: qs.refill.pending, failed: qs.refill.failures > 0 },
-          mode: qs.mode,
-          stopAfter: qs.stopAfter,
-          full: isQueueFull(qs),
-        },
+        queueSections,
         sleepTimer,
         startSleepTimer,
         cancelSleepTimer,
@@ -1229,7 +1272,7 @@ export const AudioProvider = ({ children }) => {
         }}
         onError={handleYouTubeError}
       />
-      {children}
+      <QueueContext.Provider value={queueValue}>{children}</QueueContext.Provider>
       <Toast toast={toast} onDismiss={() => setToast(null)} />
       <DuplicateQueuePrompt prompt={dupPrompt} onChoose={resolveDuplicate} />
       <ContinueHerePrompt open={Boolean(syncPrompt)} onChoose={resolveSyncPrompt} />
@@ -1242,6 +1285,13 @@ export const useAudio = () => {
   if (!context) {
     throw new Error('useAudio must be used within an AudioProvider');
   }
+  return context;
+};
+
+/** The queue panel's view of the player: steady (no re-render on every tick of the song clock). */
+export const useQueue = () => {
+  const context = useContext(QueueContext);
+  if (!context) throw new Error('useQueue must be used within an AudioProvider');
   return context;
 };
 
