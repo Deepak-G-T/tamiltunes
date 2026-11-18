@@ -111,3 +111,5 @@ Songs may carry an optional `videoId`. It comes from the curated map `backend/sr
 - `GET /api/home` assembles all shelves together (no repeats, Speed Dial songs left out via `?exclude=`); notes in `docs/HOME_FEED.md`.
   Migration `20261122000000_play_events_played_at_index` (additive index). `npm run test:home --prefix frontend` runs the home page audit.
 - UNTESTED: the live JioSaavn pools; how full each shelf is with real data (thin shelves are hidden).
+- Queue feel: Undo messages for every queue change, row motion (`hooks/useFlip.js`), `useQueue` context (panel is not redrawn on the song clock),
+  autoplay variety and "Added N similar songs" (notes in `docs/QUEUE_V2.md`). UNTESTED: real-phone haptics, swipe reveal and drag feel.
