@@ -26,6 +26,21 @@ const canvasSvg = (size, scale) => {
   return `<svg xmlns="http://www.w3.org/2000/svg" width="${size}" height="${size}" viewBox="0 0 ${size} ${size}"><defs><linearGradient id="g" x1="0" y1="1" x2="1" y2="0"><stop offset="0" stop-color="${FROM}"/><stop offset="1" stop-color="${TO}"/></linearGradient></defs><rect width="${size}" height="${size}" fill="${BG}"/><g transform="translate(${o} ${o}) scale(${k})"><rect width="48" height="48" rx="16" fill="url(#g)"/><g transform="translate(12 12)" fill="none" stroke="#fff" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">${note}</g></g></svg>`;
 };
 
+// Sources for `npx @capacitor/assets generate --android` (adaptive icon: the foreground keeps the whole logo inside the 66% safe zone)
+const ASSETS = path.resolve('assets');
+mkdirSync(ASSETS, { recursive: true });
+const layerSvg = (size, scale, withBg) => {
+  const s = size * scale; const k = s / 48; const o = (size - s) / 2;
+  return `<svg xmlns="http://www.w3.org/2000/svg" width="${size}" height="${size}" viewBox="0 0 ${size} ${size}"><defs><linearGradient id="g" x1="0" y1="1" x2="1" y2="0"><stop offset="0" stop-color="${FROM}"/><stop offset="1" stop-color="${TO}"/></linearGradient></defs>${withBg ? `<rect width="${size}" height="${size}" fill="${BG}"/>` : ''}<g transform="translate(${o} ${o}) scale(${k})"><rect width="48" height="48" rx="16" fill="url(#g)"/><g transform="translate(12 12)" fill="none" stroke="#fff" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">${note}</g></g></svg>`;
+};
+const assetJobs = [
+  ['icon-only.png', 1024, 0.8, true],        // legacy square icon: logo on #09090B
+  ['icon-foreground.png', 1024, 0.8, false], // adaptive foreground: transparent; the generator already insets it to the 66% safe zone
+  ['icon-background.png', 1024, 0, 'solid'], // adaptive background: plain #09090B
+  ['splash.png', 2732, 0.2, true],
+  ['splash-dark.png', 2732, 0.2, true],
+];
+
 const jobs = [
   ['icon-192.png', 192, 0.8],
   ['icon-512.png', 512, 0.8],
@@ -43,5 +58,12 @@ for (const [name, size, scale] of jobs) {
   await page.setContent(`<body style="margin:0;background:${BG}">${canvasSvg(size, scale)}</body>`);
   await page.screenshot({ path: path.join(OUT, name), clip: { x: 0, y: 0, width: size, height: size } });
   console.log('wrote', name);
+}
+for (const [name, size, scale, bg] of assetJobs) {
+  await page.setViewportSize({ width: size, height: size });
+  const svg = bg === 'solid' ? `<svg xmlns="http://www.w3.org/2000/svg" width="${size}" height="${size}"><rect width="${size}" height="${size}" fill="${BG}"/></svg>` : layerSvg(size, scale, bg);
+  await page.setContent(`<body style="margin:0;background:${bg === false ? 'transparent' : BG}">${svg}</body>`);
+  await page.screenshot({ path: path.join(ASSETS, name), clip: { x: 0, y: 0, width: size, height: size }, omitBackground: bg === false });
+  console.log('wrote assets/' + name);
 }
 await browser.close();

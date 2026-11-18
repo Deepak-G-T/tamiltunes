@@ -9,3 +9,12 @@ dist
 .DS_Store
 *.log
 .vercel
+
+# Android signing: never commit keys or passwords
+*.keystore
+*.jks
+keystore.properties
+android/local.properties
+frontend/android/local.properties
+frontend/android/app/release/
+frontend/android/capacitor-cordova-android-plugins/build/
