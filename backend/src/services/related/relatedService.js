@@ -3,7 +3,7 @@ import { LIMITS, VARIETY } from './weights.js';
 import { composerOf, languageOf, normMovie, primaryArtist, singersOf } from './text.js';
 import { rankCandidates, whyLabel } from './scoring.js';
 import { diversify } from './diversify.js';
-import { createIdentitySet, sameVariant, titleCore, variantCore } from './identity.js';
+import { createIdentitySet, sameVariant, titleCore, variantCore, compareVersions, clusterSongs } from './identity.js';
 
 const SHELF_KEYS = ['trending', 'latest', 'gana', 'nineties', 'twoThousands', 'melodies', 'love', 'sad', 'folk', 'instrumental'];
 
@@ -75,27 +75,22 @@ export function createRelatedService({ manager, signals, cache = new LruCacheSer
     // Merge and collapse duplicates: the same song under another id or singer order, and versions of a song (unplugged, remix ...),
     // are one candidate; the best copy is kept. The seed and its versions are never offered.
     const byId = new Map();
-    const groups = new Map(); // variant title -> accepted songs with that title
+    const accepted = []; // one entry per song (or version of it); the best copy replaces a worse one
     const seedSet = createIdentitySet([seed]);
     const sources = { recommendations: 0, sameFilm: 0, sameSinger: 0, sameComposer: 0, coListening: 0, shelves: 0 };
-    const completeness = (s) => [s.image, s.album, s.year, s.streamUrl].filter(Boolean).length;
     const isOriginal = (s) => titleCore(s) === variantCore(s);
-    const better = (a, b) => // is a a better copy than b?
-      (Number(a.playCount) || 0) !== (Number(b.playCount) || 0) ? (Number(a.playCount) || 0) > (Number(b.playCount) || 0)
-        : isOriginal(a) !== isOriginal(b) ? isOriginal(a)
-        : completeness(a) > completeness(b);
+    // original over a version first, then the shared rule: original album over a compilation, most played, best source
+    const better = (a, b) => (isOriginal(a) !== isOriginal(b) ? isOriginal(a) : compareVersions(a, b) < 0);
     const take = (list, label) => {
       for (const s of list || []) {
         if (!s?.id || !s.title || s.id === seed.id || byId.has(s.id)) continue;
         if (seedSet.hasVariant(s)) continue;
-        const bucket = groups.get(variantCore(s)) || [];
-        const twin = bucket.find((o) => sameVariant(o, s));
+        const twin = accepted.find((o) => sameVariant(o, s));
         if (twin) {
-          if (better(s, twin)) { byId.delete(twin.id); byId.set(s.id, s); bucket[bucket.indexOf(twin)] = s; } // keep the best copy
+          if (better(s, twin)) { byId.delete(twin.id); byId.set(s.id, s); accepted[accepted.indexOf(twin)] = s; } // keep the best copy
           continue;
         }
-        bucket.push(s);
-        groups.set(variantCore(s), bucket);
+        accepted.push(s);
         byId.set(s.id, s);
         sources[label]++;
       }
@@ -141,7 +136,8 @@ export function createRelatedService({ manager, signals, cache = new LruCacheSer
       .filter((r) => r.score >= 0); // penalised or wrong-language songs never enter a radio batch
 
     const picked = diversify(ranked, { limit: n, maxRun: VARIETY.maxRun, discoveryRatio: VARIETY.discoveryRatio });
-    const items = picked.map((r) => ({ ...r.song, why: r.discovery ? 'Something different' : whyLabel(r.reasons), radioScore: r.score }));
+    const canon = clusterSongs([pool.seed, ...pool.candidates]).canonicalOf;
+    const items = picked.map((r) => ({ ...r.song, canonicalId: canon.get(r.song.id) || r.song.id, why: r.discovery ? 'Something different' : whyLabel(r.reasons), radioScore: r.score }));
 
     return {
       items,

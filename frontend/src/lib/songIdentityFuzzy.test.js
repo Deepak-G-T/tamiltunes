@@ -23,8 +23,11 @@ describe('fuzzy duplicates (the three screenshots)', () => {
     expect(isSameSong(S('x', 'Kannana Kanne', 'A', 'F', 300), S('y', 'Kannaana Kane Kane', 'A', 'F', 0))).toBe(false);
   });
   it('the composer counts as a shared artist', () => {
-    expect(isSameSong(S('1', 'Vaa Vaa', 'Singer One', 'X', 250, { composer: 'Anirudh' }), S('2', 'Vaa Vaa', 'Singer Two', 'Y', 250, { composer: 'Anirudh Ravichander' }))).toBe(false); // different composer spelling is not a match
+    expect(isSameSong(S('1', 'Vaa Vaa', 'Singer One', 'X', 250, { composer: 'Anirudh' }), S('2', 'Vaa Vaa', 'Singer Two', 'Y', 250, { composer: 'Anirudh Ravichander' }))).toBe(true); // a fuller spelling of the same name
     expect(isSameSong(S('1', 'Vaa Vaa', 'Singer One', 'X', 250, { composer: 'Anirudh' }), S('2', 'Vaa Vaa', 'Singer Two', 'Y', 250, { composer: 'Anirudh' }))).toBe(true);
+  });
+  it('different composers and singers do not match', () => {
+    expect(isSameSong(S('1', 'Vaa Vaa', 'Singer One', 'X', 250, { composer: 'Anirudh' }), S('2', 'Vaa Vaa', 'Singer Two', 'Y', 250, { composer: 'Harris Jayaraj' }))).toBe(false);
   });
   it('a strong key (ISRC) settles it whatever the title says', () => {
     expect(isSameSong(S('1', 'One', 'A', 'X', 100, { isrc: 'INA0000001' }), S('2', 'Totally Other', 'B', 'Y', 400, { isrc: 'ina-0000-001' }))).toBe(true);

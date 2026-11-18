@@ -7,6 +7,7 @@
  * A section that cannot reach MIN_ITEMS unique songs is hidden instead of repeating songs.
  */
 import { createSeen, canonMovie, primaryArtist } from './normalize.js';
+import { collapseDuplicates } from '../related/identity.js';
 import { rngFrom, weightedOrder } from './seed.js';
 
 export const MIN_ITEMS = 8;
@@ -27,7 +28,7 @@ export function candidateWeight(index, total, weekPlays = 0) {
 /** Pick songs from `candidates` honouring the caps, in weighted random order. Does not touch `seen`. */
 export function pickSection(candidates, { seen, rng, weekPlays = new Map(), max = MAX_ITEMS, caps = true }) {
   const local = createSeen(); // also keeps look-alikes inside this section apart
-  const pool = candidates.filter((s) => s?.id && !seen.has(s));
+  const pool = collapseDuplicates(candidates.filter((s) => s?.id && !seen.has(s))); // one copy per song: the original release, not a compilation
   const ordered = weightedOrder(pool.map((song, i) => ({ item: song, weight: candidateWeight(i, pool.length, weekPlays.get(song.id) || 0) })), rng);
   const perMovie = new Map();
   const perArtist = new Map();

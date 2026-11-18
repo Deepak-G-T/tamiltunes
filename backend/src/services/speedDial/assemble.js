@@ -1,4 +1,5 @@
 import { SPEED_DIAL } from './config.js';
+import { clusterSongs, createIdentitySet } from '../related/identity.js';
 
 const songView = (song) => ({
   id: song.id,
@@ -25,7 +26,30 @@ const songView = (song) => ({
  *   suggestions?: object[],           // popular songs to fill with (full song objects)
  * }} input
  */
-export function assembleSpeedDial({ scores, overrides, songs, suggestions = [] }, cfg = SPEED_DIAL) {
+export function assembleSpeedDial(input, cfg = SPEED_DIAL) {
+  const { songs } = input;
+  // The same song under another id (spelling, album, compilation) is ONE tile: plays add up, the best version is shown,
+  // and hiding or pinning any copy applies to the whole song.
+  const { canonicalOf } = clusterSongs([...songs.values()]);
+  const canon = (id) => canonicalOf.get(id) || id;
+  const mergedScores = new Map();
+  for (const s of input.scores) {
+    const id = canon(s.songId);
+    const row = mergedScores.get(id);
+    if (!row) mergedScores.set(id, { ...s, songId: id });
+    else { row.score += s.score; row.plays += s.plays; if (s.lastPlayedAt && (!row.lastPlayedAt || s.lastPlayedAt > row.lastPlayedAt)) row.lastPlayedAt = s.lastPlayedAt; }
+  }
+  const scores = [...mergedScores.values()].sort((a, b) => b.score - a.score || String(a.songId).localeCompare(String(b.songId)));
+  const byOverride = new Map();
+  for (const o of input.overrides) {
+    const id = canon(o.songId);
+    const prev = byOverride.get(id);
+    if (!prev) byOverride.set(id, { ...o, songId: id });
+    else byOverride.set(id, { ...(new Date(o.updatedAt || 0) >= new Date(prev.updatedAt || 0) ? o : prev), songId: id, isHidden: prev.isHidden || o.isHidden });
+  }
+  const overrides = [...byOverride.values()];
+  const suggestionSeen = createIdentitySet([...songs.values()]); // suggestions that duplicate a played song are dropped
+  const suggestions = (input.suggestions || []).filter((x) => x?.id && !suggestionSeen.has(x));
   const n = cfg.slots;
   const hidden = new Set(overrides.filter((o) => o.isHidden).map((o) => o.songId));
   const scoreOf = new Map(scores.map((s) => [s.songId, s]));

@@ -109,6 +109,8 @@ export class JioSaavnProvider extends MusicProvider {
       playCount,
       album,
       duration: duration > 0 ? duration : 210,
+      ...(duration > 0 ? {} : { durationEstimated: true }), // 210 is a guess: identity checks treat it as unknown
+      ...(raw.isrc || raw.more_info?.isrc ? { isrc: String(raw.isrc || raw.more_info.isrc) } : {}),
       image,
       year: raw.year || raw.more_info?.year || '2024',
       streamUrl: streamUrl || null,

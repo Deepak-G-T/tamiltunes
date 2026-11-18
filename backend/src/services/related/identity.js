@@ -168,9 +168,12 @@ const artistKeys = (song) => {
   ].filter(Boolean).join(',');
   return new Set(raw.split(/,|&|\/|;|\bfeat\.?\b|\bft\.?\b|\band\b|\bwith\b/i).map((x) => squash(base(x)).replace(/[^\p{L}\p{N}\p{M}]/gu, '')).filter((k) => k.length > 0 && k !== 'tamilartist' && k !== 'various' && k !== 'variousartists'));
 };
-const shareArtist = (a, b) => { const ka = artistKeys(a); const kb = artistKeys(b); for (const k of ka) if (kb.has(k)) return true; return false; };
+// "Anirudh" and "Anirudh Ravichander", "A.R. Rahman" and "Rahman": one name inside the other (5+ letters) is the same person
+const sameName = (x, y) => x === y || (Math.min(x.length, y.length) >= 5 && (x.includes(y) || y.includes(x)));
+const shareArtist = (a, b) => { const ka = artistKeys(a); const kb = artistKeys(b); for (const x of ka) for (const y of kb) if (sameName(x, y)) return true; return false; };
 const hasArtist = (s) => artistKeys(s).size > 0;
-const seconds = (s) => { const d = Number(s?.duration); return Number.isFinite(d) && d > 0 ? d : 0; };
+// a duration the provider guessed (durationEstimated) is as good as missing
+const seconds = (s) => { const d = Number(s?.duration); return Number.isFinite(d) && d > 0 && !s?.durationEstimated ? d : 0; };
 
 /** The strong keys: equal ISRC, source track id or audio hash mean the same recording whatever the title says. */
 export const strongKeys = (song) => [song?.isrc && `isrc:${String(song.isrc).replace(/[\s-]/g, '').toUpperCase()}`, song?.sourceTrackId && `src:${song.sourceTrackId}`, song?.audioHash && `hash:${song.audioHash}`].filter(Boolean);
@@ -192,6 +195,11 @@ export function isSameSong(a, b) {
   if (durationKnown && Math.abs(da - db) > DURATION_TOLERANCE) return false;
   const artistKnown = hasArtist(a) && hasArtist(b);
   if (artistKnown && !shareArtist(a, b)) return false;
+  if (!durationKnown) { // no length to compare: two different films are two different songs, unless one is just a compilation
+    const ma = movieOf(a);
+    const mb = movieOf(b);
+    if (ma && mb && ma !== mb && !isCompilation(a) && !isCompilation(b)) return false;
+  }
   return durationKnown && artistKnown ? true : sim >= SAME_TITLE_STRICT;
 }
 
@@ -306,4 +314,10 @@ export function createIdentitySet(initial = []) {
   };
   for (const s of initial) api.add(s);
   return api;
+}
+
+/** Collapse duplicates (best version kept) and tag every song with its canonicalId. */
+export function withCanonical(songs) {
+  const { canonicalOf } = clusterSongs(songs);
+  return collapseDuplicates(songs).map((s) => ({ ...s, canonicalId: canonicalOf.get(s.id) || s.id }));
 }
