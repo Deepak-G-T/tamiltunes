@@ -18,11 +18,18 @@ Music providers: jiosaavn (unlicensed, personal/portfolio only), youtube (IFrame
 - UI audit: `npm run test:ui --prefix frontend` (Playwright at 360x640 and 390x844, mock backend, stubbed YouTube API)
 
 ## Known open items
-- Real Postgres tests and `prisma migrate diff` are untested (need TEST_DATABASE_URL on a scratch DB).
+- `prisma migrate diff` is untested. The backend suite has run against real PostgreSQL (Neon Postgres 18 branch):
+  set `TEST_DATABASE_URL` to a SCRATCH database or Neon branch, run `npm run build --prefix backend`
+  (prisma generate) first, then `npm test --prefix backend`. Never point it at production.
 - audit/golden_labeled.csv needs hand labels from the owner.
 - Mobile full-screen player and YouTube autoplay must be tested on a real phone.
 - Stream proxy: keep ENABLE_EXTERNAL_STREAMS off in production.
 - Required env: Render needs DATABASE_URL, JWT_SECRET, NODE_ENV=production, CORS_ORIGIN (explicit origins), VERCEL_TEAM_SLUG, MUSIC_PROVIDER. Vercel needs VITE_API_BASE_URL.
+- Database: production runs on Neon (Singapore, Postgres 18). `DATABASE_URL` is a Render dashboard value
+  (`sync: false` in render.yaml), set to the Neon DIRECT string with `?sslmode=require&connect_timeout=15&connection_limit=5`.
+  Setting it through the Render API does NOT redeploy: trigger a deploy afterwards. The backend retries the first
+  connection (Neon scales to zero). The old Render Postgres is a legacy rollback copy (free plan, deleted 2026-12-17):
+  remove it and the `databases:` block in render.yaml once Neon has been stable for a week.
 
 ## Optional env: video lookup (all off by default)
 Songs may carry an optional `videoId`. It comes from the curated map `backend/src/services/music/curatedVideos.js`
@@ -64,13 +71,14 @@ Songs may carry an optional `videoId`. It comes from the curated map `backend/sr
   and in-memory implementations), controllers `comment|profile|user`, routes `/api/songs/:id/comments`, `/api/comments/:id/*`,
   `/api/profile/me`, `/api/users/:username/*`. Authorization is enforced in the API (there is no RLS on this stack).
 - Migration `20261118000000_comments_profile` is additive and idempotent (backfills `users.username`). Run with the
-  UNPOOLED database URL: `npm run migrate --prefix backend`. Seed demo data locally: `npm run seed:community --prefix backend`.
+  direct (non-pooler) database URL: `npm run migrate --prefix backend` (Render also applies it on start). Seed demo
+  data locally: `npm run seed:community --prefix backend`.
 - Roles: `users.role` is `user` | `artist` | `admin`. Set it by hand in the database; it cannot be changed through the API.
   Artists/admins can pin comments; an artist's like shows the "Liked by artist" badge.
 - Blocklists live in `backend/src/community/contentFilterWords.js`. The Tamil list is a conservative starter set and needs native review.
 - Env: `FRONTEND_URL` (alias of `CORS_ORIGIN`); Vercel optional `BACKEND_URL` for `frontend/api/og.js` (link-preview HTML for bots).
 - Comments poll every 8s while the sheet is open (no websockets). New comments show live; likes/edits/deletes by others on refresh.
 - Playlists are private by default (`isPublic`); `GET /api/playlists/:id` returns 404 to non-owners of private playlists.
-- UNTESTED: Prisma store + migration on real Postgres/Neon, `frontend/api/og.js` + the bot rewrite on Vercel, real-phone crop/gestures.
+- Verified on real PostgreSQL (Neon): the Prisma store and the migration. UNTESTED: `frontend/api/og.js` + the bot rewrite on Vercel, real-phone crop/gestures.
 - `npm run test:ui` runs two suites; the older `runPlaywrightAudit.mjs` needs real network (YouTube iframe) and also rewrites
   tracked files in `audit/screenshots/` (restore them with `git checkout -- audit/screenshots` before committing).
