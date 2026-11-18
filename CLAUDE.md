@@ -98,3 +98,9 @@ Songs may carry an optional `videoId`. It comes from the curated map `backend/sr
 ## Player queue (feature/player-queue, stacked on feature/speed-dial)
 - Engine `frontend/src/lib/radioQueue.js` (tests in `radioQueue.test.js`), notes in `docs/PLAYER_QUEUE.md`. Search returns `playlists` (public only).
 - UNTESTED: drawer drag/swipe on real devices, playlist search on real Postgres.
+
+## Play queue v2 (feature/queue-v2, on master)
+- Notes, API table and shortcuts: `docs/QUEUE_V2.md`. Migration `20261121000000_queue_state` (additive; run with the UNPOOLED url). Library: `@dnd-kit`.
+- Only song ids are saved (`PUT /api/me/queue`); metadata is re-fetched on restore. `POST /api/music/songs/resolve` is public (guests), rate limited.
+- `npm run test:queue --prefix frontend` runs the queue Playwright audit (also part of `npm run test:ui`).
+- UNTESTED: real-phone drag/swipe, a second real device for "Continue on this device?", Neon (only a scratch local Postgres 16 was used).
