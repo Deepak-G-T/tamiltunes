@@ -56,12 +56,13 @@ const MusicPlayer = ({ onAddToPlaylist }) => {
   const { isAuthenticated } = useAuth();
   const hasSong = Boolean(currentSong);
   const [panels, setPanels] = useState(null);
-  useEffect(() => { // as soon as a song is on (never before: it would slow the first page load)
-    if (!hasSong || panels) return undefined;
+  const wantPanels = hasSong || isQueueOpen || isFullScreen; // a song is on, or a panel was opened with nothing playing (the empty queue)
+  useEffect(() => { // not before that: it would slow the first page load
+    if (!wantPanels || panels) return undefined;
     let alive = true;
     loadPanels().then((p) => { if (alive) setPanels(p); }).catch(() => { /* offline: the panels open once the code can load */ });
     return () => { alive = false; };
-  }, [hasSong, panels]);
+  }, [wantPanels, panels]);
   const QueueDrawer = panels?.QueueDrawer;
   const FullScreenPlayer = panels?.FullScreenPlayer;
   const [isFavorite, setIsFavorite] = useState(false);
