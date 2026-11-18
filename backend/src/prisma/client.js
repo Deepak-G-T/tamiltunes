@@ -33,6 +33,13 @@ class InMemoryDb {
       }
       return null;
     },
+    update: async ({ where, data }) => {
+      const u = this.users.get(where.id);
+      if (!u) throw new Error('User not found');
+      const updated = { ...u, ...data, updatedAt: new Date() };
+      this.users.set(where.id, updated);
+      return { ...updated };
+    },
     create: async ({ data }) => {
       const user = {
         id: 'usr_' + Math.random().toString(36).substring(2, 11),
