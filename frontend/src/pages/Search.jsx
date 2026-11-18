@@ -8,6 +8,7 @@ import ArtistCard from '../components/cards/ArtistCard';
 import PlaylistResultCard from '../components/cards/PlaylistResultCard';
 import api from '../services/api';
 import { useAuth } from '../context/AuthContext';
+import { useRecentSearches } from '../hooks/useRecentSearches';
 
 const POPULAR_SEARCHES = [
   'Leo', 'Jailer', 'Master', 'Anirudh', 'AR Rahman', 'Ilaiyaraaja',
@@ -27,23 +28,17 @@ const Search = () => {
   const [loading, setLoading] = useState(false);
   const [results, setResults] = useState({ songs: [], albums: [], artists: [], playlists: [] });
   const [error, setError] = useState(null);
-  const [recentSearches, setRecentSearches] = useState(() => {
-    try {
-      const saved = localStorage.getItem('tamiltunes_recent_searches');
-      return saved ? JSON.parse(saved) : [];
-    } catch {
-      return [];
-    }
-  });
+  // Recent searches are saved only when a search is committed (Enter, a chip or tile, or an action on a result), never while typing
+  const { recent: recentSearches, save: saveRecentSearch, remove: removeRecent, clear: clearRecent } = useRecentSearches();
 
-  // Debounce input
+  // Debounce input: results and the address bar follow the typing, but NOTHING is stored here
   useEffect(() => {
     const handler = setTimeout(() => {
       setDebouncedTerm(searchTerm);
       if (searchTerm.trim()) {
-        setSearchParams({ q: searchTerm.trim() });
+        setSearchParams({ q: searchTerm.trim() }, { replace: true }); // replace: typing must not fill the Back button either
       } else {
-        setSearchParams({});
+        setSearchParams({}, { replace: true });
       }
     }, 350);
 
@@ -61,14 +56,6 @@ const Search = () => {
     let isMounted = true;
     setLoading(true);
     setError(null);
-
-    // Save to recent searches
-    setRecentSearches((prev) => {
-      const clean = prev.filter((s) => s.toLowerCase() !== debouncedTerm.toLowerCase());
-      const updated = [debouncedTerm, ...clean].slice(0, 8);
-      localStorage.setItem('tamiltunes_recent_searches', JSON.stringify(updated));
-      return updated;
-    });
 
     api.get('/music/search', {
       params: {
@@ -106,11 +93,23 @@ const Search = () => {
     setResults({ songs: [], albums: [], artists: [], playlists: [] });
   };
 
-  const removeRecentSearch = (itemToRemove, e) => {
-    e.stopPropagation();
-    const updated = recentSearches.filter((s) => s !== itemToRemove);
-    setRecentSearches(updated);
-    localStorage.setItem('tamiltunes_recent_searches', JSON.stringify(updated));
+  // Run a search right now (no waiting for the typing pause) and remember it
+  const commitSearch = (text) => {
+    const q = text.trim();
+    setSearchTerm(q);
+    setDebouncedTerm(q);
+    if (q) setSearchParams({ q }, { replace: true });
+    saveRecentSearch(q);
+  };
+
+  // Pressing Enter commits what is typed. A chip or tile commits its own text.
+  const onSearchKeyDown = (e) => {
+    if (e.key === 'Enter' && !e.nativeEvent.isComposing) { e.preventDefault(); commitSearch(searchTerm); } // isComposing: do not fire while a Tamil input method is still composing
+  };
+
+  // Playing, adding or opening something from the results means the search worked: remember the text that found it
+  const onResultsClick = (e) => {
+    if (e.target.closest('button, a, [role="button"]')) saveRecentSearch(debouncedTerm);
   };
 
   const hasResults =
@@ -130,6 +129,9 @@ const Search = () => {
           type="text"
           value={searchTerm}
           onChange={(e) => setSearchTerm(e.target.value)}
+          onKeyDown={onSearchKeyDown}
+          enterKeyHint="search"
+          aria-label="Search"
           placeholder="Search Tamil songs, movies, singers, music directors, albums..."
           className="w-full pl-12 pr-10 py-3.5 rounded-full bg-surface-4 hover:bg-surface-5 border-2 border-transparent text-white placeholder-zinc-400 text-sm font-medium focus:outline-none focus:border-white transition-colors"
         />
@@ -180,7 +182,7 @@ const Search = () => {
 
       {/* Results View */}
       {!loading && debouncedTerm && hasResults && (
-        <div className="space-y-8">
+        <div className="space-y-8" onClickCapture={onResultsClick}>
           {/* Songs Section */}
           {(activeFilter === 'all' || activeFilter === 'songs') && results.songs?.length > 0 && (
             <div>
@@ -264,27 +266,28 @@ const Search = () => {
         <div className="space-y-6 pt-2">
           {recentSearches.length > 0 && (
             <div>
-              <div className="flex items-center gap-2 mb-3 text-xs font-semibold text-zinc-400 uppercase tracking-wider">
-                <Clock className="w-3.5 h-3.5 text-zinc-400" />
-                <span>Recent Searches</span>
+              <div className="flex items-center justify-between gap-2 mb-3">
+                <div className="flex items-center gap-2 text-xs font-semibold text-zinc-400 uppercase tracking-wider">
+                  <Clock className="w-3.5 h-3.5 text-zinc-400" />
+                  <span>Recent Searches</span>
+                </div>
+                <button type="button" onClick={clearRecent} className="text-xs font-semibold text-zinc-400 hover:text-white hover:underline focus-visible:outline focus-visible:outline-2 focus-visible:outline-brand-400 rounded">
+                  Clear all
+                </button>
               </div>
-              <div className="flex flex-wrap gap-2">
-                {recentSearches.map((item, idx) => (
-                  <div
-                    key={idx}
-                    onClick={() => setSearchTerm(item)}
-                    className="flex items-center gap-2 px-3.5 py-1.5 rounded-full bg-white/10 hover:bg-white/20 text-sm text-white cursor-pointer transition-colors"
-                  >
-                    <span>{item}</span>
-                    <button
-                      onClick={(e) => removeRecentSearch(item, e)}
-                      className="text-zinc-500 hover:text-rose-400"
-                    >
-                      <X className="w-3 h-3" />
+              <ul className="flex flex-wrap gap-2" aria-label="Recent searches">
+                {recentSearches.map((item) => (
+                  <li key={item} className="flex items-center rounded-full bg-white/10 hover:bg-white/20 transition-colors">
+                    <button type="button" onClick={() => commitSearch(item)} className="pl-3.5 pr-1.5 py-1.5 text-sm text-white rounded-l-full focus-visible:outline focus-visible:outline-2 focus-visible:outline-brand-400">
+                      {item}
                     </button>
-                  </div>
+                    <button type="button" onClick={() => removeRecent(item)} aria-label={`Remove ${item} from recent searches`}
+                      className="pr-3 pl-1 py-1.5 text-zinc-400 hover:text-rose-400 rounded-r-full focus-visible:outline focus-visible:outline-2 focus-visible:outline-brand-400">
+                      <X className="w-3 h-3" aria-hidden="true" />
+                    </button>
+                  </li>
                 ))}
-              </div>
+              </ul>
             </div>
           )}
 
@@ -294,7 +297,7 @@ const Search = () => {
               {POPULAR_SEARCHES.map((term, idx) => (
                 <button
                   key={term}
-                  onClick={() => setSearchTerm(term)}
+                  onClick={() => commitSearch(term)}
                   className={`relative overflow-hidden aspect-[16/9] md:aspect-[2/1] rounded-lg p-3 md:p-4 text-left text-base md:text-xl font-extrabold text-white leading-tight hover:scale-[1.02] transition-transform focus-visible:ring-2 focus-visible:ring-white focus-visible:outline-none ${tileColor(idx)}`}
                 >
                   <span className="relative z-10 line-clamp-2">{term}</span>
