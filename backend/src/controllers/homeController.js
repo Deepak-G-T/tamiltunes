@@ -1,4 +1,4 @@
-import { buildHome, TAB_TITLES } from '../services/homeFeed/homeFeedService.js';
+import { buildHome, TAB_TITLES, MAX_AVOID } from '../services/homeFeed/homeFeedService.js';
 import { videoLookup } from '../services/music/videoLookup.js';
 
 /**
@@ -10,7 +10,11 @@ export const getHome = async (req, res, next) => {
   try {
     const exclude = String(req.query.exclude || '').split(',').map((s) => s.trim()).filter((s) => /^[\w.:\-~]{1,128}$/.test(s)).slice(0, 60);
     const tab = typeof req.query.tab === 'string' && TAB_TITLES[req.query.tab] ? req.query.tab : null;
-    const feed = await buildHome({ userId: req.user?.id || null, exclude, tab });
+    const idList = (raw, max) => String(raw || '').split(',').map((x) => x.trim()).filter((x) => /^[\w.:\-~]{1,128}$/.test(x)).slice(0, max);
+    const visit = typeof req.query.visit === 'string' && /^[\w-]{1,24}$/.test(req.query.visit) ? req.query.visit : null; // new on each app open / pull to refresh
+    const avoid = idList(req.query.avoid, MAX_AVOID); // songs shown last time
+    const hintArtists = String(req.query.artists || '').split(',').map((x) => x.trim().replace(/[^\p{L}\p{N} .'&-]/gu, '')).filter((x) => x.length >= 2 && x.length <= 60).slice(0, 6);
+    const feed = await buildHome({ userId: req.user?.id || null, exclude, tab, visit, avoid, hintArtists: req.user?.id ? [] : hintArtists });
     const withVideo = (items, kind) => (kind === 'songs' ? videoLookup.attach(items) : items);
     res.json({
       success: true,

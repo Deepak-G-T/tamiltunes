@@ -27,6 +27,9 @@ export const VARIETY = {
   maxRun: 3, // never more than this many in a row from the same artist or the same album
   discoveryRatio: 0.3, // about 30% of a batch is "discovery" (less similar), the rest is very similar
   similarMinScore: 2.0, // score at or above this counts as "very similar"
+  maxPerMovie: 2, // within any movieWindow songs of a batch, at most this many from one film or album
+  movieWindow: 10,
+  maxSingerOnlyShare: 0.3, // "same singer" must not be the only reason for more than this share of a batch
 };
 
 export const LIMITS = {

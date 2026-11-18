@@ -28,10 +28,11 @@ export const toFeedSong = (s) => s && ({
   source: 'audio',
 });
 
-const artistNames = (songs, counts, limit) => {
+const LIKE_POINTS = 3; // a liked song counts like three plays for taste
+const artistNames = (songs, counts, limit, liked = new Set()) => {
   const score = new Map();
   for (const s of songs) {
-    const plays = counts.get(s.id) || 1;
+    const plays = (counts.get(s.id) || 0) + (liked.has(s.id) ? LIKE_POINTS : 0) || 1;
     const names = String(s.artist || '').split(/[,&]/).map((x) => x.trim()).filter(Boolean);
     for (const n of names.slice(0, 2)) score.set(n, (score.get(n) || 0) + plays);
   }
@@ -46,7 +47,9 @@ export function createMemorySignals() {
     async weekPlays(userId, now = Date.now()) { return tally(counted(userId, now - WINDOWS.weekDays * DAY)); },
     async topArtists(userId, limit = 3, now = Date.now()) {
       const counts = tally(counted(userId, now - WINDOWS.tasteDays * DAY));
-      return artistNames([...counts.keys()].map((id) => toFeedSong(db.songs.get(id))).filter(Boolean), counts, limit);
+      const liked = new Set([...db.favorites.values()].filter((f) => f.userId === userId).map((f) => f.songId));
+      const ids = new Set([...counts.keys(), ...liked]);
+      return artistNames([...ids].map((id) => toFeedSong(db.songs.get(id))).filter(Boolean), counts, limit, liked);
     },
     async globalTrending(limit = 30, now = Date.now()) {
       const counts = tally(counted(null, now - WINDOWS.trendingDays * DAY));
@@ -78,7 +81,9 @@ export function createPrismaSignals(prisma) {
     async topArtists(userId, limit = 3, now = Date.now()) {
       const rows = await prisma.playEvent.groupBy({ by: ['songId'], where: { userId, playedAt: { gte: since(WINDOWS.tasteDays, now) }, OR: COUNTED }, _count: { _all: true }, orderBy: { _count: { songId: 'desc' } }, take: 60 });
       const counts = new Map(rows.map((r) => [r.songId, r._count._all]));
-      return artistNames((await songsByIds([...counts.keys()])).map(toFeedSong), counts, limit);
+      const likedRows = await prisma.favorite.findMany({ where: { userId }, select: { songId: true }, orderBy: { createdAt: 'desc' }, take: 60 }).catch(() => []);
+      const liked = new Set(likedRows.map((r) => r.songId));
+      return artistNames((await songsByIds([...new Set([...counts.keys(), ...liked])])).map(toFeedSong), counts, limit, liked);
     },
     async globalTrending(limit = 30, now = Date.now()) {
       const rows = await prisma.playEvent.groupBy({ by: ['songId'], where: { playedAt: { gte: since(WINDOWS.trendingDays, now) }, OR: COUNTED }, _count: { _all: true }, orderBy: { _count: { songId: 'desc' } }, take: limit }); // uses the playedAt index

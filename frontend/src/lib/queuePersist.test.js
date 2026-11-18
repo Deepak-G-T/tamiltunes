@@ -6,7 +6,7 @@ import {
   toSaved, fromSaved, sameQueue, shouldAskToContinue, savedIds, readGuestQueue, writeGuestQueue, getDeviceId, withRetry, isTransient, GUEST_QUEUE_KEY,
 } from './queuePersist';
 
-const S = (id) => ({ id, title: `Song ${id}`, artist: 'A', image: null, duration: 100 });
+const S = (id) => ({ id, title: `Song ${id}`, artist: `Artist ${id}`, image: null, duration: 100 }); // a different artist each, so the 3-in-a-row rule does not drop songs
 const byId = (...ids) => Object.fromEntries(ids.map((i) => [i, S(i)]));
 const memory = () => { const m = new Map(); return { getItem: (k) => (m.has(k) ? m.get(k) : null), setItem: (k, v) => m.set(k, String(v)), removeItem: (k) => m.delete(k) }; };
 const radioState = () => {

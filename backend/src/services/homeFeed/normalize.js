@@ -1,3 +1,4 @@
+import { isSameSong, createIdentitySet } from '../related/identity.js';
 /**
  * "Is this the same song?" for the home page. The same song often comes back under different ids: a remaster, a duplicate
  * upload, or a title like `Vaathi Coming (From "Master")`. Titles are cleaned, then compared together with the movie
@@ -29,43 +30,20 @@ export const singersOf = (song) =>
 export const primaryArtist = (song) => [...singersOf(song)][0] || '';
 
 /**
- * Two songs are the same when the cleaned titles match AND the movies agree (or one side has no movie)
- * AND the singers overlap (or one side has no singers).
+ * Two songs are the same song when they sound alike (phonetic Tanglish title, same version words), have the same length (within 2 s),
+ * and share an artist or music director; an equal ISRC / track id also counts. See related/identity.js (same rules as the web app).
  */
-export function sameSong(a, b) {
-  if (!a || !b) return false;
-  if (a.id && a.id === b.id) return true;
-  const ta = canonTitle(a);
-  if (!ta || ta !== canonTitle(b)) return false;
-  const ma = canonMovie(a);
-  const mb = canonMovie(b);
-  if (ma && mb && ma !== mb) return false;
-  const sa = singersOf(a);
-  const sb = singersOf(b);
-  if (sa.size && sb.size && ![...sa].some((x) => sb.has(x) || [...sb].some((y) => x.includes(y) || y.includes(x)))) return false;
-  return true;
-}
+export const sameSong = isSameSong;
 
-/** A growing set of songs already on the page. `has` treats look-alikes as the same song. */
+/** A growing set of songs already on the page. `has` treats look-alikes (any id, spelling or album) as the same song. */
 export function createSeen(initial = []) {
-  const byTitle = new Map();
+  const set = createIdentitySet(initial);
   const ids = new Set();
   const api = {
-    add(song) {
-      if (!song) return api;
-      if (song.id) ids.add(song.id);
-      const t = canonTitle(song);
-      if (!byTitle.has(t)) byTitle.set(t, []);
-      byTitle.get(t).push(song);
-      return api;
-    },
-    has(song) {
-      if (!song) return false;
-      if (song.id && ids.has(song.id)) return true;
-      return (byTitle.get(canonTitle(song)) || []).some((other) => sameSong(song, other));
-    },
+    add(song) { if (song) { if (song.id) ids.add(song.id); set.add(song); } return api; },
+    has: (song) => set.has(song),
     get size() { return ids.size; },
   };
-  for (const s of initial) api.add(s);
+  for (const s of initial) if (s?.id) ids.add(s.id);
   return api;
 }

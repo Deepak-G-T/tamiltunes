@@ -81,7 +81,7 @@ describe('windowing long queues', () => {
     expect(end.padBottom).toBe(0);
   });
   it('uses fixed heights', () => {
-    expect([ROW_HEIGHT, HEADER_HEIGHT, NOTE_HEIGHT]).toEqual([60, 40, 72]);
+    expect([ROW_HEIGHT, HEADER_HEIGHT, NOTE_HEIGHT]).toEqual([72, 40, 72]);
   });
 });
 

@@ -243,3 +243,8 @@ input[type="range"]:active::-moz-range-thumb {
 
 .no-scrollbar { scrollbar-width: none; }
 .no-scrollbar::-webkit-scrollbar { display: none; }
+
+/* Long text in one line (the "Playing from" bar): slides to the end and back. Still text when motion is reduced. */
+@keyframes marquee-slide { 0%, 15% { transform: translateX(0); } 50%, 65% { transform: translateX(var(--marquee-shift)); } 100% { transform: translateX(0); } }
+.marquee-slide { animation: marquee-slide 10s ease-in-out infinite; }
+@media (prefers-reduced-motion: reduce) { .marquee-slide { animation: none; } }

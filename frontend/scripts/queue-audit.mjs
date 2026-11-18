@@ -15,7 +15,7 @@ const BASE = `http://127.0.0.1:${PORT}`;
 const song = (id, title, extra = {}) => ({ id, title, artist: 'Test Artist', album: 'Test Album', duration: 200, image: '', streamUrl: `https://aac.saavncdn.com/${id}_320.mp4`, source: 'audio', ...extra });
 const Q = Array.from({ length: 6 }, (_, i) => song(`q${i + 1}`, `Queue Song ${i + 1}`));
 const RADIO_ARTISTS = ['Artist A', 'Artist A', 'Artist A', 'Artist A', 'Artist A', 'Artist B', 'Artist B', 'Artist C', 'Artist C', 'Artist C', 'Artist D', 'Artist D']; // five in a row by one artist: autoplay must spread them
-const R = Array.from({ length: 12 }, (_, i) => song(`r${i + 1}`, `Radio Song ${i + 1}`, { duration: 180, artist: RADIO_ARTISTS[i] }));
+const R = Array.from({ length: 12 }, (_, i) => song(`r${i + 1}`, `Radio Song ${i + 1}`, { duration: 180, artist: RADIO_ARTISTS[i], album: `Radio Film ${i + 1}` })); // a different film each: at most 2 songs per film are allowed per 10
 const relatedCalls = [];
 const FEED = { trending: Q, latest: [], gana: [], nineties: [], twoThousands: [], melodies: [], love: [], sad: [], folk: [], instrumental: [], popularAlbums: [], popularArtists: [], albums: [], artists: [] };
 
@@ -607,7 +607,7 @@ async function phone(browser, width, height) {
   check(`${tag} rows have a visible drag handle and at least 44 px touch targets for the main actions`, await (async () => {
     const h = await page.locator('[data-testid=queue-row]').first().locator('button[aria-label^="Reorder"]').boundingBox();
     const row = await page.locator('[data-testid=queue-row]').first().boundingBox();
-    return h && h.width >= 40 && h.height >= 40 && row.height >= 56;
+    return h && h.width >= 44 && h.height >= 44 && row.height >= 64;
   })());
 
   const before = await titles(page);
@@ -657,6 +657,94 @@ async function phone(browser, width, height) {
   await ctx.close();
 }
 
+
+// Long Tanglish titles and long singer lists on a phone: nothing is cut off without a way to read it, targets stay 44px.
+async function mobileRows(browser, width, height) {
+  const tag = `[${width}x${height} rows]`;
+  const ctx = await browser.newContext({ viewport: { width, height }, deviceScaleFactor: 1, isMobile: true, hasTouch: true });
+  const page = await ctx.newPage();
+  const errors = [];
+  page.on('pageerror', (e) => errors.push(e.message));
+  await setup(page);
+  currentPage = page;
+  const LONG_ARTISTS = 'A.R. Rahman, Vijay Prakash, Shreya Ghoshal, Chinmayi Sripaada, Karthik';
+  await page.route('**/api/music/songs/resolve', (r) => {
+    const ids = JSON.parse(r.request().postData() || '{}').ids || [];
+    const songs = Object.fromEntries(ids.map((id, i) => [id, song(id, i === 1 ? 'Innum Konjam Neram (From "Maryan") - Extended Film Version Original Motion Picture' : `Long Title Number ${i} (From "Some Very Long Film Name")`, { artist: LONG_ARTISTS, album: 'A.R. Rahman Romantic Hits Collection Of The Year', duration: 313 })]));
+    return r.fulfill({ json: { success: true, songs } });
+  });
+  await page.addInitScript(() => {
+    const items = Array.from({ length: 12 }, (_, i) => ({ id: `m${i}`, o: i < 2 ? 'u' : 'r' }));
+    localStorage.setItem('tamiltunes_queue_v1', JSON.stringify({ items, currentIndex: 0, positionSec: 0, shuffle: false, repeat: 'off', autoplay: false, mode: 'radio', sourceLabel: null, deviceId: 'x' }));
+  });
+  await page.goto(`${BASE}/`);
+  await page.waitForSelector('[aria-label="Show queue"]');
+  await page.locator('[aria-label="Show queue"]').tap();
+  await page.waitForSelector('[data-testid=queue-row]');
+  await sleep(page, 400);
+  const first = page.locator('[data-testid=queue-row]').first();
+  const m = await first.evaluate((li) => {
+    const r = (el) => el?.getBoundingClientRect();
+    const title = li.querySelector('[data-testid=queue-row-title]');
+    const artist = li.querySelector('[data-testid=queue-row-artist]');
+    const grip = li.querySelector('button[aria-label^="Reorder"]');
+    const more = li.querySelector('button[aria-label^="More options"]');
+    const dur = li.querySelector('[aria-label^="Length"]');
+    const lh = parseFloat(getComputedStyle(title).lineHeight);
+    const hit = (b) => ({ w: Math.round(r(b).width), h: Math.round(r(b).height) });
+    const overlap = (a, b) => !(a.right <= b.left || b.right <= a.left || a.bottom <= b.top || b.bottom <= a.top);
+    return { row: Math.round(r(li).height), titleLines: Math.round(r(title).height / lh), titleAttr: title.getAttribute('title'), artistLines: Math.round(r(artist).height / parseFloat(getComputedStyle(artist).lineHeight)), artistAttr: artist.getAttribute('title'), grip: hit(grip), more: hit(more), durationClear: !overlap(r(dur), r(more)) && !overlap(r(dur), r(grip)), overflowX: li.scrollWidth > li.clientWidth + 1 };
+  });
+  check(`${tag} a long title wraps to two lines and keeps its full text in the tooltip`, m.titleLines === 2 && /Extended Film Version/.test(m.titleAttr), JSON.stringify(m));
+  check(`${tag} the artists stay on one line, the full list is in the tooltip`, m.artistLines === 1 && m.artistAttr === LONG_ARTISTS, JSON.stringify(m));
+  check(`${tag} rows are at least 64px high`, m.row >= 64, JSON.stringify(m));
+  check(`${tag} the drag handle and the "..." button are at least 44px`, m.grip.w >= 44 && m.grip.h >= 44 && m.more.w >= 44 && m.more.h >= 44, JSON.stringify(m));
+  check(`${tag} the duration is not crowded by the handle or the menu button`, m.durationClear && !m.overflowX, JSON.stringify(m));
+  const headers = await page.locator('[data-testid=queue-list] h3').allTextContents();
+  check(`${tag} the section headers "Next in queue" and "Next from radio" are shown`, headers.includes('Next in queue') && headers.includes('Next from radio'), headers.join('|'));
+  const pinnedBefore = await page.locator('[data-testid=queue-now-playing]').boundingBox();
+  await page.locator('[data-testid=queue-list]').evaluate((el) => { el.scrollTop = 400; });
+  await sleep(page, 200);
+  const pinnedAfter = await page.locator('[data-testid=queue-now-playing]').boundingBox();
+  check(`${tag} the current song row stays pinned while the list scrolls`, pinnedBefore && pinnedAfter && Math.abs(pinnedBefore.y - pinnedAfter.y) < 2, JSON.stringify([pinnedBefore, pinnedAfter]));
+  await page.locator('[data-testid=queue-list]').evaluate((el) => { el.scrollTop = 0; });
+  await first.locator('button[aria-label^="More options"]').tap();
+  await page.waitForSelector('[data-testid=menu-heading]');
+  const head = await page.locator('[data-testid=menu-heading]').innerText();
+  check(`${tag} the "..." menu starts with the full title and all singers`, /Extended Film Version/.test(head) && head.includes(LONG_ARTISTS), head);
+  await page.keyboard.press('Escape');
+  check(`${tag} no page errors`, errors.length === 0, errors.join(' | '));
+  await ctx.close();
+}
+
+async function playingFrom(browser) {
+  const tag = '[360x640 playing from]';
+  const ctx = await browser.newContext({ viewport: { width: 360, height: 640 }, deviceScaleFactor: 1, isMobile: true, hasTouch: true });
+  const page = await ctx.newPage();
+  await setup(page);
+  currentPage = page;
+  await page.route('**/api/music/songs/resolve', (r) => {
+    const ids = JSON.parse(r.request().postData() || '{}').ids || [];
+    return r.fulfill({ json: { success: true, songs: Object.fromEntries(ids.map((id) => [id, song(id, 'Short Title', { album: 'A.R. Rahman Romantic Hits Collection Of The Year Volume Two Special Edition' })])) } });
+  });
+  await page.addInitScript(() => {
+    localStorage.setItem('tamiltunes_queue_v1', JSON.stringify({ items: [{ id: 'p1', o: 'r' }, { id: 'p2', o: 'r' }], currentIndex: 0, positionSec: 0, shuffle: false, repeat: 'off', autoplay: false, mode: 'radio', sourceLabel: null, deviceId: 'x' }));
+  });
+  await page.goto(`${BASE}/`);
+  await page.waitForSelector('[aria-label="Open now playing full screen"]');
+  await page.locator('[aria-label="Open now playing full screen"]').tap();
+  await page.waitForSelector('[data-testid=marquee-text]');
+  const mq = page.locator('[data-testid=marquee-text]');
+  const full = await mq.getAttribute('aria-label');
+  check(`${tag} "Playing from" carries the full source name`, /Collection Of The Year Volume Two Special Edition/.test(full), full);
+  check(`${tag} a long source name scrolls (marquee) instead of being cut`, (await mq.getAttribute('data-overflow')) === 'true' && (await mq.locator('span').first().getAttribute('class')).includes('marquee-slide'));
+  await mq.tap();
+  await sleep(page, 200);
+  const open = await mq.evaluate((el) => ({ expanded: el.getAttribute('aria-expanded'), h: el.getBoundingClientRect().height, sw: el.scrollWidth <= el.clientWidth + 1 }));
+  check(`${tag} tapping it shows the whole name on several lines`, open.expanded === 'true' && open.sw && open.h > 30, JSON.stringify(open));
+  await ctx.close();
+}
+
 let server;
 let browser;
 try {
@@ -668,7 +756,7 @@ try {
   if (!only || only === 'long') await longList(browser);
   if (!only || only === 'stream') await failedStream(browser);
   if (!only || only === 'feel') { await feel(browser); await stableScroll(browser); await motion(browser); }
-  if (!only || only === 'phone') { await phone(browser, 360, 640); await phone(browser, 390, 844); }
+  if (!only || only === 'phone') { await phone(browser, 360, 640); await phone(browser, 390, 844); await mobileRows(browser, 360, 640); await mobileRows(browser, 390, 844); await playingFrom(browser); }
 } catch (err) {
   console.error('Queue audit crashed:', String(err.message).split('\n').slice(0, 12).join('\n'));
   if (OUT && currentPage) await currentPage.screenshot({ path: path.join(OUT, 'crash.png') }).catch(() => {});

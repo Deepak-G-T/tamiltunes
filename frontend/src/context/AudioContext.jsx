@@ -934,7 +934,7 @@ export const AudioProvider = ({ children }) => {
     if (!song) return 'none';
     const q = qsRef.current;
     if (isQueueFull(q)) { showToast(`The queue is full (${MAX_QUEUE} songs). Remove some to add more.`); return 'full'; }
-    const at = findQueued(q, song.id);
+    const at = findQueued(q, song); // the same song under another id or singer order counts as queued
     if (at >= 0) { setDupPrompt({ song, where, uid: q.upcoming[at].uid }); return 'prompt'; }
     withUndo(where === 'next' ? 'Playing next.' : 'Added to queue.', (s) => (where === 'next' ? queuePlayNext(s, song) : queueAdd(s, song)));
     return 'added';

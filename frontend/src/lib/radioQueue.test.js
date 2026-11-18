@@ -675,3 +675,129 @@ describe('smarter autoplay (queue feel)', () => {
     for (let i = 11; i <= 60; i++) expect(request.exclude).toContain(`p${i}`);
   });
 });
+
+describe('no repeats of the same song or its versions (autoplay)', () => {
+  const think = (id, extra = {}) => ({ id, title: 'Pavazha Malli (From "Think Indie")', album: 'Think Indie', singers: 'Sam CS, Pragathi Guruprasad', artist: 'Sam CS', ...extra });
+  const unplugged = (id, extra = {}) => think(id, { title: 'Pavazha Malli Unplugged (From "Think Indie")', ...extra });
+  const other = (id, n = 1, extra = {}) => ({ id, title: `Other ${id}`, album: `Film ${n}`, singers: `Singer ${id}`, artist: `Artist ${id}`, ...extra });
+  const radioIds = (s) => s.upcoming.filter((e) => e.origin === 'radio').map((e) => e.song.id);
+  const start = (song) => playFromSearch(createQueueState(), song);
+
+  it('the playing song never comes back, even with another id, another cover or the singers in another order', () => {
+    const s = applyRefill(start(think('a')), [think('b', { image: 'other.jpg', singers: 'Pragathi Guruprasad, Sam CS' }), other('o1'), other('o2')]);
+    expect(radioIds(s)).toEqual(['o1', 'o2']);
+  });
+
+  it('a version (unplugged) is not added while the original plays', () => {
+    const s = applyRefill(start(think('a')), [unplugged('u1'), other('o1')]);
+    expect(radioIds(s)).toEqual(['o1']);
+  });
+
+  it('a version is not added while the original is in your queue, and the original is not added while a version is', () => {
+    let s = addToQueue(start(other('cur')), think('q1'));
+    s = applyRefill(s, [unplugged('u1'), think('copy'), other('o1')]);
+    expect(radioIds(s)).toEqual(['o1']);
+    let t = addToQueue(start(other('cur')), unplugged('u2'));
+    t = applyRefill(t, [think('x1'), other('o1')]);
+    expect(radioIds(t)).toEqual(['o1']);
+  });
+
+  it('songs played or skipped lately (last 50) are kept out, also by version and other ids', () => {
+    let s = start(think('a'));
+    s = applyRefill(s, [other('o1'), other('o2')]);
+    s = advance(s, { reason: 'skip' }).state; // o1 plays; the original is in history and skipped
+    s = advance(s, { reason: 'skip' }).state; // o2 plays
+    const next = applyRefill({ ...s, upcoming: [] }, [think('again'), unplugged('u9'), other('o3')]);
+    expect(radioIds(next)).toEqual(['o3']);
+    expect(s.skipped.map((x) => x.id)).toEqual(['a', 'o1']);
+  });
+
+  it('at most one song per variant in the radio block (also across batches)', () => {
+    let s = applyRefill(start(other('cur')), [unplugged('u1'), think('t1', { title: 'Pavazha Malli (Remix)' }), think('t2', { title: 'Pavazha Malli Reprise' }), other('o1', 2)]);
+    expect(radioIds(s).filter((id) => id !== 'o1')).toHaveLength(1);
+    s = applyRefill(s, [think('t3', { title: 'Pavazha Malli (Acoustic)' }), other('o2', 3)]);
+    expect(radioIds(s).filter((id) => id.startsWith('u') || id.startsWith('t'))).toHaveLength(1);
+  });
+
+  it('at most 2 songs from one film within any 10 songs of the radio block', () => {
+    const same = Array.from({ length: 6 }, (_, i) => other(`m${i}`, 1, { album: 'Same Film', artist: `A${i}`, singers: `S${i}` }));
+    const diff = Array.from({ length: 8 }, (_, i) => other(`d${i}`, i + 10));
+    const s = applyRefill(start(other('cur', 99)), [...same, ...diff]);
+    const films = s.upcoming.map((e) => e.song.album);
+    for (let i = 0; i + 10 <= films.length; i++) expect(films.slice(i, i + 10).filter((f) => f === 'Same Film').length).toBeLessThanOrEqual(2);
+    expect(films.filter((f) => f === 'Same Film').length).toBeLessThanOrEqual(2);
+  });
+
+  it('never more than 3 in a row by one artist', () => {
+    const songs = Array.from({ length: 8 }, (_, i) => other(`a${i}`, i + 1, { artist: 'One Artist', singers: 'One Artist' }));
+    const mix = Array.from({ length: 3 }, (_, i) => other(`b${i}`, i + 20));
+    const s = applyRefill(start(other('cur', 99, { artist: 'Zed', singers: 'Zed' })), [...songs, ...mix]);
+    const artists = s.upcoming.map((e) => e.song.artist);
+    let run = 1;
+    artists.forEach((a, i) => { if (i) { run = a === artists[i - 1] ? run + 1 : 1; expect(run).toBeLessThanOrEqual(3); } });
+  });
+
+  it('a song you add yourself always wins: a duplicate still asks, then is allowed; a version is allowed without asking', () => {
+    let s = addToQueue(start(other('cur')), think('q1'));
+    expect(findQueued(s, think('same-song-other-id', { singers: 'Pragathi Guruprasad, Sam CS' }))).toBe(0); // so the app asks "Already in queue - add again?"
+    s = addToQueue(s, think('again')); // answered "add again"
+    expect(s.upcoming.map((e) => e.song.id)).toEqual(['q1', 'again']);
+    expect(findQueued(s, unplugged('u1'))).toBe(-1); // a version is a different song: no prompt
+    s = addToQueue(s, unplugged('u1'));
+    expect(s.upcoming).toHaveLength(3);
+    expect(findQueued(s, 'q1')).toBe(0); // by id still works
+  });
+
+  it('Refresh recommendations gives no duplicate of the playing song, the history or your queue', () => {
+    let s = start(other('h1'));
+    s = applyRefill(s, [other('o1')]);
+    s = advance(s).state; // o1 plays, h1 in history
+    s = addToQueue(s, think('q1'));
+    s = clearRadio(s);
+    s = applyRefill(s, [other('h1x', 1, { title: 'Other h1', singers: 'Singer h1', artist: 'Artist h1' }), think('t9'), unplugged('u9'), other('o1', 1, { id: 'o1b', title: 'Other o1', singers: 'Singer o1', artist: 'Artist o1' }), other('fresh', 7)]);
+    expect(radioIds(s)).toEqual(['fresh']);
+  });
+
+  it('the queue is checked again when the answer arrives (you queued the song while the request was running)', async () => {
+    let s = start(other('cur'));
+    await runRefill({
+      get: () => s,
+      update: (fn) => { s = fn(s); },
+      fetchRelated: async () => { s = addToQueue(s, think('mine')); return [think('theirs', { singers: 'Pragathi Guruprasad, Sam CS' }), other('o1')]; },
+    });
+    expect(radioIds(s)).toEqual(['o1']);
+    expect(s.upcoming[0].song.id).toBe('mine');
+  });
+
+  it('the fallback songs follow the same rules', () => {
+    let s = start(think('a'));
+    s = { ...s, fallback: [think('b'), unplugged('u1'), other('o1')] };
+    expect(radioIds(applyFallback(s))).toEqual(['o1']);
+  });
+
+  it('cleans a queue that already holds repeats: loading it, and the playing song changing', () => {
+    const dirty = {
+      current: think('a'),
+      upcoming: [
+        { uid: '1', song: unplugged('u1'), origin: 'radio' }, // a version of the playing song
+        { uid: '2', song: other('o1'), origin: 'radio' },
+        { uid: '3', song: other('o1', 1, { id: 'o1b' }), origin: 'radio' }, // the same song as the one before
+        { uid: '4', song: think('mine'), origin: 'user' }, // yours: kept even though it repeats
+      ],
+      userCount: 0, mode: 'radio',
+    };
+    const loaded = fromSnapshot(dirty);
+    expect(loaded.upcoming.map((e) => e.uid)).toEqual(['2', '4']);
+    expect(loaded.upcoming.find((e) => e.uid === '4').origin).toBe('user');
+
+    // the playing song changes to something the radio had queued twice under another id
+    let s = fromSnapshot({ current: other('x'), upcoming: [{ uid: 'a', song: other('y'), origin: 'radio' }, { uid: 'b', song: other('y', 1, { id: 'y2' }), origin: 'radio' }, { uid: 'c', song: other('z'), origin: 'radio' }], userCount: 0, mode: 'radio' });
+    s = jumpTo(s, 0).state;
+    expect(s.upcoming.map((e) => e.song.id)).toEqual(['z']);
+  });
+
+  it('keeps your own songs when cleaning a restored queue', () => {
+    const s = fromSnapshot({ current: think('a'), upcoming: [{ uid: '1', song: think('mine'), origin: 'user' }, { uid: '2', song: unplugged('u'), origin: 'user' }], userCount: 2, mode: 'radio' });
+    expect(s.upcoming).toHaveLength(2);
+  });
+});

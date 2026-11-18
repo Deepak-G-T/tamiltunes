@@ -1,6 +1,6 @@
 // What the queue panel shows, as plain data (no React): rows, windowing for long queues, total time, screen-reader text.
 export const VIRTUAL_THRESHOLD = 100; // above this many upcoming songs the list is windowed
-export const ROW_HEIGHT = 60;
+export const ROW_HEIGHT = 72; // room for a two-line title, the artists line and 44px touch targets
 export const HEADER_HEIGHT = 40;
 export const NOTE_HEIGHT = 72; // skeleton / error / empty rows
 

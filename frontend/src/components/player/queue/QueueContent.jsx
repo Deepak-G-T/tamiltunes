@@ -320,11 +320,11 @@ const QueueContent = ({ onClose, embedded = false }) => {
                         if (r.type === 'header') {
                           return (
                             <li key={r.key} role="presentation" style={{ height: r.height, listStyle: 'none' }} className="flex items-end justify-between px-1.5 pb-1.5">
-                              <h3 className="text-[11px] uppercase tracking-wider font-bold text-zinc-400 truncate">{r.title}</h3>
+                              <h3 title={r.title} className="min-w-0 text-[11px] uppercase tracking-wider font-bold text-zinc-400 truncate">{r.title}</h3>
                               {r.canRefresh && (
                                 <button type="button" onClick={refreshRecommendations} disabled={queueSections.refill.pending} aria-label="Refresh recommendations"
-                                  className="inline-flex items-center gap-1 text-[11px] font-semibold text-zinc-300 hover:text-white disabled:opacity-40 focus-visible:outline focus-visible:outline-2 focus-visible:outline-brand-400 rounded">
-                                  <RefreshCw className={`w-3 h-3 ${queueSections.refill.pending ? 'animate-spin' : ''}`} aria-hidden="true" /> Refresh recommendations
+                                  className="flex-shrink-0 ml-2 inline-flex items-center gap-1 min-h-11 px-1 text-[11px] font-semibold text-zinc-300 hover:text-white disabled:opacity-40 focus-visible:outline focus-visible:outline-2 focus-visible:outline-brand-400 rounded">
+                                  <RefreshCw className={`w-3 h-3 ${queueSections.refill.pending ? 'animate-spin' : ''}`} aria-hidden="true" /> <span className="hidden min-[400px]:inline">Refresh recommendations</span><span className="min-[400px]:hidden">Refresh</span>
                                 </button>
                               )}
                             </li>
@@ -385,6 +385,7 @@ const QueueContent = ({ onClose, embedded = false }) => {
 
       {menu && (
         <QueueMenu anchor={menu.anchor} label={menu.kind === 'row' ? 'Song options' : 'Queue options'} onClose={() => setMenu(null)}
+          heading={menu.kind === 'row' && byUid.get(menu.uid) ? { title: byUid.get(menu.uid).entry.song.title, subtitle: byUid.get(menu.uid).entry.song.artist || byUid.get(menu.uid).entry.song.singers } : null}
           items={menu.kind === 'row' ? rowMenuItems(menu.uid) : moreMenuItems()} />
       )}
       <SaveQueueDialog open={saveOpen} onClose={() => setSaveOpen(false)} onSave={saveQueueAsPlaylist} count={(currentSong ? 1 : 0) + total} />

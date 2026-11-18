@@ -1,4 +1,5 @@
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect, useMemo, useRef } from 'react';
+import { RefreshCw } from 'lucide-react';
 import { useOutletContext, useNavigate } from 'react-router-dom';
 import SongCard from '../components/cards/SongCard';
 import AlbumCard from '../components/cards/AlbumCard';
@@ -11,6 +12,8 @@ import { useAuth } from '../context/AuthContext';
 import { useSpeedDial } from '../hooks/useSpeedDial';
 import { useStartRadio } from '../hooks/useStartRadio';
 import { useHomeFeed } from '../hooks/useHomeFeed';
+import { usePullToRefresh } from '../hooks/usePullToRefresh';
+import { topGuestArtists } from '../lib/guestPlays';
 import { setShownOnHome } from '../lib/shownOnHome';
 import { ErrorState } from '../components/common/StateViews';
 import api from '../services/api';
@@ -108,7 +111,10 @@ const Home = () => {
 
   // Everything below Speed Dial comes from one request, so no song is shown twice. It waits for Speed Dial so those songs can be left out.
   const speedReady = !loading && speedDial.status !== 'loading';
-  const feed = useHomeFeed({ tab: activeTab, ready: speedReady, excludeIds: activeTab === 'all' ? speedDial.items.map((i) => i.id) : [] }); // Speed Dial is only shown on "All"
+  const guestArtists = useMemo(() => (isAuthenticated ? [] : topGuestArtists(window.localStorage)), [isAuthenticated]); // a guest's Daily Mix comes from what they play in this browser
+  const feed = useHomeFeed({ tab: activeTab, ready: speedReady, excludeIds: activeTab === 'all' ? speedDial.items.map((i) => i.id) : [], artists: guestArtists }); // Speed Dial is only shown on "All"
+  const pageRef = useRef(null);
+  const { pull, armed } = usePullToRefresh(pageRef, feed.refresh, { enabled: feed.status !== 'loading' && !feed.refreshing });
 
   const toggleFavorite = async (song) => {
     if (!isAuthenticated) {
@@ -179,7 +185,7 @@ const Home = () => {
             {mixSeeds.map((song) => <RadioMixCard key={song.id} song={song} onStart={startRadio} />)}
           </Shelf>
         )}
-        <Shelf title={section.title} onShowAll={section.id === 'trending' ? () => navigate('/search?q=Tamil') : undefined}>
+        <Shelf title={section.title} subtitle={section.subtitle} onShowAll={section.id === 'trending' ? () => navigate('/search?q=Tamil') : undefined}>
           {section.items.map((song) => songCard(song, section.items))}
         </Shelf>
       </React.Fragment>
@@ -187,7 +193,16 @@ const Home = () => {
   };
 
   return (
-    <div className="space-y-8 md:space-y-10 animate-in fade-in duration-300">
+    <div ref={pageRef} className="space-y-8 md:space-y-10 animate-in fade-in duration-300" style={pull ? { transform: `translateY(${pull}px)`, transition: 'none' } : { transition: 'transform 0.2s' }}>
+      {/* Pull down: the indicator sits above the page */}
+      {(pull > 0 || feed.refreshing) && (
+        <div role="status" aria-live="polite" data-testid="pull-indicator" className="absolute left-0 right-0 -top-9 flex justify-center pointer-events-none" style={{ transform: `translateY(${-pull}px)` }}>
+          <span className="inline-flex items-center gap-2 rounded-full bg-surface-3 px-3 py-1.5 text-xs font-semibold text-zinc-200 shadow-lg">
+            <RefreshCw className={`w-3.5 h-3.5 ${feed.refreshing ? 'animate-spin' : ''}`} aria-hidden="true" />
+            {feed.refreshing ? 'Fresh mix coming…' : armed ? 'Release for a fresh mix' : 'Pull for a fresh mix'}
+          </span>
+        </div>
+      )}
       {/* Greeting + category pills */}
       <div className="space-y-4">
         <div>
@@ -199,6 +214,10 @@ const Home = () => {
           </p>
         </div>
         <div className="flex items-center gap-2 overflow-x-auto pb-1 scrollbar-none">
+          <button type="button" onClick={feed.refresh} disabled={feed.status === 'loading' || feed.refreshing} aria-label="Refresh for a fresh mix"
+            className="flex-shrink-0 inline-flex items-center justify-center w-9 h-9 rounded-full bg-white/10 hover:bg-white/20 text-white disabled:opacity-40 press">
+            <RefreshCw className={`w-4 h-4 ${feed.refreshing ? 'animate-spin' : ''}`} aria-hidden="true" />
+          </button>
           {CATEGORIES.map((cat) => (
             <button
               key={cat.id}

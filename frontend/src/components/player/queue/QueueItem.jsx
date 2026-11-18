@@ -66,34 +66,37 @@ const QueueItem = ({ entry, index, tabStop, selectMode, selected, onPlay, onRemo
           <button type="button" ref={setActivatorNodeRef} {...attributes} {...listeners} tabIndex={tab}
             aria-label={`Reorder ${song.title}. Press space to pick up, arrow keys to move, space to drop.`}
             style={{ touchAction: 'none' }}
-            className={`${btn} w-10 h-10 inline-flex items-center justify-center cursor-grab active:cursor-grabbing flex-shrink-0`}>
+            className={`${btn} w-11 h-11 inline-flex items-center justify-center cursor-grab active:cursor-grabbing flex-shrink-0`}>
             <GripVertical className="w-5 h-5" aria-hidden="true" />
           </button>
         )}
 
         <button type="button" tabIndex={tab} onClick={() => (selectMode ? onToggleSelect(uid) : onPlay(uid))} aria-label={selectMode ? `Select ${song.title}` : `Play ${song.title} now`}
-          className="flex items-center gap-3 min-w-0 flex-1 text-left rounded-md focus-visible:outline focus-visible:outline-2 focus-visible:outline-brand-400">
+          className="flex items-center gap-2.5 min-w-0 flex-1 text-left rounded-md focus-visible:outline focus-visible:outline-2 focus-visible:outline-brand-400">
           <SafeImage src={song.image} alt="" className="w-11 h-11 rounded-md object-cover flex-shrink-0 bg-surface-4" />
           <span className="min-w-0 flex-1">
-            <span dir="auto" className="block text-sm font-semibold text-white truncate leading-[1.4]">{song.title}</span>
-            <span dir="auto" className="flex items-center gap-1.5 text-xs text-zinc-400 leading-[1.4]">
+            {/* the title wraps to two lines; the artists stay on one line (the full list is in the tooltip and at the top of the "..." menu) */}
+            <span dir="auto" title={song.title} className="text-sm font-semibold text-white leading-snug line-clamp-2 break-words" data-testid="queue-row-title">{song.title}</span>
+            <span dir="auto" title={song.artist || song.singers} className="flex items-center gap-1.5 text-xs text-zinc-400 leading-[1.4]" data-testid="queue-row-artist">
               {origin === 'radio' && <span className="flex-shrink-0 px-1.5 rounded bg-brand-500/15 text-brand-300 text-[10px] font-bold uppercase tracking-wide">Autoplay</span>}
               <span className="truncate">{song.artist || song.singers}{song.why && <span className="text-brand-300/90"> · {song.why}</span>}</span>
             </span>
           </span>
         </button>
 
-        <span className="text-xs tabular-nums text-zinc-500 flex-shrink-0 w-10 text-right" aria-label={`Length ${formatClock(song.duration)}`}>{formatClock(song.duration)}</span>
-
+        {/* length above, "..." below: a 44px target that does not crowd the duration */}
+        <div className="flex flex-col items-center justify-center flex-shrink-0 w-11">
+          <span className="text-[11px] tabular-nums text-zinc-500 leading-none mb-0.5" aria-label={`Length ${formatClock(song.duration)}`}>{formatClock(song.duration)}</span>
+          {!selectMode && (
+            <button type="button" tabIndex={tab} onClick={(e) => onOpenMenu(uid, e.currentTarget)} aria-haspopup="menu" aria-label={`More options for ${song.title}`} className={`${btn} w-11 h-11 inline-flex items-center justify-center`}>
+              <MoreHorizontal className="w-5 h-5" aria-hidden="true" />
+            </button>
+          )}
+        </div>
         {!selectMode && (
-          <>
-            <button type="button" tabIndex={tab} onClick={(e) => onOpenMenu(uid, e.currentTarget)} aria-haspopup="menu" aria-label={`More options for ${song.title}`} className={`${btn} p-1.5 flex-shrink-0`}>
-              <MoreHorizontal className="w-4 h-4" aria-hidden="true" />
-            </button>
-            <button type="button" tabIndex={tab} onClick={() => onRemove(uid)} aria-label={`Remove ${song.title} from the queue`} className={`${btn} p-1.5 flex-shrink-0 hidden md:inline-flex hover:!text-rose-400`}>
-              <X className="w-4 h-4" aria-hidden="true" />
-            </button>
-          </>
+          <button type="button" tabIndex={tab} onClick={() => onRemove(uid)} aria-label={`Remove ${song.title} from the queue`} className={`${btn} w-11 h-11 flex-shrink-0 hidden md:inline-flex items-center justify-center hover:!text-rose-400`}>
+            <X className="w-4 h-4" aria-hidden="true" />
+          </button>
         )}
       </div>
     </li>
