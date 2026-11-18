@@ -106,3 +106,8 @@ Songs may carry an optional `videoId`. It comes from the curated map `backend/sr
 - `npm run test:queue --prefix frontend` runs the queue Playwright audit (also part of `npm run test:ui`).
 - UNTESTED: real-phone drag/swipe, a second real device for "Continue on this device?". The `queue_state` migration is applied on Neon; the API passed on a scratch Postgres 16.
 - A song that cannot be played is skipped with the toast `Couldn't play "<title>", skipped.`
+
+## Home feed (feature/home-variety-queue-feel)
+- `GET /api/home` assembles all shelves together (no repeats, Speed Dial songs left out via `?exclude=`); notes in `docs/HOME_FEED.md`.
+  Migration `20261122000000_play_events_played_at_index` (additive index). `npm run test:home --prefix frontend` runs the home page audit.
+- UNTESTED: the live JioSaavn pools; how full each shelf is with real data (thin shelves are hidden).
