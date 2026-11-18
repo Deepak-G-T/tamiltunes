@@ -70,3 +70,17 @@ export const relatedLimiter = perUser({
   max: 60,
   message: 'Too many radio requests, please slow down.',
 });
+
+// Play reports: one per song play (plus the odd skip), so 120/min per listener is far above normal use
+export const playEventLimiter = perUser({
+  windowMs: 60 * 1000,
+  max: 120,
+  message: 'Too many play reports, please slow down.',
+});
+
+// Speed Dial edits (pin, hide, reorder, import)
+export const speedDialWriteLimiter = perUser({
+  windowMs: 60 * 1000,
+  max: 60,
+  message: 'Too many Speed Dial changes, please slow down.',
+});

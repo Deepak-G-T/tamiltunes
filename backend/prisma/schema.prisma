@@ -38,6 +38,7 @@ model User {
   commentLikes     CommentLike[]
   reports          Report[]
   playEvents       PlayEvent[]
+  speedDialOverrides SpeedDialOverride[]
   followers        Follow[]  @relation("Followed")
   following        Follow[]  @relation("Follower")
 
@@ -231,11 +232,34 @@ model PlayEvent {
   playedAt     DateTime @default(now())
   completed    Boolean  @default(false)
   skippedAtSec Int?
-  source       String?  // radio | search | playlist | album | queue
+  source       String?  // radio | search | playlist | album | queue | speed-dial | guest-import
+  // Speed Dial: one row per play. A play counts once the user listened 30 s or half the song.
+  playId       String?  // client-made id so a later "completed" update hits the same row
+  listenedSec  Int?
+  durationSec  Int?
 
   user User @relation(fields: [userId], references: [id], onDelete: Cascade)
 
+  @@unique([userId, playId])
   @@index([userId, playedAt(sort: Desc)])
   @@index([songId, playedAt(sort: Desc)])
+  @@index([userId, songId, playedAt])
   @@map("play_events")
+}
+
+// Per-user changes to the auto-ranked Speed Dial: pinned slots and hidden songs.
+model SpeedDialOverride {
+  id           String   @id @default(uuid())
+  userId       String
+  songId       String
+  slotPosition Int?     // 0-based slot for a pinned song
+  isPinned     Boolean  @default(false)
+  isHidden     Boolean  @default(false)
+  updatedAt    DateTime @updatedAt
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, songId])
+  @@index([userId])
+  @@map("speed_dial_overrides")
 }

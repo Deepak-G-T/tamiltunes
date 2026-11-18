@@ -1,12 +1,15 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { useOutletContext, useNavigate } from 'react-router-dom';
 import SongCard from '../components/cards/SongCard';
 import AlbumCard from '../components/cards/AlbumCard';
 import ArtistCard from '../components/cards/ArtistCard';
-import QuickPickCard from '../components/cards/QuickPickCard';
+import RadioMixCard from '../components/cards/RadioMixCard';
+import SpeedDial from '../components/home/SpeedDial';
 import Shelf from '../components/common/Shelf';
 import FeaturedHero from '../components/cards/FeaturedHero';
 import { useAuth } from '../context/AuthContext';
+import { useSpeedDial } from '../hooks/useSpeedDial';
+import { useStartRadio } from '../hooks/useStartRadio';
 import api from '../services/api';
 
 const CATEGORIES = [
@@ -30,8 +33,10 @@ const greeting = () => {
 
 const Home = () => {
   const { onOpenAddToPlaylist } = useOutletContext();
-  const { isAuthenticated } = useAuth();
+  const { isAuthenticated, user } = useAuth();
   const navigate = useNavigate();
+  const startRadio = useStartRadio();
+  const firstName = (user?.name || '').trim().split(/\s+/)[0];
 
   const [activeTab, setActiveTab] = useState('all');
   const [loading, setLoading] = useState(true);
@@ -46,6 +51,7 @@ const Home = () => {
     folk: []
   });
   const [favoritesMap, setFavoritesMap] = useState({});
+  const [recent, setRecent] = useState([]);
 
   useEffect(() => {
     let isMounted = true;
@@ -89,6 +95,40 @@ const Home = () => {
     };
   }, [isAuthenticated]);
 
+  // popular songs that fill empty Speed Dial slots: trending first, then melodies, gaana, 90s, 2000s, folk
+  const fillPool = useMemo(() => {
+    const seen = new Set();
+    return ['trending', 'melodies', 'gana', 'nineties', 'twoThousands', 'folk']
+      .flatMap((k) => homeData[k] || [])
+      .filter((s) => s?.id && s.streamUrl && !seen.has(s.id) && seen.add(s.id));
+  }, [homeData]);
+  const speedDial = useSpeedDial({ trending: fillPool });
+
+  // Continue listening: your latest distinct songs
+  useEffect(() => {
+    if (!isAuthenticated) {
+      setRecent([]);
+      return undefined;
+    }
+    let on = true;
+    api.get('/history', { params: { limit: 30 } })
+      .then(({ data }) => {
+        if (!on) return;
+        const seen = new Set();
+        const songs = [];
+        for (const row of data.items || []) {
+          const song = row.song || row;
+          if (song?.id && !seen.has(song.id)) {
+            seen.add(song.id);
+            songs.push(song);
+          }
+        }
+        setRecent(songs.slice(0, 12));
+      })
+      .catch(() => {});
+    return () => { on = false; };
+  }, [isAuthenticated]);
+
   const toggleFavorite = async (song) => {
     if (!isAuthenticated) {
       navigate('/login');
@@ -129,7 +169,8 @@ const Home = () => {
 
   const show = (...tabs) => activeTab === 'all' || tabs.includes(activeTab);
   const featured = (homeData.trending || [])[0];
-  const quickPicks = (homeData.trending || []).slice(0, 6);
+  // Radio mixes from your three most-played songs
+  const mixSeeds = speedDial.items.filter((i) => i.source === 'played' && i.hot).slice(0, 3);
   const ganaList = homeData.gana?.length > 0 ? homeData.gana : homeData.folk;
 
   return (
@@ -137,8 +178,12 @@ const Home = () => {
       {/* Greeting + category pills */}
       <div className="space-y-4">
         <div>
-          <h1 className="text-2xl md:text-3xl font-extrabold text-white tracking-tight">{greeting().en}</h1>
-          <p lang="ta" className="text-sm md:text-base font-semibold text-accent-400">{greeting().ta}</p>
+          <h1 className="text-2xl md:text-3xl font-extrabold text-white tracking-tight" dir="auto">
+            Vanakkam{firstName ? `, ${firstName}` : ''}
+          </h1>
+          <p className="text-sm md:text-base font-semibold text-accent-400">
+            {greeting().en} · <span lang="ta">{greeting().ta}</span>
+          </p>
         </div>
         <div className="flex items-center gap-2 overflow-x-auto pb-1 scrollbar-none">
           {CATEGORIES.map((cat) => (
@@ -158,18 +203,24 @@ const Home = () => {
         </div>
       </div>
 
+      {/* Speed dial: your most-played songs, one tap away (replaces the old Quick picks grid) */}
+      {activeTab === 'all' && <SpeedDial {...speedDial} loadingHome={loading} />}
+
       {/* Featured today: big artwork card with the first trending song */}
       {activeTab === 'all' && !loading && featured && <FeaturedHero song={featured} playlist={homeData.trending} />}
 
-      {/* Quick picks: compact tiles that play on tap */}
-      {activeTab === 'all' && (loading || quickPicks.length > 0) && (
-        <section aria-label="Quick picks" className="grid grid-cols-2 lg:grid-cols-3 gap-2 md:gap-3 stagger">
-          {loading
-            ? Array.from({ length: 6 }, (_, i) => (
-                <div key={i} className="h-12 md:h-14 rounded-md shimmer" />
-              ))
-            : quickPicks.map((song) => <QuickPickCard key={song.id} song={song} playlist={homeData.trending} />)}
-        </section>
+      {/* Continue listening */}
+      {activeTab === 'all' && isAuthenticated && recent.length > 0 && (
+        <Shelf title="Recently played" subtitle="சமீபத்தில் கேட்டவை">
+          {recent.map((song) => songCard(song, recent))}
+        </Shelf>
+      )}
+
+      {/* Made for you: radio mixes from your most-played songs */}
+      {activeTab === 'all' && mixSeeds.length > 0 && (
+        <Shelf title="Made for you" subtitle="உங்களுக்காக">
+          {mixSeeds.map((song) => <RadioMixCard key={song.id} song={song} onStart={startRadio} />)}
+        </Shelf>
       )}
 
       {show('trending') && (
