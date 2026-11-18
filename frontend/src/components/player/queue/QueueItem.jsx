@@ -1,7 +1,7 @@
 import React, { memo, useRef, useState } from 'react';
 import { useSortable } from '@dnd-kit/sortable';
 import { CSS } from '@dnd-kit/utilities';
-import { GripVertical, MoreHorizontal, X, Check, Trash2 } from 'lucide-react';
+import { GripVertical, MoreHorizontal, X, Check, Trash2, Video } from 'lucide-react';
 import SafeImage from '../../common/SafeImage';
 import { formatClock, ROW_HEIGHT } from '../../../lib/queueView';
 
@@ -79,6 +79,7 @@ const QueueItem = ({ entry, index, tabStop, selectMode, selected, onPlay, onRemo
             <span dir="auto" title={song.title} className="text-sm font-semibold text-white leading-snug line-clamp-2 break-words" data-testid="queue-row-title">{song.title}</span>
             <span dir="auto" title={song.artist || song.singers} className="flex items-center gap-1.5 text-xs text-zinc-400 leading-[1.4]" data-testid="queue-row-artist">
               {origin === 'radio' && <span className="flex-shrink-0 px-1.5 rounded bg-brand-500/15 text-brand-300 text-[10px] font-bold uppercase tracking-wide">Autoplay</span>}
+              {song.videoId && <Video className="w-3.5 h-3.5 flex-shrink-0 text-zinc-300" aria-label="Has a video" role="img" data-testid="row-video-icon" />}
               <span className="truncate">{song.artist || song.singers}{song.why && <span className="text-brand-300/90"> · {song.why}</span>}</span>
             </span>
           </span>

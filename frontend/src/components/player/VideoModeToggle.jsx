@@ -16,7 +16,7 @@ const VideoModeToggle = ({ className = '', compact = false }) => {
         type="button"
         onClick={(e) => {
           e.stopPropagation();
-          switchPlaybackMode(target);
+          switchPlaybackMode(target, { user: true });
         }}
         data-testid={`mode-${target}`}
         aria-label={target === 'video' ? 'Switch to video' : 'Switch to audio'}
@@ -33,7 +33,7 @@ const VideoModeToggle = ({ className = '', compact = false }) => {
       type="button"
       onClick={(e) => {
         e.stopPropagation();
-        switchPlaybackMode(mode);
+        switchPlaybackMode(mode, { user: true });
       }}
       aria-pressed={playbackMode === mode}
       data-testid={`mode-${mode}`}

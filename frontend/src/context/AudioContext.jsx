@@ -17,6 +17,9 @@ import { peekNext } from '../lib/radioQueue';
 import { fetchRelated } from '../lib/radioApi';
 import { useAuth } from './AuthContext';
 import { loadHidden, rememberHidden } from '../lib/videoHides';
+import { readVideoPrefs, writeVideoPrefs, videoBlockedByData, PREFS_EVENT } from '../lib/videoPrefs';
+import { useConnectionType } from '../hooks/useConnectionType';
+import { youtubeThumb } from '../lib/youtubeThumb';
 import { toSaved, fromSaved, sameQueue, savedIds, readGuestQueue, writeGuestQueue, getDeviceId, shouldAskToContinue, SAVE_DEBOUNCE_MS, SYNC_CHECK_MIN_MS } from '../lib/queuePersist';
 import { loadServerQueue, loadServerQueueMeta, saveServerQueue, saveServerQueueOnExit, resolveSongIds } from '../lib/queueApi';
 import ContinueHerePrompt from '../components/player/ContinueHerePrompt';
@@ -83,6 +86,19 @@ export const AudioProvider = ({ children }) => {
   const playbackModeRef = useRef('audio');
   const unavailableVideosRef = useRef(null); // videoIds that failed to embed: this session, plus the last 7 days in this browser
   if (unavailableVideosRef.current === null) unavailableVideosRef.current = new Set(typeof window === 'undefined' ? [] : loadHidden(window.localStorage));
+  // Video settings (per device) and the connection type, for "Prefer video" and "Wi-Fi only video"
+  const [videoPrefs, setVideoPrefsState] = useState(() => readVideoPrefs(typeof window === 'undefined' ? null : window.localStorage));
+  useEffect(() => {
+    const on = (e) => setVideoPrefsState(e.detail || readVideoPrefs(window.localStorage));
+    window.addEventListener(PREFS_EVENT, on);
+    return () => window.removeEventListener(PREFS_EVENT, on);
+  }, []);
+  const setVideoPrefs = useCallback((patch) => writeVideoPrefs(window.localStorage, patch), []);
+  const connectionType = useConnectionType();
+  const videoBlocked = videoBlockedByData(videoPrefs, connectionType);
+  const videoBlockedRef = useRef(videoBlocked);
+  videoBlockedRef.current = videoBlocked;
+  const userChoseAudioRef = useRef(null); // the song the person switched to audio themselves: "Prefer video" leaves it alone
   const [unavailableVersion, setUnavailableVersion] = useState(0);
   const [toast, setToast] = useState(null);
   const [videoSlots, setVideoSlots] = useState([]); // registered <VideoSlot> elements; last wins
@@ -610,8 +626,13 @@ export const AudioProvider = ({ children }) => {
   // Switch between Audio and Video. Both engines are stopped first, then ONLY the new one is started at the
   // same position, and only if the song was playing (the tap on the toggle is the user action). A paused song
   // stays paused.
-  const switchPlaybackMode = (target) => {
+  const switchPlaybackMode = (target, { user = false } = {}) => {
     const song = currentSongRef.current;
+    if (target === 'video' && videoBlockedRef.current) {
+      showToast('Video is set to Wi-Fi only. You can change this in Video settings.');
+      return false;
+    }
+    if (user) userChoseAudioRef.current = target === 'audio' ? song?.id ?? null : null;
     const plan = planSwitch({
       song,
       currentMode: playbackModeRef.current,
@@ -659,6 +680,22 @@ export const AudioProvider = ({ children }) => {
     if (wasFullScreenRef.current && !isFullScreen && playbackModeRef.current === 'video' && hasAudioStream(currentSongRef.current)) switchPlaybackMode('audio');
     wasFullScreenRef.current = isFullScreen;
   }, [isFullScreen]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  // Wi-Fi only: leaving Wi-Fi for mobile data during a video switches to audio at the same spot
+  useEffect(() => {
+    if (videoBlocked && playbackModeRef.current === 'video' && hasAudioStream(currentSongRef.current)) {
+      if (switchPlaybackMode('audio')) showToast('Switched to audio: video is set to Wi-Fi only.'); // switching TO audio is never blocked
+    }
+  }, [videoBlocked]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  // Prefer video: while Now Playing is open, a song that has a video plays it (unless the person picked audio for this song)
+  useEffect(() => {
+    const song = currentSongRef.current;
+    if (!isFullScreen || !videoPrefs.preferVideo || videoBlocked || !song) return;
+    if (playbackModeRef.current === 'video' || userChoseAudioRef.current === song.id) return;
+    if (!canToggleVideo(song, unavailableVideosRef.current)) return;
+    switchPlaybackMode('video');
+  }, [isFullScreen, currentSong?.id, videoPrefs.preferVideo, videoBlocked, unavailableVersion]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // Keep the screen awake only while a video is actually playing (and let it sleep again as soon as it stops)
   const videoPlaying = activeEngine === 'youtube' && isPlaying;
@@ -1108,6 +1145,15 @@ export const AudioProvider = ({ children }) => {
     return () => clearTimeout(t);
   }, [nextUpId, currentSong?.id]); // eslint-disable-line react-hooks/exhaustive-deps
 
+  // In video mode, fetch the next song's thumbnail ahead of time (the embed API cannot preload a second video without replacing the
+  // current one, so the video itself starts when the song does)
+  const nextVideoId = qs.upcoming[0]?.song?.videoId;
+  useEffect(() => {
+    if (playbackMode !== 'video' || !nextVideoId || unavailableVideosRef.current.has(nextVideoId)) return;
+    const src = youtubeThumb(nextVideoId);
+    if (src) { const img = new Image(); img.src = src; }
+  }, [playbackMode, nextVideoId]);
+
   // Media Session API: lock screen, notification, headphone and Bluetooth controls.
   // The handlers are registered once and read the latest functions through a ref (the old effect re-ran every second because it
   // depended on currentTime, rebuilding the metadata and every handler each tick).
@@ -1280,6 +1326,9 @@ export const AudioProvider = ({ children }) => {
         playbackMode,
         activeEngine,
         canToggleVideo: canToggleVideo(currentSong, unavailableVideosRef.current),
+        videoPrefs,
+        setVideoPrefs,
+        videoBlocked,
         switchPlaybackMode,
         registerVideoSlot,
         unavailableVersion

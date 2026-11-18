@@ -305,6 +305,77 @@ async function runSignedInReport(browser) {
   await ctx.close();
 }
 
+// Video settings: "Prefer video" and "Wi-Fi only video" (mobile data simulated through navigator.connection, as Chrome on Android reports it)
+async function runVideoSettings(browser) {
+  const tag = 'video settings';
+  const open = async ({ prefs, connection }) => {
+    const ctx = await browser.newContext({ viewport: { width: 390, height: 844 }, deviceScaleFactor: 1, isMobile: true, hasTouch: true });
+    const page = await ctx.newPage();
+    await setupRoutes(page);
+    await page.addInitScript(({ prefs, connection }) => {
+      if (prefs) localStorage.setItem('tamiltunes_video_prefs_v1', JSON.stringify(prefs));
+      if (connection) {
+        const c = { type: connection, _l: [], addEventListener(_e, f) { this._l.push(f); }, removeEventListener() {} };
+        Object.defineProperty(navigator, 'connection', { configurable: true, get: () => c });
+        window.__setConnection = (t) => { c.type = t; c._l.forEach((f) => f()); };
+      }
+    }, { prefs, connection });
+    await page.goto(`http://127.0.0.1:${PORT}/`);
+    await page.waitForSelector('text=Badass (Leo)');
+    await page.getByText('Badass (Leo)').first().click();
+    await page.waitForFunction(() => { const a = window.__tamiltunes_audio; return a && !a.paused && a.currentTime > 0.3; }, null, { timeout: 8000 });
+    await page.locator('[aria-label="Open now playing full screen"]').click({ position: { x: 20, y: 10 } });
+    await page.waitForSelector('[aria-label="Close now playing"]');
+    await page.waitForTimeout(900);
+    return { ctx, page };
+  };
+
+  // Prefer video: opening Now Playing plays the video; picking audio for this song is respected; closing goes back to audio
+  let { ctx, page } = await open({ prefs: { preferVideo: true, wifiOnly: true }, connection: 'wifi' });
+  let s = await state(page);
+  check(`[${tag}] Prefer video: Now Playing starts the video by itself`, s.ytPlaying && !s.audioPlaying, JSON.stringify(s));
+  await page.locator('[data-testid=mode-audio]').last().click();
+  await page.waitForTimeout(1200);
+  s = await state(page);
+  check(`[${tag}] Prefer video: choosing Audio for this song is respected (not forced back to video)`, s.audioPlaying && !s.ytPlaying, JSON.stringify(s));
+  await page.locator('[data-testid=mode-video]').last().click();
+  await page.waitForTimeout(700);
+  await page.evaluate(() => window.__setConnection('cellular'));
+  await page.waitForTimeout(900);
+  s = await state(page);
+  check(`[${tag}] Wi-Fi only: moving to mobile data during a video switches to audio`, s.audioPlaying && !s.ytPlaying, JSON.stringify(s));
+  check(`[${tag}] ...and says why`, /Wi-Fi only/.test(await page.locator('[data-testid=toast]').innerText().catch(() => '')));
+  await ctx.close();
+
+  // Wi-Fi only on mobile data: Video does not start, nothing from YouTube is loaded
+  ({ ctx, page } = await open({ prefs: { preferVideo: true, wifiOnly: true }, connection: 'cellular' }));
+  s = await state(page);
+  check(`[${tag}] Wi-Fi only on mobile data: Prefer video does not start a video`, s.audioPlaying && !s.ytPlaying, JSON.stringify(s));
+  await page.locator('[data-testid=mode-video]').last().click();
+  await page.waitForTimeout(700);
+  s = await state(page);
+  check(`[${tag}] Wi-Fi only on mobile data: tapping Video keeps audio and explains`, s.audioPlaying && !s.ytPlaying && /Wi-Fi only/.test(await page.locator('[data-testid=toast]').innerText().catch(() => '')), JSON.stringify(s));
+  check(`[${tag}] ...and the YouTube script was never loaded`, await page.evaluate(() => typeof window.__yt === 'undefined'));
+  // turning Wi-Fi only off in Video settings (Now Playing) allows it
+  await page.locator('[data-testid=video-settings-button]').click();
+  const sw = page.locator('[data-testid=pref-wifi-only]');
+  check(`[${tag}] Video settings open from Now Playing with both switches`, (await sw.count()) === 1 && (await page.locator('[data-testid=pref-prefer-video]').count()) === 1);
+  check(`[${tag}] the Video settings button is a 44px target`, ((await box(page.locator('[data-testid=video-settings-button]')))?.height || 0) >= 44);
+  await sw.click();
+  check(`[${tag}] the setting is saved on this device`, await page.evaluate(() => JSON.parse(localStorage.getItem('tamiltunes_video_prefs_v1')).wifiOnly === false));
+  await page.locator('[data-testid=mode-video]').last().click();
+  await page.waitForTimeout(700);
+  s = await state(page);
+  check(`[${tag}] with Wi-Fi only off, video plays on mobile data`, s.ytPlaying && !s.audioPlaying, JSON.stringify(s));
+  await ctx.close();
+
+  // defaults: Prefer video is off, so Now Playing stays on audio
+  ({ ctx, page } = await open({}));
+  s = await state(page);
+  check(`[${tag}] by default Now Playing stays on audio (Prefer video is off)`, s.audioPlaying && !s.ytPlaying, JSON.stringify(s));
+  await ctx.close();
+}
+
 async function runGestures(browser, width, height) {
   const tag = `${width}x${height}`;
   const ctx = await browser.newContext({ viewport: { width, height }, deviceScaleFactor: 1, isMobile: true, hasTouch: true });
@@ -456,6 +527,7 @@ try {
     await runGestures(browser, w, h);
   }
   await runSignedInReport(browser);
+  await runVideoSettings(browser);
 } catch (err) {
   console.error("UI audit crashed:", String(err.message).split("\n").slice(0,12).join("\n"));
   results.push({ name: 'audit run', ok: false, detail: String(err) });
