@@ -10,7 +10,8 @@ const suites = [
   ['sign in / sign up audit', 'scripts/auth-audit.mjs'],
   ['recent searches audit', 'scripts/search-audit.mjs'],
   ['home feed audit', 'scripts/home-audit.mjs'],
-  ['PWA audit (needs port 5000 free)', 'scripts/pwa-audit.mjs']
+  ['PWA audit (needs port 5000 free)', 'scripts/pwa-audit.mjs'],
+  ['Android app audit (simulated native plugins)', 'scripts/native-audit.mjs']
 ];
 
 const failed = [];

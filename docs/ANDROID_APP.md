@@ -27,9 +27,45 @@ FCP 1.9 s, LCP 3.8 s, TBT 130-220 ms, CLS 0). Performance is below 90: the cost 
 Left alone: the tap-target note (the "..." button sits on the whole-tile button of a Speed Dial tile) and a console error for `youtube.com/iframe_api`
 (unreachable from the test sandbox; fine on the real network). Measure the real deployment with PageSpeed Insights.
 
-## Phase 2 / 3 (not started)
-Capacitor wrapper, native media notification, secure token storage, deep links, signed release AAB script and the debug-APK workflow come after PR #31
-(login gate) is merged. See the plan in the task description.
+## Phase 2: Capacitor wrapper (Android app) - code done, builds only in CI, nothing tested on a phone
+`frontend/android/` is the Android project (appId `com.tamiltunes.app`, Capacitor 8, minSdk 24, target 36). The app loads the bundled web build; the website is unchanged.
+
+**Plugins and why**
+- Status bar (dark `#09090B`), splash screen (logo on `#09090B`, hidden once the first screen is drawn), app (Back button, links), network (offline banner), share, haptics, preferences (secure login storage).
+- **Media notification and background audio: `capacitor-music-controls-plugin` 8.0.0.** Read its Android source: it shows a MediaStyle notification (cover, play / pause / previous / next, seek bar) and runs a
+  `mediaPlayback` foreground service with the right permission, so one plugin does both jobs and there is no second, duplicate notification. Headset unplug pauses. Rejected: `@jofr/capacitor-media-session`
+  (last release 2024, Capacitor 6 only) and a separate foreground-service plugin (it would add a second notification).
+- Capacitor's `KeepRunning` default is true (checked in the 8.6.2 source): it does not pause the WebView in the background, so HTML audio keeps playing while the foreground service keeps the process alive. UNTESTED on a phone.
+- Android 13+ needs the notification permission for the notification to show: `MainActivity` asks once at the first start.
+
+**Login and the server**
+- The same 7-day JWT, kept in `@capacitor/preferences` (private to the app) through `lib/tokenStore.js`; the website still uses localStorage. A token an old version left in localStorage is moved and removed.
+  `allowBackup="false"` so Android's cloud backup never copies it. No refresh tokens, no backend change.
+- The app calls the Render server directly (`config/app.js`: `NATIVE_API_URL`), because `/api` on `https://localhost` would point at the phone.
+- **CORS (one setting on Render, no code change):** add the app origins to `CORS_ORIGIN`, for example
+  `https://frontend-eosin-five-11.vercel.app,https://localhost,capacitor://localhost` (tested in `backend/test/cors-native.test.js`). Without it every API call from the app is blocked.
+
+**Back button** (`lib/backAction.js`, `components/native/NativeBridge.jsx`): a menu or dialog closes first, then the full-screen player, then the queue panel, then one page back, and only then the app exits.
+**Links**: `https://frontend-eosin-five-11.vercel.app/u/..., /album/..., /artist/..., /playlist/..., /search, /song` open in the app (`/song` opens home: there is no song page). Android only trusts these links after it
+verifies `/.well-known/assetlinks.json`: replace `REPLACE_WITH_THE_SHA256_OF_THE_RELEASE_SIGNING_KEY` in `frontend/public/.well-known/assetlinks.json` with the fingerprint of your release key
+(`keytool -list -v -keystore <your keystore>` > SHA256), and deploy. Debug builds use a different, changing key, so link verification only works for release builds.
+**Not included, on purpose:** no downloads, no offline audio, no audio caching (the service worker is not registered in the app, and in the browser it never touches streams).
+
+**Build** (needs JDK 21 and the Android SDK; the GitHub workflow `.github/workflows/android-debug.yml` does it for you on every push and keeps `app-debug.apk` as a download under Actions > the run > Artifacts):
+```
+cd frontend
+npm ci
+npm run android:debug      # builds the web app, copies it in (cap sync) and runs gradle assembleDebug
+# the APK: frontend/android/app/build/outputs/apk/debug/app-debug.apk   (or: npm run android:open  to use Android Studio)
+```
+Icons and splash: `npm run android:icons` (regenerates from the logo). Version: set `TAMILTUNES_VERSION_NAME` / `TAMILTUNES_VERSION_CODE` or pass `-PtamiltunesVersionName` / `-PtamiltunesVersionCode` to gradle.
+**Browser checks**: `npm run test:native --prefix frontend` builds the app with recording mocks of the plugins (`--mode nativetest`) and checks, in Chromium, our own code paths (token storage, server address, Back order, notification calls,
+offline banner, share, links). It cannot test the real plugins or Android.
+**Not verifiable here (no Android SDK reachable from this environment):** the Gradle build, the manifest merge, the APK itself. They are UNTESTED until the workflow or your computer builds them.
+**Risk to check on the phone:** YouTube's embedded player inside a WebView served from `https://localhost` may refuse some videos (YouTube wants a valid referrer). The app then falls back to audio for songs that have a stream.
+
+## Phase 3 (not started)
+Signed release AAB script, Play Store checklist (skipped by decision), GitHub Release with the APK.
 
 ## Real-phone checklist (all UNTESTED until you report back)
 Chrome on Android, installed from the browser (menu > Install app, or the bar on the home page / the `/install` page):
@@ -39,6 +75,18 @@ Chrome on Android, installed from the browser (menu > Install app, or the bar on
 4. Receive a call (or start another audio app): the song pauses, and resumes afterwards. [UNTESTED]
 5. Turn airplane mode on and reopen the app: you see the offline page, not a blank screen. [UNTESTED]
 6. Rotate the phone with the player open, then the queue: nothing breaks. [UNTESTED]
-7. Press Back with the queue / player open: it closes first (this is the installed app's behaviour; the APK handles Back natively in Phase 2). [UNTESTED]
+7. Press Back with a menu, then the player, then the queue open: each press closes one, then goes back a page, then exits. [UNTESTED]
 8. Play a YouTube-sourced song, lock the screen: it pauses and the player showed the notice. [UNTESTED]
 9. Log in, close the app, reopen: still logged in and the queue is back. [UNTESTED]
+
+### Extra checks for the APK (all UNTESTED)
+10. Install the debug APK (allow "install unknown apps" for your file manager or browser); the app opens with the green icon and a dark splash, no white flash. [UNTESTED]
+11. Android 13+: the first start asks to allow notifications; after allowing, playing a song shows the media notification with the cover, and its buttons and seek bar work with the screen on and off. [UNTESTED]
+12. Pull the headphones out (or turn Bluetooth off): the song pauses. [UNTESTED]
+13. Log in, force-close the app, reopen: you are still logged in. [UNTESTED]
+14. Turn off Wi-Fi and data: the "You are offline" bar appears; turn them on: it goes away. [UNTESTED]
+15. Share a song and a profile: the Android share sheet opens. [UNTESTED]
+16. Tap a link to `https://frontend-eosin-five-11.vercel.app/u/<name>` in another app: opens the TamilTunes app (release builds only, after the assetlinks file is filled in). [UNTESTED]
+17. Open the keyboard in the login form: the form stays visible (the layout resizes). [UNTESTED]
+18. Rotate with the player open: nothing breaks. [UNTESTED]
+

@@ -14,8 +14,14 @@ export function decideBack({ overlayOpen = false, fullScreen = false, queueOpen 
   return canGoBack ? 'back' : 'exit';
 }
 
-/** The topmost open menu or dialog in the page, or null. Both close on Escape, so Back simply sends them one. */
+/**
+ * The topmost open menu or dialog in the page, or null. Both close on Escape, so Back simply sends them one.
+ * A menu that stands on its own (the queue row menu) is on top of everything; a menu INSIDE a dialog (the song menu sheet) is not the target:
+ * the dialog is, because the sheet ignores Escape aimed at a menu inside it.
+ */
 export const topOverlay = (doc = document) => {
-  const all = [...doc.querySelectorAll('[role="menu"], [role="dialog"]')];
-  return all.length ? all[all.length - 1] : null;
+  const standalone = [...doc.querySelectorAll('[role="menu"]')].filter((m) => !m.closest?.('[role="dialog"]'));
+  if (standalone.length) return standalone[standalone.length - 1];
+  const dialogs = [...doc.querySelectorAll('[role="dialog"]')];
+  return dialogs.length ? dialogs[dialogs.length - 1] : null;
 };

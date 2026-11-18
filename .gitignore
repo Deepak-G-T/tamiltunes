@@ -18,3 +18,4 @@ android/local.properties
 frontend/android/local.properties
 frontend/android/app/release/
 frontend/android/capacitor-cordova-android-plugins/build/
+dist-nativetest

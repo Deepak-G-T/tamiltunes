@@ -2,13 +2,21 @@ import { defineConfig } from 'vite'
 import react from '@vitejs/plugin-react'
 import tailwindcss from '@tailwindcss/vite'
 import { VitePWA } from 'vite-plugin-pwa'
+import { fileURLToPath } from 'node:url'
 
 // https://vite.dev/config/
-export default defineConfig({
+// `vite build --mode nativetest` is only for scripts/native-audit.mjs: the Capacitor plugins are swapped for recording mocks and the output goes
+// to dist-nativetest, so the real build is never touched.
+const nativeMocks = fileURLToPath(new URL('./scripts/native-mocks/index.js', import.meta.url))
+const NATIVE_PACKAGES = ['@capacitor/app', '@capacitor/preferences', '@capacitor/network', '@capacitor/share', '@capacitor/haptics', '@capacitor/status-bar', '@capacitor/splash-screen', 'capacitor-music-controls-plugin']
+
+export default defineConfig(({ mode }) => ({
+  ...(mode === 'nativetest' ? { build: { outDir: 'dist-nativetest', emptyOutDir: true }, resolve: { alias: Object.fromEntries(NATIVE_PACKAGES.map((p) => [p, nativeMocks])) } } : {}),
   plugins: [
     react(),
     tailwindcss(),
     VitePWA({
+      disable: mode === 'nativetest',
       strategies: 'injectManifest', // our own worker in src/sw.js: it decides exactly what may be cached
       srcDir: 'src',
       filename: 'sw.js',
@@ -62,4 +70,4 @@ export default defineConfig({
       }
     }
   }
-})
+}))
