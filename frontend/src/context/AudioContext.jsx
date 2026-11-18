@@ -22,6 +22,7 @@ import ContinueHerePrompt from '../components/player/ContinueHerePrompt';
 import Toast from '../components/common/Toast';
 import { getCoverColor, rgbVar } from '../lib/coverColor';
 import { engineFor, canToggleVideo, getVideoId, planSwitch, planEmbedError } from '../lib/playbackLogic';
+import { getToken } from '../lib/tokenStore';
 
 const AudioContext = createContext();
 const QUEUE_ACTIONS = ['jumpToUid', 'removeUids', 'moveUidsToQueue', 'reorderByUid', 'clearQueue', 'refreshRecommendations', 'removeCurrentSong', 'playFromHistoryAt', 'saveQueueAsPlaylist', 'toggleStopAfter', 'startSleepTimer', 'cancelSleepTimer', 'setAutoplay', 'continueWithRadio', 'startRadio', 'addToQueue', 'playNext'];
@@ -323,7 +324,7 @@ export const AudioProvider = ({ children }) => {
   const checkRecordHistory = useCallback((song, time) => {
     if (time > 5 && song && historyRecordedSongId !== song.id) {
       setHistoryRecordedSongId(song.id);
-      const token = localStorage.getItem('tamiltunes_token');
+      const token = getToken();
       if (token) {
         api.post('/history', {
           songId: song.id,

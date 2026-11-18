@@ -1,3 +1,4 @@
+import { shareLink } from '../../lib/share';
 import React, { Suspense, lazy, useState, useCallback, useMemo, useRef } from 'react';
 import { Settings, Pencil, Share2, MapPin, CalendarDays, Lock, Heart, ListMusic, History, MessageCircle } from 'lucide-react';
 import Avatar from '../common/Avatar';
@@ -65,10 +66,8 @@ const ProfileView = ({ profile, isSelf, onProfileChange }) => {
   };
 
   const share = useCallback(async () => {
-    try {
-      if (navigator.share) await navigator.share({ title: `${profile.name} on TamilTunes`, url });
-      else { await navigator.clipboard.writeText(url); setShareMsg('Link copied'); setTimeout(() => setShareMsg(''), 2000); }
-    } catch { /* user cancelled */ }
+    const r = await shareLink({ title: `${profile.name} on TamilTunes`, url });
+    if (r === 'copied') { setShareMsg('Link copied'); setTimeout(() => setShareMsg(''), 2000); }
   }, [profile.name, url]);
 
   const onFollowChange = (isFollowing, followers) =>

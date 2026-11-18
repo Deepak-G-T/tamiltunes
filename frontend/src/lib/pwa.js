@@ -5,7 +5,8 @@
 export const DISMISS_KEY = 'tamiltunes_install_dismissed_v1';
 export const DISMISS_DAYS = 30;
 
-export const isNativeApp = () => typeof window !== 'undefined' && Boolean(window.Capacitor?.isNativePlatform?.());
+import { isNativeApp } from './platform';
+export { isNativeApp };
 export const isStandalone = () => typeof window !== 'undefined' && (window.matchMedia?.('(display-mode: standalone)').matches || window.navigator.standalone === true);
 
 /** Was "Not now" tapped recently? Broken storage means "not dismissed". */

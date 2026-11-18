@@ -5,8 +5,10 @@ import { createTracker, onTick, onLeave } from '../../lib/playTracker';
 import { speedDialApi } from '../../lib/speedDialApi';
 import { recordGuestPlay } from '../../lib/guestPlays';
 import { GUEST_PLAYS_EVENT } from '../../hooks/useSpeedDial';
+import { API_BASE_URL as API_BASE } from '../../config/app';
+import { getToken } from '../../lib/tokenStore';
 
-const API_BASE = import.meta.env.VITE_API_BASE_URL || '/api';
+
 
 /**
  * Invisible: watches playback and reports a play to the server only once it counts (30 s or half the song), plus
@@ -30,7 +32,7 @@ const PlayTracker = () => {
           try {
             fetch(`${API_BASE}/me/play-events`, {
               method: 'POST', keepalive: true,
-              headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${localStorage.getItem('tamiltunes_token')}` },
+              headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${getToken()}` },
               body: JSON.stringify(e),
             }).catch(() => {});
           } catch { /* ignore */ }

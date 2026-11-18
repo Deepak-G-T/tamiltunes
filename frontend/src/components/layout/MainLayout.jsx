@@ -5,6 +5,9 @@ import Sidebar from './Sidebar';
 import TopNav from './TopNav';
 import MobileNav from './MobileNav';
 import PwaBar from '../common/PwaBar';
+import OfflineBanner from '../common/OfflineBanner';
+import NativeBridge from '../native/NativeBridge';
+import NativeMediaControls from '../native/NativeMediaControls';
 import MusicPlayer from '../player/MusicPlayer';
 import MiniPlayer from '../player/MiniPlayer';
 import CreatePlaylistModal from '../modals/CreatePlaylistModal';
@@ -59,6 +62,7 @@ const MainLayout = () => {
         {/* Top Navbar */}
         <TopNav onToggleMobileSidebar={() => setMobileSidebarOpen(true)} />
 
+        <OfflineBanner />
         <PwaBar />
 
         {/* Cold Start Indicator for Render Free Tier */}
@@ -84,6 +88,9 @@ const MainLayout = () => {
             }} />
           </div>
         </main>
+
+        <NativeBridge />
+        <NativeMediaControls />
 
         {/* Visible video surface when the YouTube engine is active */}
 

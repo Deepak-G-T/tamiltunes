@@ -14,7 +14,11 @@
     "test:search": "vite build && node scripts/search-audit.mjs",
     "test:auth": "vite build && node scripts/auth-audit.mjs",
     "test:home": "vite build && node scripts/home-audit.mjs",
-    "test:pwa": "vite build && node scripts/pwa-audit.mjs"
+    "test:pwa": "vite build && node scripts/pwa-audit.mjs",
+    "build:android": "vite build && cap sync android",
+    "android:open": "cap open android",
+    "android:debug": "node scripts/android-build.mjs assembleDebug",
+    "android:icons": "node scripts/make-icons.mjs && capacitor-assets generate --android --assetPath assets"
   },
   "dependencies": {
     "@capacitor/android": "^8.6.2",
