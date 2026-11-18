@@ -29,6 +29,8 @@ const startServer = () => new Promise((resolve, reject) => {
 });
 
 const calls = [];
+// poll a condition (for things that happen outside the page, like requests); a slow machine just waits longer
+const waitFor = async (fn, ms = 8000) => { const t = Date.now(); while (Date.now() - t < ms) { if (fn()) return true; await new Promise((r) => setTimeout(r, 50)); } return false; };
 let failFolk = true;
 // Acts like the server for the parts that matter here: leaves out `exclude`d songs, answers after a short delay
 const homeHandler = async (route) => {
@@ -109,7 +111,9 @@ async function run(browser) {
   check('a shelf shows its subtitle (Daily Mix style)', (await page.locator('section[aria-label="New releases"] >> text=Singer A, Singer B and more').count()) === 1);
   const before = calls.length;
   await page.getByRole('button', { name: 'Refresh for a fresh mix' }).click();
-  await page.waitForSelector('section[aria-label="Trending now"]');
+  // wait for the refresh request itself (the old shelves stay on screen while it loads, so a selector would not wait)
+  await waitFor(() => calls.length >= before + 1);
+  await page.waitForSelector('button[aria-label="Refresh for a fresh mix"]:not([disabled])'); // the new mix has arrived
   const refreshed = calls.at(-1);
   check('Refresh asks for a new mix (a different visit token)', calls.length === before + 1 && refreshed.visit && refreshed.visit !== first.visit, JSON.stringify(refreshed));
   check('Refresh sends the songs that were on screen so they sink', refreshed.avoid.length >= 5 && refreshed.avoid.every((id) => /^[\w.:~-]+$/.test(id)), JSON.stringify(refreshed.avoid));
@@ -138,8 +142,8 @@ async function pullToRefresh(browser) {
   const indicator = await page.locator('[data-testid=pull-indicator]').innerText().catch(() => '');
   check('pulling down shows "Release for a fresh mix"', /Release for a fresh mix/.test(indicator), indicator);
   await cdp.send('Input.dispatchTouchEvent', { type: 'touchEnd', touchPoints: [] });
-  await page.waitForFunction(() => document.querySelectorAll('section[aria-label="Trending now"]').length > 0);
-  await page.waitForTimeout(1200);
+  await waitFor(() => calls.length >= n + 1);
+  await page.waitForSelector('section[aria-label="Trending now"]');
   check('letting go asks for a new mix', calls.length === n + 1 && calls.at(-1).visit !== firstVisit, JSON.stringify(calls.slice(n)));
   check('no page errors (pull to refresh)', errors.length === 0, errors.join(' | '));
   await ctx.close();
