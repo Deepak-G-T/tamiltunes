@@ -9,6 +9,9 @@ import {
   needsRefill, runRefill, toFlatQueue, getSections, isQueueFull, findQueued, moveToQueue, indexOfUid, MAX_QUEUE
 } from '../lib/radioQueue';
 import { fetchRelated } from '../lib/radioApi';
+import { useAuth } from './AuthContext';
+import { toSaved, fromSaved, sameQueue, savedIds, readGuestQueue, writeGuestQueue, getDeviceId, SAVE_DEBOUNCE_MS } from '../lib/queuePersist';
+import { loadServerQueue, saveServerQueue, saveServerQueueOnExit, resolveSongIds } from '../lib/queueApi';
 import Toast from '../components/common/Toast';
 import { getCoverColor, rgbVar } from '../lib/coverColor';
 import { engineFor, canToggleVideo, getVideoId, planSwitch, planEmbedError } from '../lib/playbackLogic';
@@ -22,6 +25,7 @@ export const AudioProvider = ({ children }) => {
   const audioRef = useRef(new Audio());
   const ytPlayerRef = useRef(null);
 
+  const { isAuthenticated, isLoading: authLoading, user: authUser } = useAuth();
   const [currentSong, setCurrentSong] = useState(null);
   const [isPlaying, setIsPlaying] = useState(false);
   const isPlayingRef = useRef(false);
@@ -119,6 +123,87 @@ export const AudioProvider = ({ children }) => {
     const t = setTimeout(() => setToast(null), 6000);
     return () => clearTimeout(t);
   }, [toast]);
+
+  // ---- Saved queue: restore on app open (paused), save a moment after every change (guests: browser, signed in: account)
+  const restoredRef = useRef(null); // { id, positionSec } while a restored song waits for the first Play
+  const deviceIdRef = useRef(null);
+  if (!deviceIdRef.current) deviceIdRef.current = getDeviceId(typeof window !== 'undefined' ? window.localStorage : null);
+  const currentTimeRef = useRef(0);
+  const isAuthRef = useRef(false);
+  const queueReadyRef = useRef(false); // nothing is saved until the restore attempt is over, so a saved queue is never overwritten by an empty one
+  const lastSavedRef = useRef(null);
+  const restoreKeyRef = useRef(null);
+  useEffect(() => { currentTimeRef.current = currentTime; }, [currentTime]);
+  useEffect(() => { isAuthRef.current = isAuthenticated; }, [isAuthenticated]);
+
+  const flushQueueSave = useCallback((onExit = false) => {
+    if (!queueReadyRef.current) return;
+    const saved = toSaved(qsRef.current, { positionSec: currentTimeRef.current, deviceId: deviceIdRef.current });
+    if (!saved) return;
+    if (restoredRef.current && qsRef.current.current?.id === restoredRef.current.id) saved.positionSec = restoredRef.current.positionSec;
+    const last = lastSavedRef.current;
+    if (last && sameQueue(last, saved) && Math.abs(last.positionSec - saved.positionSec) < 5) return; // nothing worth saving
+    lastSavedRef.current = saved;
+    if (isAuthRef.current) {
+      if (onExit) saveServerQueueOnExit(saved);
+      else saveServerQueue(saved).catch((e) => { lastSavedRef.current = null; console.warn('Could not save the queue:', e.message); }); // quiet: the next change tries again
+    } else {
+      writeGuestQueue(window.localStorage, saved);
+    }
+  }, []);
+
+  useEffect(() => {
+    if (!queueReadyRef.current) return undefined;
+    const t = setTimeout(() => flushQueueSave(false), SAVE_DEBOUNCE_MS);
+    return () => clearTimeout(t);
+  }, [qs, isPlaying, flushQueueSave]);
+
+  useEffect(() => {
+    const onHide = () => { if (document.visibilityState === 'hidden') flushQueueSave(true); };
+    const onPageHide = () => flushQueueSave(true);
+    document.addEventListener('visibilitychange', onHide);
+    window.addEventListener('pagehide', onPageHide);
+    return () => { document.removeEventListener('visibilitychange', onHide); window.removeEventListener('pagehide', onPageHide); };
+  }, [flushQueueSave]);
+
+  useEffect(() => {
+    if (authLoading) return;
+    const key = authUser?.id || 'guest';
+    if (restoreKeyRef.current === key) return;
+    restoreKeyRef.current = key;
+    (async () => {
+      try {
+        let saved = null;
+        let songs = {};
+        if (isAuthenticated) {
+          try { ({ queue: saved, songs } = await loadServerQueue()); } catch { /* the server is slow or asleep: fall back to this browser's copy, no error shown */ }
+        }
+        if (!saved) {
+          const local = readGuestQueue(window.localStorage);
+          if (local) {
+            try { songs = await resolveSongIds(savedIds(local)); saved = local; } catch { saved = null; }
+          }
+        }
+        if (!saved || qsRef.current.current || currentSongRef.current) return; // nothing saved, or the user already started something
+        const restored = fromSaved(saved, songs, { autoplay: qsRef.current.autoplay });
+        if (!restored) return;
+        const song = restored.currentSong;
+        updateQs(() => restored.state);
+        setCurrentSong(song);
+        currentSongRef.current = song;
+        setCurrentTime(restored.positionSec);
+        setDuration(song.duration || 0);
+        setIsPlaying(false); // restored paused: never auto-plays
+        restoredRef.current = { id: song.id, positionSec: restored.positionSec };
+        lastSavedRef.current = toSaved(restored.state, { positionSec: restored.positionSec, deviceId: deviceIdRef.current });
+        if (restored.dropped > 0) showToast(`${restored.dropped} song${restored.dropped === 1 ? '' : 's'} from your saved queue ${restored.dropped === 1 ? 'is' : 'are'} no longer available.`);
+      } catch (e) {
+        console.warn('Could not restore the queue:', e.message);
+      } finally {
+        queueReadyRef.current = true;
+      }
+    })();
+  }, [authLoading, authUser?.id, isAuthenticated, updateQs, showToast]);
 
   const registerVideoSlot = useCallback((el) => {
     setVideoSlots((prev) => [...prev, el]);
@@ -379,6 +464,7 @@ export const AudioProvider = ({ children }) => {
 
     // Increment request ID to invalidate in-flight play attempts
     const requestId = ++playRequestIdRef.current;
+    restoredRef.current = null; // a real play replaces any restored-but-paused song
 
     setPlaybackError(null);
     playbackModeRef.current = 'audio'; // every new song starts in audio mode
@@ -555,8 +641,21 @@ export const AudioProvider = ({ children }) => {
     setTimeout(() => nextTrack(), 1500);
   };
 
+  // A queue restored from a save is shown paused. The first Play starts it at the saved position.
+  const startRestored = async () => {
+    const r = restoredRef.current;
+    if (!r || !currentSongRef.current || r.id !== currentSongRef.current.id) return false;
+    const song = currentSongRef.current;
+    const at = r.positionSec;
+    const started = startPlayback(song); // sets the source synchronously, then waits for playback
+    if (at > 1 && !isYouTubeSong(song)) seekAudioWhenReady(at);
+    await started;
+    return true;
+  };
+
   const togglePlay = async () => {
     if (!currentSong) return;
+    if (!isPlaying && (await startRestored())) return;
     const isYT = isYouTubeSong(currentSong);
 
     if (isYT) {
@@ -595,6 +694,7 @@ export const AudioProvider = ({ children }) => {
   };
 
   const resume = async () => {
+    if (await startRestored()) return;
     if (isYouTubeSong(currentSong)) {
       ytPlayerRef.current?.play();
       setIsPlaying(true);
