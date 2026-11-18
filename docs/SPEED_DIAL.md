@@ -51,3 +51,17 @@ than 90 days is ignored. A song needs at least one counted play and a score of `
 `(userId, songId, playedAt)`; `speed_dial_overrides` holds pins and hidden songs (unique per user and song). The ranking
 is one grouped SQL query over `play_events`. UNTESTED on real Postgres until the suite runs with `TEST_DATABASE_URL`
 (the same tests then check that the SQL and the JavaScript reference agree).
+
+## On the home page (frontend)
+Order: greeting ("Vanakkam, <name>") -> **Speed dial** -> Featured -> Recently played -> Made for you -> the existing shelves.
+Speed Dial replaces the old "Quick picks" grid. 3x3 tiles on phones, 5 + 4 on wide screens.
+- **Tap** plays the song and queues related songs (interim radio: `lib/startRadio.js`; if the radio returns nothing, the
+  other tiles are queued instead). Tapping the song that is playing pauses it; the playing tile shows an equalizer.
+- **Long-press** (phone), the **"..." button** or **right-click** opens the menu: Play, Add to queue, Go to artist, Pin /
+  Unpin, Move earlier / later, Remove. Signed-out visitors see "Sign in to pin, move or remove songs".
+- **Drag and drop** (desktop) pins the dragged tile where it lands; already-pinned tiles it shifts keep their place.
+- **Reporting plays**: `components/player/PlayTracker.jsx` (invisible) watches the player and reports a play once it
+  counts (`lib/playTracker.js`: real listening time only, so seeking does not count). Signed-out plays are counted in
+  localStorage (`lib/guestPlays.js`) and imported on sign-in.
+- **Made for you** shows a radio mix for each of your three most-played songs.
+- Tamil wording on the home page ("அடிக்கடி கேட்டவை", "உங்களுக்காக") needs a native check.

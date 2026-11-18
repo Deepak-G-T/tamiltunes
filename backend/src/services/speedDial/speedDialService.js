@@ -24,11 +24,11 @@ export function createSpeedDialService({ store, songs, manager, cache = new LruC
   const key = (userId) => `sd_${userId}`;
   const invalidate = (userId) => cache.delete(key(userId));
 
-  /** Popular Tamil songs to fill empty slots (the home-feed trending shelf, then melodies). */
+  /** Popular Tamil songs to fill empty slots: trending first, then melodies, gaana, 90s, 2000s and folk. */
   async function suggestions() {
     try {
       const feed = await manager.getHomeFeed();
-      return [...(feed?.trending || []), ...(feed?.melodies || [])].filter(hasStream);
+      return ['trending', 'melodies', 'gana', 'nineties', 'twoThousands', 'folk'].flatMap((k) => feed?.[k] || []).filter(hasStream);
     } catch {
       return [];
     }
@@ -99,8 +99,9 @@ export function createSpeedDialService({ store, songs, manager, cache = new LruC
   }
 
   /**
-   * Save a drag-and-drop result. Dropping a tile pins it at its new slot. With `moved` only that tile is pinned (the
-   * others keep following the ranking); without it, every tile whose position changed is pinned.
+   * Save a drag-and-drop result. Dropping a tile pins it at its new slot. With `moved`, that tile is pinned and so are
+   * any already-pinned tiles the drop shifted (so they keep their place in the order the user sees); unpinned tiles keep
+   * following the ranking. Without `moved`, every tile whose position changed is pinned.
    */
   async function setOrder(userId, order, moved = null) {
     const current = await compute(userId);
@@ -108,7 +109,8 @@ export function createSpeedDialService({ store, songs, manager, cache = new LruC
     const same = order.length === ids.length && new Set(order).size === order.length && order.every((id) => ids.includes(id));
     if (!same) throw new HttpError(400, 'order must list exactly the songs currently shown');
     if (moved && !order.includes(moved)) throw new HttpError(400, 'moved song is not in order');
-    const changes = order.map((id, slot) => ({ id, slot })).filter(({ id, slot }) => (moved ? id === moved && ids[slot] !== id : ids[slot] !== id));
+    const wasPinned = new Set(current.filter((i) => i.pinned).map((i) => i.id));
+    const changes = order.map((id, slot) => ({ id, slot })).filter(({ id, slot }) => ids[slot] !== id && (!moved || id === moved || wasPinned.has(id)));
     for (const { id } of changes) await ensureSong(current.find((i) => i.id === id)); // a moved suggestion needs a song row to live in
     await store.upsertOverrides(userId, changes.map(({ id, slot }) => ({ songId: id, patch: { isPinned: true, isHidden: false, slotPosition: slot } })));
     invalidate(userId);

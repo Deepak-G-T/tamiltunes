@@ -87,3 +87,10 @@ Songs may carry an optional `videoId`. It comes from the curated map `backend/sr
 - `GET /api/songs/:id/related` ranks related songs; weights and tuning guide: `docs/RADIO.md`, knobs in
   `backend/src/services/related/weights.js`. Migration `20261119000000_radio_foundation` adds song metadata columns and `play_events`.
 - UNTESTED: `reco.getreco` against live JioSaavn, the Prisma signals queries on real Postgres (run the suite with TEST_DATABASE_URL).
+
+## Speed Dial (feature/speed-dial, stacked on feature/player-radio)
+- Home shows the user's most-played songs: ranking, pins, hide, reorder and tuning guide in `docs/SPEED_DIAL.md`; knobs in
+  `backend/src/services/speedDial/config.js`. A play counts after 30 s or 50% of the song (server re-checks it).
+- Migration `20261120000000_speed_dial` (play_events columns + `speed_dial_overrides`). Needs the radio migration first.
+- UNTESTED: the ranking SQL on real Postgres (run the backend suite with TEST_DATABASE_URL: the same tests compare it with the
+  JavaScript reference), the 30 s counting with real audio on a phone, long-press on real devices.

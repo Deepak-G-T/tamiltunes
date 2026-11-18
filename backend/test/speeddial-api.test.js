@@ -138,6 +138,15 @@ try {
   assert.deepEqual(ids(r), swapped);
   assert.equal(r.json.items[0].pinned, true);
   assert.equal(r.json.items[1].pinned, false);
+  // a drop that shifts an already-pinned tile moves that pin too, so the saved order equals what was shown
+  await call('POST', '/me/speed-dial/pin', { token: B.token, body: { songId: ids(r)[1], slot: 1 } });
+  r = await sd(B.token);
+  const o2 = ids(r);
+  const dragged = o2[3];
+  const shown = [dragged, o2[0], o2[1], o2[2], ...o2.slice(4)];
+  await call('PUT', '/me/speed-dial/order', { token: B.token, body: { order: shown, moved: dragged } });
+  assert.deepEqual(ids(await sd(B.token)), shown, 'dragging a tile in front of a pinned one keeps the order that was shown');
+  await call('DELETE', '/me/speed-dial', { token: B.token }); // back to automatic for the checks below
   assert.equal((await call('PUT', '/me/speed-dial/order', { token: B.token, body: { order: ['not', 'these'] } })).status, 400, 'order must list the songs shown');
   assert.equal((await call('PUT', '/me/speed-dial/order', { token: B.token, body: { order: [...order, 'extra'].slice(0, C.slots + 1) } })).status, 400);
   console.log('✓ drag and drop pins the moved tile; invalid orders are rejected');
