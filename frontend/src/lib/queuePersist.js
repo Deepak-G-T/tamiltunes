@@ -45,10 +45,10 @@ export function fromSaved(saved, songsById, { autoplay = true } = {}) {
   if (!saved || !Array.isArray(saved.items) || !saved.items.length) return null;
   const idx = Math.min(Math.max(saved.currentIndex, 0), saved.items.length - 1);
   const known = (it) => Boolean(songsById[it.id]);
-  const before = saved.items.slice(0, idx).filter(known);
+  const before = saved.items.slice(0, idx).filter(known).slice(-MAX_HISTORY); // History keeps the last 50
   const after = saved.items.slice(idx + 1).filter(known);
   const cur = saved.items[idx];
-  const dropped = saved.items.length - before.length - after.length - (known(cur) ? 1 : 0);
+  const dropped = saved.items.slice(0, idx).filter((it) => !known(it)).length + saved.items.slice(idx + 1).filter((it) => !known(it)).length + (known(cur) ? 0 : 1);
 
   let current = known(cur) ? songsById[cur.id] : null;
   const rawPosition = Number(saved.positionSec);

@@ -123,6 +123,16 @@ describe('restoring the queue', () => {
     expect(r.state.shuffle).toBe(true);
   });
 
+  it('keeps only the last 50 history songs, and does not count the extra old ones as "no longer available"', () => {
+    const items = [...Array.from({ length: 70 }, (_, i) => ({ id: `h${i}`, o: 'r' })), { id: 'now', o: 'r' }, { id: 'next', o: 'r' }];
+    const ids = items.map((i) => i.id);
+    const r = fromSaved({ items, currentIndex: 70, positionSec: 0, mode: 'radio' }, byId(...ids));
+    expect(r.state.history).toHaveLength(50);
+    expect(r.state.history[49].id).toBe('h69');
+    expect(r.state.history[0].id).toBe('h20');
+    expect(r.dropped).toBe(0);
+  });
+
   it('a corrupt index is clamped instead of crashing', () => {
     const r = fromSaved({ items: [{ id: 'a', o: 'r' }, { id: 'b', o: 'r' }], currentIndex: 99, positionSec: 'x', mode: 'radio' }, byId('a', 'b'));
     expect(r.currentSong.id).toBe('b');

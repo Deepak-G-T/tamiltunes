@@ -315,7 +315,10 @@ export function restoreRemoved(state, removed) {
     const at = Math.min(index, upcoming.length);
     upcoming.splice(at, 0, e);
     if (e.origin === 'user' && at <= userCount) userCount += 1;
-    else if (e.origin !== 'user' && at < userCount) upcoming[at] = { ...e, origin: 'user' }, userCount += 1; // landed inside the user block
+    else if (e.origin !== 'user' && at < userCount) { // landed inside the user block, so it becomes a user song
+      upcoming[at] = { ...e, origin: 'user' };
+      userCount += 1;
+    }
   }
   return { ...state, upcoming, userCount };
 }

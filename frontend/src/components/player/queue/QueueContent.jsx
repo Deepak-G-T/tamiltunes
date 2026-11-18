@@ -29,10 +29,11 @@ const Tab = ({ id, active, onSelect, children }) => (
   </button>
 );
 
-const ToolButton = ({ icon: Icon, children, onClick, disabled, pressed, label }) => (
-  <button type="button" onClick={onClick} disabled={disabled} aria-pressed={pressed} aria-label={label}
+const ToolButton = ({ icon: Icon, children, short, onClick, disabled, pressed }) => (
+  <button type="button" onClick={onClick} disabled={disabled} aria-pressed={pressed} aria-label={short ? children : undefined}
     className={`press min-h-9 px-3 inline-flex items-center gap-1.5 rounded-full text-xs font-semibold disabled:opacity-40 transition-colors focus-visible:outline focus-visible:outline-2 focus-visible:outline-brand-400 ${pressed ? 'bg-brand-500 text-black' : 'bg-white/10 text-zinc-100 hover:bg-white/15'}`}>
-    <Icon className="w-4 h-4" aria-hidden="true" />{children}
+    <Icon className="w-4 h-4" aria-hidden="true" />
+    {short ? (<><span aria-hidden="true" className="sm:hidden">{short}</span><span aria-hidden="true" className="hidden sm:inline">{children}</span></>) : children}
   </button>
 );
 
@@ -211,7 +212,7 @@ const QueueContent = ({ onClose, embedded = false }) => {
   return (
     <div className="flex flex-col h-full min-h-0" data-testid="queue-content">
       {/* Header */}
-      <div className="flex-shrink-0 px-4 pt-4 pb-2 space-y-3">
+      <div className="flex-shrink-0 px-4 pt-2 sm:pt-4 pb-2 space-y-2 sm:space-y-3">
         <div className="flex items-center justify-between gap-2">
           <div role="tablist" aria-label="Queue views" className="flex items-center gap-2">
             <Tab id="queue" active={tab === 'queue'} onSelect={setTab}>Queue</Tab>
@@ -225,8 +226,8 @@ const QueueContent = ({ onClose, embedded = false }) => {
         {tab === 'queue' && (
           <>
             <div className="flex flex-wrap items-center gap-2">
-              <ToolButton icon={Trash2} onClick={clearQueue} disabled={!userCount}>Clear queue</ToolButton>
-              <ToolButton icon={Save} onClick={onSave} disabled={empty}>Save as playlist</ToolButton>
+              <ToolButton icon={Trash2} short="Clear" onClick={clearQueue} disabled={!userCount}>Clear queue</ToolButton>
+              <ToolButton icon={Save} short="Save" onClick={onSave} disabled={empty}>Save as playlist</ToolButton>
               <ToolButton icon={CheckSquare} onClick={() => setSelectMode((s) => !s)} pressed={selectMode} disabled={!total}>Select</ToolButton>
               <button type="button" aria-haspopup="menu" aria-label="More queue options" onClick={(e) => setMenu({ kind: 'more', anchor: e.currentTarget })}
                 className="press min-h-9 min-w-9 inline-flex items-center justify-center rounded-full bg-white/10 hover:bg-white/15 text-zinc-100 focus-visible:outline focus-visible:outline-2 focus-visible:outline-brand-400"><MoreHorizontal className="w-4 h-4" /></button>
@@ -253,8 +254,8 @@ const QueueContent = ({ onClose, embedded = false }) => {
         <div id="queue-panel-queue" role="tabpanel" aria-labelledby="queue-tab-queue" className="flex-1 min-h-0 flex flex-col">
           {/* Now playing */}
           {currentSong && (
-            <div className="flex-shrink-0 mx-4 mb-2 flex items-center gap-3 p-3 rounded-xl bg-brand-500/10 ring-1 ring-brand-500/40" data-testid="queue-now-playing" aria-label="Now playing">
-              <SafeImage src={currentSong.image} alt="" className="w-20 h-20 rounded-lg object-cover flex-shrink-0 bg-surface-4 shadow-lg" />
+            <div className="flex-shrink-0 mx-4 mb-2 flex items-center gap-3 p-2 sm:p-3 rounded-xl bg-brand-500/10 ring-1 ring-brand-500/40" data-testid="queue-now-playing" aria-label="Now playing">
+              <SafeImage src={currentSong.image} alt="" className="w-14 h-14 sm:w-20 sm:h-20 rounded-lg object-cover flex-shrink-0 bg-surface-4 shadow-lg" />
               <div className="min-w-0 flex-1">
                 <p className="text-[11px] uppercase tracking-wider font-bold text-brand-300 mb-0.5">Now playing</p>
                 <p dir="auto" className="text-base font-bold text-white truncate">{currentSong.title}</p>

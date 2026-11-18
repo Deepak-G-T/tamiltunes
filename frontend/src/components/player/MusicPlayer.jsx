@@ -102,17 +102,28 @@ const MusicPlayer = ({ onAddToPlaylist }) => {
 
   if (!currentSong) {
     return (
-      <footer className="hidden md:flex h-20 bg-black px-4 md:px-6 items-center justify-between text-zinc-500 text-xs">
-        <div className="flex items-center gap-3">
-          <div className="w-12 h-12 rounded-lg bg-zinc-800/50 flex items-center justify-center">
-            <ShieldCheck className="w-5 h-5 text-zinc-600" />
+      <>
+        <footer className="hidden md:flex h-20 bg-black px-4 md:px-6 items-center justify-between text-zinc-500 text-xs">
+          <div className="flex items-center gap-3">
+            <div className="w-12 h-12 rounded-lg bg-zinc-800/50 flex items-center justify-center">
+              <ShieldCheck className="w-5 h-5 text-zinc-600" />
+            </div>
+            <div>
+              <p className="font-medium text-zinc-400">TamilTunes Ready</p>
+              <p className="text-[11px] text-zinc-600">Discover and play your favorite Tamil tracks</p>
+            </div>
           </div>
-          <div>
-            <p className="font-medium text-zinc-400">TamilTunes Ready</p>
-            <p className="text-[11px] text-zinc-600">Discover and play your favorite Tamil tracks</p>
-          </div>
-        </div>
-      </footer>
+          <button
+            onClick={() => setIsQueueOpen(!isQueueOpen)}
+            title="Toggle Queue"
+            aria-label="Toggle Queue"
+            className={`p-2 rounded-lg transition-colors focus-visible:ring-2 focus-visible:ring-brand-500 focus-visible:outline-none ${isQueueOpen ? 'text-brand-400 bg-brand-500/10' : 'text-zinc-400 hover:text-white'}`}
+          >
+            <ListMusic className="w-5 h-5" />
+          </button>
+        </footer>
+        <QueueDrawer isOpen={isQueueOpen} onClose={() => setIsQueueOpen(false)} />
+      </>
     );
   }
 
