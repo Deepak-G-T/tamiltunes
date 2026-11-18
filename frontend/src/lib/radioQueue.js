@@ -11,13 +11,14 @@
  *   mode      'radio' (fills itself forever) | 'context' (follows a playlist / album order, then offers radio)
  *
  * @typedef {{ id: string, title?: string }} Song
- * @typedef {{ song: Song, origin: 'user' | 'radio' | 'context' }} Entry
+ * @typedef {{ uid: string, song: Song, origin: 'user' | 'radio' | 'context' }} Entry   (uid is unique per queue slot, so the same song can be queued twice)
  * @typedef {ReturnType<typeof createQueueState>} QueueState
  */
 
 export const REFILL_THRESHOLD = 3; // refill when fewer than this many songs remain
 export const REFILL_BATCH = 20; // songs requested per refill
-export const MAX_HISTORY = 200;
+export const MAX_HISTORY = 50; // songs kept in the History tab
+export const MAX_QUEUE = 500; // songs allowed in the upcoming list
 export const MAX_PLAYED = 500;
 export const MAX_EXCLUDE = 200; // the related-songs endpoint accepts at most this many excluded ids
 
@@ -45,7 +46,10 @@ export function createQueueState(overrides = {}) {
 }
 
 const sourceOrigin = (state) => (state.mode === 'context' ? 'context' : 'radio');
-const entry = (song, origin) => ({ song, origin });
+let uidSeq = 0;
+/** A fresh id for one queue slot. Unique per slot, not per song. */
+export const newUid = () => `qi_${Date.now().toString(36)}${(++uidSeq).toString(36)}${Math.random().toString(36).slice(2, 6)}`;
+const entry = (song, origin, uid) => ({ uid: uid || newUid(), song, origin });
 const withPlayed = (played, ...ids) => cap(unique([...played, ...ids.filter(Boolean)]), MAX_PLAYED);
 const pushHistory = (history, song) => (song ? cap([...history, song], MAX_HISTORY) : history);
 
@@ -259,7 +263,7 @@ export function reorderUpcoming(state, from, to) {
   else if (from >= userCount && to < userCount) userCount += 1; // dropped into it
 
   const origin = sourceOrigin(state);
-  return { ...state, userCount, upcoming: list.map((e, i) => entry(e.song, i < userCount ? 'user' : origin)) };
+  return { ...state, userCount, upcoming: list.map((e, i) => entry(e.song, i < userCount ? 'user' : origin, e.uid)) };
 }
 
 export function clearUserQueue(state) {
@@ -401,7 +405,9 @@ export function getSections(state) {
   return {
     nowPlaying: state.current,
     nextInQueue: userEntries(state).map((e) => e.song),
+    nextInQueueEntries: userEntries(state),
     nextFrom: {
+      entries: sourceEntries(state),
       kind: state.mode,
       label: state.mode === 'context' ? (state.context?.label ? `Next from ${state.context.label}` : 'Next in this list') : 'Next from radio',
       items: source,
@@ -427,4 +433,27 @@ export function toSnapshot(state) {
   };
 }
 
-export const fromSnapshot = (snap) => createQueueState({ ...snap, history: [] });
+/**
+ * Give every entry a unique uid. Snapshots saved before uids existed have none, and a hand-edited or corrupted snapshot
+ * may repeat one: both are repaired here, so the rest of the engine can rely on "uid is unique".
+ */
+export function normalizeEntries(upcoming, userCount = 0) {
+  const seen = new Set();
+  const list = (Array.isArray(upcoming) ? upcoming : [])
+    .filter((e) => e && e.song && e.song.id)
+    .slice(0, MAX_QUEUE)
+    .map((e) => {
+      const uid = typeof e.uid === 'string' && e.uid && !seen.has(e.uid) ? e.uid : newUid();
+      seen.add(uid);
+      return { uid, song: e.song, origin: ['user', 'radio', 'context'].includes(e.origin) ? e.origin : 'radio' };
+    });
+  return { upcoming: list, userCount: Math.max(0, Math.min(userCount, list.length)) };
+}
+
+export const fromSnapshot = (snap) => {
+  const { upcoming, userCount } = normalizeEntries(snap?.upcoming, snap?.userCount ?? 0);
+  return createQueueState({ ...snap, upcoming, userCount, history: [] });
+};
+
+/** Index of a queue slot by uid (-1 when it is not in the upcoming list). */
+export const indexOfUid = (state, uid) => state.upcoming.findIndex((e) => e.uid === uid);

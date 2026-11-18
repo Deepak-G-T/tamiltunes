@@ -3,7 +3,7 @@ import {
   createQueueState, playFromSearch, playFromContext, switchToRadio, advance, previous, jumpTo, addToQueue, playNext,
   removeFromUpcoming, reorderUpcoming, clearUserQueue, setShuffle, setRepeat, nextRepeat, setAutoplay, needsRefill,
   startRefill, applyRefill, refillFailed, runRefill, getSections, peekNext, toSnapshot, fromSnapshot, shuffled,
-  applyFallback, toFlatQueue, removeFromHistory,
+  applyFallback, toFlatQueue, removeFromHistory, indexOfUid,
   REFILL_THRESHOLD, MAX_EXCLUDE, REFILL_BACKOFF_MS,
 } from './radioQueue';
 
@@ -405,5 +405,55 @@ describe('fallback, flat view and history', () => {
     const s = advance(advance(radio('a', 'b', 'c')).state).state; // history a b, playing c
     expect(removeFromHistory(s, 0).history.map((x) => x.id)).toEqual(['b']);
     expect(removeFromHistory(s, 5)).toBe(s);
+  });
+});
+
+describe('queue item ids (queue v2)', () => {
+  it('gives every slot a unique id, so the same song can be queued twice', () => {
+    let s = radio('a', 'r1');
+    s = addToQueue(addToQueue(s, S('x')), S('x'));
+    const uids = s.upcoming.map((e) => e.uid);
+    expect(uids.every(Boolean)).toBe(true);
+    expect(new Set(uids).size).toBe(uids.length);
+    expect(ids(s.upcoming).filter((i) => i === 'x')).toHaveLength(2);
+  });
+
+  it('keeps a slot id when it is dragged to a new place', () => {
+    let s = radio('a', 'r1', 'r2', 'r3');
+    const uid = s.upcoming[2].uid;
+    s = reorderUpcoming(s, 2, 0);
+    expect(s.upcoming[0].uid).toBe(uid);
+  });
+
+  it('repairs old snapshots that have no ids, and repeated or invalid entries', () => {
+    const old = { current: S('c'), upcoming: [{ song: S('a'), origin: 'user' }, { song: S('b'), origin: 'radio' }], userCount: 1, mode: 'radio' };
+    const s = fromSnapshot(old);
+    expect(s.upcoming.every((e) => typeof e.uid === 'string' && e.uid)).toBe(true);
+    const dup = fromSnapshot({ current: S('c'), upcoming: [{ uid: 'same', song: S('a'), origin: 'user' }, { uid: 'same', song: S('b'), origin: 'radio' }, { song: null }, { uid: 'z', song: S('d'), origin: 'weird' }], userCount: 9 });
+    expect(new Set(dup.upcoming.map((e) => e.uid)).size).toBe(3);
+    expect(dup.upcoming[2].origin).toBe('radio');
+    expect(dup.userCount).toBe(3); // clamped to the list
+  });
+
+  it('keeps ids through a save and restore', () => {
+    const s = addToQueue(radio('a', 'r1'), S('x'));
+    const back = fromSnapshot(JSON.parse(JSON.stringify(toSnapshot(s))));
+    expect(back.upcoming.map((e) => e.uid)).toEqual(s.upcoming.map((e) => e.uid));
+  });
+
+  it('finds a slot by id and exposes entries to the panel', () => {
+    let s = addToQueue(radio('a', 'r1'), S('x'));
+    const u = s.upcoming[0].uid;
+    expect(indexOfUid(s, u)).toBe(0);
+    expect(indexOfUid(s, 'nope')).toBe(-1);
+    expect(getSections(s).nextInQueueEntries[0].uid).toBe(u);
+    expect(getSections(s).nextFrom.entries.length).toBe(1);
+  });
+
+  it('keeps only the last 50 songs of history', () => {
+    let s = playFromSearch(createQueueState(), S('s0'));
+    for (let i = 1; i <= 60; i++) s = playFromSearch(s, S(`s${i}`));
+    expect(s.history).toHaveLength(50);
+    expect(s.history[49].id).toBe('s59');
   });
 });
