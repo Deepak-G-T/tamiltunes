@@ -67,12 +67,16 @@ model Song {
   year     Int?
   language String?
 
+  // The id of the best copy of this song (same song under another id, spelling or album). Filled by scripts/backfill-canonical-ids.mjs
+  canonicalId String? @map("canonical_id")
+
   playlistSongs    PlaylistSong[]
   favorites        Favorite[]
   listeningHistory ListeningHistory[]
 
   @@index([composer])
   @@index([language, year])
+  @@index([canonicalId])
   @@map("songs")
 }
 

@@ -21,6 +21,7 @@
     "reset-password": "node scripts/reset-password.mjs",
     "verify-password": "node scripts/verify-password.mjs",
     "report:duplicate-songs": "node scripts/report-duplicate-songs.mjs",
+    "backfill:canonical-ids": "node scripts/backfill-canonical-ids.mjs",
     "prisma:push": "prisma db push"
   },
   "keywords": [

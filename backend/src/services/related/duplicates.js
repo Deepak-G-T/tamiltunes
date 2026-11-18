@@ -1,4 +1,4 @@
-import { songFingerprint, variantKey, sameSong, sameVariant } from './identity.js';
+import { songFingerprint, variantKey, sameSong, sameVariant, clusterSongs } from './identity.js';
 
 /**
  * Groups of songs that are the same song (or versions of it). Report only: nothing is changed or deleted.
@@ -42,4 +42,14 @@ export function findDuplicateGroups(songs) {
     }
   }
   return groups.sort((x, y) => y.songs.length - x.songs.length);
+}
+
+/**
+ * Fuzzy duplicate clusters (same song under another id, spelling, album or compilation) with the copy that would be shown.
+ * Report only. Uses the same rules as the queue and the related endpoint (identity.js: isSameSong).
+ */
+export function findCanonicalClusters(songs) {
+  return clusterSongs(songs).groups
+    .filter((g) => g.songs.length > 1)
+    .sort((a, b) => b.songs.length - a.songs.length);
 }
