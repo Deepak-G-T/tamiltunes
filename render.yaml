@@ -29,12 +29,3 @@ services:
         # (drop channel_binding=... if Neon adds it). Not synced from the Blueprint so a sync can never
         # point the service back at the old Render database.
         sync: false
-
-# Legacy Render Postgres (free plan: deleted 30 days after creation, 2026-12-17). Keep until Neon has run
-# stably for a week, then remove this block and delete the database in the Render dashboard.
-databases:
-  - name: tamiltunes-db
-    databaseName: tamiltunes
-    user: tamiltunes_user
-    plan: free
-    region: singapore

@@ -28,8 +28,8 @@ Music providers: jiosaavn (unlicensed, personal/portfolio only), youtube (IFrame
 - Database: production runs on Neon (Singapore, Postgres 18). `DATABASE_URL` is a Render dashboard value
   (`sync: false` in render.yaml), set to the Neon DIRECT string with `?sslmode=require&connect_timeout=15&connection_limit=5`.
   Setting it through the Render API does NOT redeploy: trigger a deploy afterwards. The backend retries the first
-  connection (Neon scales to zero). The old Render Postgres is a legacy rollback copy (free plan, deleted 2026-12-17):
-  remove it and the `databases:` block in render.yaml once Neon has been stable for a week.
+  connection (Neon scales to zero). The legacy Render Postgres has been retired. Take periodic `pg_dump` backups of Neon (its free plan has only a
+  short restore window) and keep them outside the repo.
 
 ## Optional env: video lookup (all off by default)
 Songs may carry an optional `videoId`. It comes from the curated map `backend/src/services/music/curatedVideos.js`
