@@ -73,7 +73,7 @@ const QueueDrawer = ({ isOpen, onClose }) => {
   );
 
   return (
-    <BottomSheet open={isOpen} onClose={onClose} tall title="Play queue" subtitle={total ? `${total} coming up` : 'Nothing queued'} footer={footer}>
+    <BottomSheet open={isOpen} onClose={onClose} tall testId="queue-sheet" title="Play queue" subtitle={total ? `${total} coming up` : 'Nothing queued'} footer={footer}>
       <div className="pb-2">
         {nowPlaying && (
           <Section title="Now playing">

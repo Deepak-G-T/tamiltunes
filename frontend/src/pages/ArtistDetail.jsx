@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useParams, useNavigate, useOutletContext } from 'react-router-dom';
 import { Play, Pause, Heart, ArrowLeft, Loader2, Music2, Disc } from 'lucide-react';
+import CoverImage from '../components/common/CoverImage';
 import { useAudio } from '../context/AudioContext';
 import useCoverColor from '../hooks/useCoverColor';
 import { useAuth } from '../context/AuthContext';
@@ -91,16 +92,7 @@ const ArtistDetail = () => {
       {/* Artist Hero Header */}
       <div style={{ '--cover-rgb': coverRgb }} className="relative overflow-hidden flex flex-col sm:flex-row items-center gap-6 cover-wash-strong -mx-4 md:-mx-6 -mt-4 px-4 md:px-6 pt-10 pb-6">
         <div className="w-36 h-36 sm:w-44 sm:h-44 rounded-full overflow-hidden shadow-2xl border-2 border-brand-500/30 flex-shrink-0 bg-zinc-800">
-          <img
-            src={artist.image || 'https://images.unsplash.com/photo-1511671782779-c97d3d27a1d4?w=500&auto=format&fit=crop&q=80'}
-            alt={artist.name}
-            loading="lazy"
-            onError={(e) => {
-              e.currentTarget.onerror = null;
-              e.currentTarget.src = 'https://images.unsplash.com/photo-1511671782779-c97d3d27a1d4?w=500&auto=format&fit=crop&q=80';
-            }}
-            className="w-full h-full object-cover"
-          />
+          <CoverImage src={artist.image} variant="artist" alt={artist.name} className="w-full h-full object-cover" />
         </div>
 
         <div className="flex-1 text-center sm:text-left space-y-2">

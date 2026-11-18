@@ -329,6 +329,30 @@ async function runGestures(browser, width, height) {
   await page.waitForTimeout(500);
   check(`[${tag}] swipe down on the artwork closes the player`, (await page.locator('[aria-label="Close now playing"]').count()) === 0);
 
+  // queue: a bottom sheet on phones; swipe down on its handle or tap the dimmed page to close; no broken pictures
+  await mini.click({ position: { x: 20, y: 10 } });
+  await page.waitForSelector('[aria-label="Close now playing"]', { timeout: 3000 });
+  await page.locator('[aria-label="Open queue"]').click();
+  const sheet = page.locator('[data-testid=queue-sheet]');
+  await sheet.waitFor({ timeout: 3000 });
+  await page.waitForTimeout(450); // slide-in animation
+  const sb = await sheet.boundingBox();
+  check(`[${tag}] queue opens as a bottom sheet (full width, anchored to the bottom)`, sb && Math.abs(sb.width - width) < 2 && Math.abs(sb.y + sb.height - height) < 2 && sb.height < height * 0.85, JSON.stringify(sb));
+  const broken = await sheet.evaluate((el) => [...el.querySelectorAll('img')].filter((i) => !(i.complete && i.naturalWidth > 0)).length);
+  check(`[${tag}] queue pictures are never broken (placeholder when there is no cover)`, broken === 0, `${broken} broken`);
+  const handle = await center(page.locator('[data-testid=queue-sheet] > div').first());
+  await swipe(page, { x: handle.x, y: handle.y }, { x: handle.x, y: handle.y + 160 });
+  await page.waitForTimeout(400);
+  check(`[${tag}] swiping down on the queue handle closes it`, (await page.locator('[data-testid=queue-sheet]').count()) === 0);
+  await mini.click({ position: { x: 20, y: 10 } });
+  await page.waitForSelector('[aria-label="Close now playing"]', { timeout: 3000 });
+  await page.locator('[aria-label="Open queue"]').click();
+  await page.locator('[data-testid=queue-sheet]').waitFor({ timeout: 3000 });
+  await page.waitForTimeout(450);
+  await page.touchscreen.tap(width / 2, 40); // the dimmed page above the sheet
+  await page.waitForTimeout(400);
+  check(`[${tag}] tapping the dimmed page closes the queue`, (await page.locator('[data-testid=queue-sheet]').count()) === 0);
+
   // "Add to playlist" button closes the full-screen layer (the dialog sits below it)
   await mini.click({ position: { x: 20, y: 10 } });
   await page.waitForSelector('[aria-label="Close now playing"]', { timeout: 3000 });
@@ -337,6 +361,14 @@ async function runGestures(browser, width, height) {
   await addBtn.click();
   await page.waitForTimeout(400);
   check(`[${tag}] "Add to playlist" closes the full-screen player`, (await page.locator('[aria-label="Close now playing"]').count()) === 0);
+
+  // Explore: compact tiles, so several fit on one screen
+  await page.goto(`http://127.0.0.1:${PORT}/explore`);
+  await page.waitForSelector('text=Explore Tamil music');
+  await page.waitForTimeout(900);
+  const tiles = await page.locator('div.stagger > button').evaluateAll((els) => els.map((e) => { const r = e.getBoundingClientRect(); return { top: r.top, bottom: r.bottom }; }));
+  const onScreen = tiles.filter((t) => t.top >= 0 && t.bottom <= height - 64).length;
+  check(`[${tag}] Explore fits at least 4 tiles on one screen`, tiles.length >= 8 && onScreen >= 4, `tiles=${tiles.length} onScreen=${onScreen}`);
 
   check(`[${tag}] no uncaught page errors during gestures`, errors.length === 0, errors.join(' | '));
   await ctx.close();

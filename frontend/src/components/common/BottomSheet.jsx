@@ -8,8 +8,9 @@ const FOCUSABLE = 'a[href],button:not([disabled]),textarea,input,select,[tabinde
  * Accessible modal: bottom sheet on phones, centered dialog on larger screens.
  * Traps focus, closes on Escape / backdrop, restores focus, respects safe areas.
  */
-const BottomSheet = ({ open, onClose, title, subtitle, children, footer, tall = false }) => {
+const BottomSheet = ({ open, onClose, title, subtitle, children, footer, tall = false, testId }) => {
   const ref = useRef(null);
+  const dragY = useRef(null);
   const titleId = useId();
 
   useEffect(() => {
@@ -50,13 +51,25 @@ const BottomSheet = ({ open, onClose, title, subtitle, children, footer, tall = 
       <div
         ref={ref}
         role="dialog"
+        data-testid={testId}
         aria-modal="true"
         aria-labelledby={titleId}
         className={`slide-up relative w-full sm:max-w-lg bg-surface-2 border border-white/10 rounded-t-2xl sm:rounded-2xl shadow-2xl flex flex-col ${
-          tall ? 'h-[88dvh]' : 'max-h-[88dvh]'
+          tall ? 'h-[84dvh]' : 'max-h-[84dvh]'
         } sm:max-h-[85dvh]`}
       >
-        <div className="flex items-center justify-between gap-3 px-4 pt-4 pb-2 flex-shrink-0">
+        {/* Drag handle: swipe down to close (phones). Escape, the backdrop and the X still work. */}
+        <div
+          aria-hidden="true"
+          className="sm:hidden flex justify-center pt-2 pb-1 flex-shrink-0"
+          style={{ touchAction: 'none' }}
+          onPointerDown={(e) => { dragY.current = e.clientY; e.currentTarget.setPointerCapture?.(e.pointerId); }}
+          onPointerUp={(e) => { if (dragY.current !== null && e.clientY - dragY.current > 60) onClose(); dragY.current = null; }}
+          onPointerCancel={() => { dragY.current = null; }}
+        >
+          <span className="block w-10 h-1 rounded-full bg-white/25" />
+        </div>
+        <div className="flex items-center justify-between gap-3 px-4 pt-2 pb-2 flex-shrink-0">
           <div className="min-w-0">
             <h2 id={titleId} className="text-base font-bold text-white truncate">{title}</h2>
             {subtitle && <p className="text-[11px] text-zinc-400 truncate">{subtitle}</p>}
