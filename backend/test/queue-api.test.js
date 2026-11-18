@@ -1,5 +1,6 @@
 import assert from 'node:assert/strict';
 import app from '../src/app.js';
+import { config } from '../src/config/env.js';
 import { initDb, db } from '../src/prisma/client.js';
 import { musicService } from '../src/services/music/providerManager.js';
 import { musicCache } from '../src/services/cacheService.js';
@@ -10,6 +11,7 @@ musicService.setProvider('mock');
 musicCache.clear();
 const server = app.listen(5017);
 const BASE = 'http://localhost:5017/api';
+const origRequireLogin = config.requireLogin;
 const tag = Math.random().toString(36).slice(2, 7);
 const call = async (method, path, { token, body } = {}) => {
   const res = await fetch(`${BASE}${path}`, { method, headers: { ...(body ? { 'Content-Type': 'application/json' } : {}), ...(token ? { Authorization: `Bearer ${token}` } : {}) }, body: body ? JSON.stringify(body) : undefined });
@@ -105,12 +107,14 @@ try {
   assert.equal((await call('GET', '/me/queue', { token: A })).json.queue, null);
 
   // guests: ids -> songs, no login, capped
+  config.requireLogin = false;
   const guest = await call('POST', '/music/songs/resolve', { body: { ids: [s1, `gone-${tag}`] } });
   assert.equal(guest.status, 200);
   assert.ok(guest.json.songs[s1]);
   assert.equal(guest.json.songs[`gone-${tag}`], undefined);
   assert.equal((await call('POST', '/music/songs/resolve', { body: { ids: Array.from({ length: 101 }, (_, i) => `x${i}`) } })).status, 400);
   assert.equal((await call('POST', '/music/songs/resolve', { body: { ids: [] } })).status, 400);
+  config.requireLogin = origRequireLogin;
 
   // resolver: database first, provider only for the rest, capped, failures tolerated
   const calls = [];
@@ -140,5 +144,6 @@ try {
 
   console.log('✓ queue: auth, validation, id-only storage, isolation, last-write-wins, dropped songs, guest resolve, resolver caps');
 } finally {
+  config.requireLogin = origRequireLogin;
   server.close();
 }

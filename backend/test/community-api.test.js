@@ -1,11 +1,14 @@
 import assert from 'node:assert/strict';
 import app from '../src/app.js';
+import { config } from '../src/config/env.js';
 import { initDb, db } from '../src/prisma/client.js';
 import { getStore } from '../src/community/store/index.js';
 
 await initDb();
 const server = app.listen(5012);
 const BASE = 'http://localhost:5012/api';
+const origRequireLogin = config.requireLogin;
+config.requireLogin = false;
 
 const call = async (method, path, { token, body } = {}) => {
   const res = await fetch(`${BASE}${path}`, {
@@ -237,5 +240,6 @@ try {
   assert.equal((await call('GET', '/users/' + B.username, {})).json.profile.stats.following, 0, 'follows to the deleted user are removed');
   console.log('✓ account deletion needs the password and removes comments, follows and playlists');
 } finally {
+  config.requireLogin = origRequireLogin;
   server.close();
 }

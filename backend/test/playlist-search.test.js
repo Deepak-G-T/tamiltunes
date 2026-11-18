@@ -25,7 +25,7 @@ try {
   await call('POST', '/playlists', { token: B.token, body: { name: `${word} hidden owner`, isPublic: true } });
   await call('PATCH', '/profile/me', { token: B.token, body: { isPublicProfile: false } });
 
-  const r = await call('GET', `/music/search?query=${word}`);
+  const r = await call('GET', `/music/search?query=${word}`, { token: A.token });
   assert.equal(r.status, 200);
   assert.ok(Array.isArray(r.json.data.playlists), 'search returns a playlists group');
   assert.deepEqual(r.json.data.playlists.map((p) => p.name), [`${word} public`], 'only public playlists of public profiles');
@@ -35,12 +35,12 @@ try {
   assert.equal(p.songCount, 0);
   assert.equal(JSON.stringify(r.json).includes('@example.com'), false, 'no emails in search results');
 
-  const only = await call('GET', `/music/search?query=${word}&type=playlists`);
+  const only = await call('GET', `/music/search?query=${word}&type=playlists`, { token: A.token });
   assert.equal(only.json.data.playlists.length, 1);
   assert.deepEqual(only.json.data.songs, []);
-  assert.deepEqual((await call('GET', '/music/search?query=a')).json.data.playlists, [], 'one-letter queries do not search playlists');
-  assert.deepEqual((await call('GET', '/music/search?query=')).json.data.playlists, []);
-  assert.equal((await call('GET', `/music/search?query=Veezha`)).json.data.songs.length >= 0, true, 'song search still works');
+  assert.deepEqual((await call('GET', '/music/search?query=a', { token: A.token })).json.data.playlists, [], 'one-letter queries do not search playlists');
+  assert.deepEqual((await call('GET', '/music/search?query=', { token: A.token })).json.data.playlists, []);
+  assert.equal((await call('GET', `/music/search?query=Veezha`, { token: A.token })).json.data.songs.length >= 0, true, 'song search still works');
   console.log('✓ search: Playlists group lists only public playlists of public profiles, no emails, type filter, short queries');
 } finally {
   server.close();

@@ -5,6 +5,7 @@ import { AudioProvider } from './context/AudioContext';
 import MainLayout from './components/layout/MainLayout';
 import PlayTracker from './components/player/PlayTracker';
 import { SongActionsProvider } from './components/common/SongActionsSheet';
+import LoginGate from './components/auth/LoginGate';
 import { Loader2 } from 'lucide-react';
 
 const PageLoader = () => (
@@ -36,27 +37,37 @@ function App() {
         <AudioProvider>
           <PlayTracker />
           <SongActionsProvider>
-          <Suspense fallback={<PageLoader />}>
-            <Routes>
-              <Route path="/" element={<MainLayout />}>
-                <Route index element={<Home />} />
-                <Route path="explore" element={<Explore />} />
-                <Route path="search" element={<Search />} />
-                <Route path="album/:id" element={<AlbumDetail />} />
-                <Route path="artist/:id" element={<ArtistDetail />} />
-                <Route path="playlist/:id" element={<PlaylistDetail />} />
-                <Route path="favorites" element={<Favorites />} />
-                <Route path="history" element={<History />} />
-                <Route path="login" element={<Login />} />
-                <Route path="signup" element={<Signup />} />
-                <Route path="forgot-password" element={<ForgotPassword />} />
-                <Route path="reset-password" element={<ResetPassword />} />
-                <Route path="profile" element={<Profile />} />
-                <Route path="u/:username" element={<UserProfile />} />
-                <Route path="*" element={<Navigate to="/" replace />} />
-              </Route>
-            </Routes>
-          </Suspense>
+            <Suspense fallback={<PageLoader />}>
+              <Routes>
+                {/* Public Auth Routes */}
+                <Route path="/login" element={<Login />} />
+                <Route path="/signup" element={<Signup />} />
+                <Route path="/forgot-password" element={<ForgotPassword />} />
+                <Route path="/reset-password" element={<ResetPassword />} />
+
+                {/* Main Application Routes (Protected by Login-First Gate) */}
+                <Route
+                  path="/"
+                  element={
+                    <LoginGate>
+                      <MainLayout />
+                    </LoginGate>
+                  }
+                >
+                  <Route index element={<Home />} />
+                  <Route path="explore" element={<Explore />} />
+                  <Route path="search" element={<Search />} />
+                  <Route path="album/:id" element={<AlbumDetail />} />
+                  <Route path="artist/:id" element={<ArtistDetail />} />
+                  <Route path="playlist/:id" element={<PlaylistDetail />} />
+                  <Route path="favorites" element={<Favorites />} />
+                  <Route path="history" element={<History />} />
+                  <Route path="profile" element={<Profile />} />
+                  <Route path="u/:username" element={<UserProfile />} />
+                  <Route path="*" element={<Navigate to="/" replace />} />
+                </Route>
+              </Routes>
+            </Suspense>
           </SongActionsProvider>
         </AudioProvider>
       </AuthProvider>

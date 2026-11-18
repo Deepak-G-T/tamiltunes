@@ -9,7 +9,7 @@ const bad = 'border-rose-500/70 focus:border-rose-400 focus:ring-rose-400';
 
 /** The card all four screens share. */
 export const AuthShell = ({ title, subtitle, children, footer }) => (
-  <div className="min-h-[80vh] flex items-center justify-center p-4">
+  <main className="min-h-screen flex items-center justify-center p-4 bg-[#09090B]">
     <div className="w-full max-w-md bg-surface-2 rounded-2xl border border-zinc-800 p-6 sm:p-8 shadow-2xl animate-in fade-in zoom-in-95 duration-200">
       <div className="text-center mb-7">
         <div className="w-12 h-12 rounded-2xl bg-gradient-to-tr from-brand-600 to-brand-400 flex items-center justify-center mx-auto shadow-lg shadow-brand-600/30 mb-3">
@@ -21,7 +21,7 @@ export const AuthShell = ({ title, subtitle, children, footer }) => (
       {children}
       {footer && <div className="mt-6 pt-6 border-t border-zinc-800 text-center text-xs text-zinc-400">{footer}</div>}
     </div>
-  </div>
+  </main>
 );
 
 const Field = ({ label, icon: Icon, error, id, children, hint }) => (
@@ -45,27 +45,92 @@ export const TextField = ({ label, icon = User, error, ...props }) => {
   );
 };
 
-export const EmailField = (props) => <TextField label="Email address" icon={Mail} type="email" autoComplete="email" inputMode="email" autoCapitalize="none" spellCheck={false} placeholder="name@example.com" {...props} />;
+export const EmailField = (props) => (
+  <TextField
+    label="Email address"
+    icon={Mail}
+    type="email"
+    autoComplete="email"
+    inputMode="email"
+    autoCapitalize="off"
+    autoCorrect="off"
+    spellCheck={false}
+    placeholder="name@example.com"
+    {...props}
+  />
+);
 
 /** Password with a show / hide eye. The password is sent exactly as typed (never trimmed). */
 export const PasswordField = ({ label = 'Password', error, showStrength = false, value, ...props }) => {
   const id = useId();
   const [shown, setShown] = useState(false);
   const strength = showStrength ? passwordStrength(value) : null;
+
+  const spaceWarning = React.useMemo(() => {
+    if (!value) return null;
+    const leading = value.startsWith(' ');
+    const trailing = value.endsWith(' ');
+    if (leading && trailing) return 'Your password has spaces at the beginning and end';
+    if (trailing) return 'Your password has a space at the end';
+    if (leading) return 'Your password has a space at the beginning';
+    return null;
+  }, [value]);
+
   return (
-    <Field label={label} icon={Lock} error={error} id={id}
-      hint={strength && (value ? (
-        <div className="mt-2" data-testid="strength">
-          <div className="flex gap-1" aria-hidden="true">
-            {[1, 2, 3, 4].map((n) => <span key={n} className={`h-1 flex-1 rounded-full ${strength.score >= n ? ['', 'bg-rose-500', 'bg-amber-400', 'bg-brand-400', 'bg-brand-300'][strength.score] : 'bg-zinc-700'}`} />)}
-          </div>
-          <p className="mt-1.5 text-[11px] text-zinc-400" aria-live="polite"><span className="font-semibold text-zinc-200">{strength.label}</span>{strength.hint ? `: ${strength.hint}` : ''}</p>
-        </div>
-      ) : null)}>
-      <input id={id} type={shown ? 'text' : 'password'} value={value} aria-invalid={Boolean(error)} aria-describedby={error ? `${id}-error` : undefined}
-        className={`${INPUT} pr-11 ${error ? bad : ok}`} autoCapitalize="none" spellCheck={false} {...props} />
-      <button type="button" onClick={() => setShown((s) => !s)} aria-pressed={shown} aria-label={shown ? 'Hide password' : 'Show password'}
-        className="absolute inset-y-0 right-0 px-3.5 text-zinc-400 hover:text-white focus-visible:outline focus-visible:outline-2 focus-visible:outline-brand-400 rounded-r-xl">
+    <Field
+      label={label}
+      icon={Lock}
+      error={error}
+      id={id}
+      hint={
+        <>
+          {spaceWarning && (
+            <p className="mt-1 text-[11px] text-amber-400 font-medium" role="status">
+              {spaceWarning}
+            </p>
+          )}
+          {strength && value ? (
+            <div className="mt-2" data-testid="strength">
+              <div className="flex gap-1" aria-hidden="true">
+                {[1, 2, 3, 4].map((n) => (
+                  <span
+                    key={n}
+                    className={`h-1 flex-1 rounded-full ${
+                      strength.score >= n
+                        ? ['', 'bg-rose-500', 'bg-amber-400', 'bg-brand-400', 'bg-brand-300'][strength.score]
+                        : 'bg-zinc-700'
+                    }`}
+                  />
+                ))}
+              </div>
+              <p className="mt-1.5 text-[11px] text-zinc-400" aria-live="polite">
+                <span className="font-semibold text-zinc-200">{strength.label}</span>
+                {strength.hint ? `: ${strength.hint}` : ''}
+              </p>
+            </div>
+          ) : null}
+        </>
+      }
+    >
+      <input
+        id={id}
+        type={shown ? 'text' : 'password'}
+        value={value}
+        aria-invalid={Boolean(error)}
+        aria-describedby={error ? `${id}-error` : undefined}
+        className={`${INPUT} pr-11 ${error ? bad : ok}`}
+        autoCapitalize="off"
+        autoCorrect="off"
+        spellCheck={false}
+        {...props}
+      />
+      <button
+        type="button"
+        onClick={() => setShown((s) => !s)}
+        aria-pressed={shown}
+        aria-label={shown ? 'Hide password' : 'Show password'}
+        className="absolute inset-y-0 right-0 px-3.5 text-zinc-400 hover:text-white focus-visible:outline focus-visible:outline-2 focus-visible:outline-brand-400 rounded-r-xl"
+      >
         {shown ? <EyeOff className="w-4 h-4" aria-hidden="true" /> : <Eye className="w-4 h-4" aria-hidden="true" />}
       </button>
     </Field>

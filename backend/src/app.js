@@ -9,6 +9,7 @@ import { db } from './prisma/client.js';
 import { musicService } from './services/music/providerManager.js';
 import { apiLimiter } from './middleware/rateLimiter.js';
 import { errorHandler } from './middleware/errorHandler.js';
+import { loginGate } from './middleware/auth.js';
 
 // Route imports
 import authRoutes from './routes/authRoutes.js';
@@ -92,18 +93,20 @@ const healthHandler = (req, res) => {
 app.get('/health', healthHandler);
 app.get('/api/health', healthHandler);
 
-// Mount Routes
+// Public Auth Routes & Health
 app.use('/api/auth', authRoutes);
-app.use('/api/music', musicRoutes);
-app.use('/api/playlists', playlistRoutes);
-app.use('/api/favorites', favoriteRoutes);
-app.use('/api/history', historyRoutes);
-app.use('/api', commentRoutes);
-app.use('/api', relatedRoutes);
-app.use('/api/me', meRoutes);
-app.use('/api/home', homeRoutes);
-app.use('/api/profile', profileRoutes);
-app.use('/api/users', userRoutes);
+
+// Protected resource routes gated by loginGate (enforces 401 when REQUIRE_LOGIN=true)
+app.use('/api/music', loginGate, musicRoutes);
+app.use('/api/playlists', loginGate, playlistRoutes);
+app.use('/api/favorites', loginGate, favoriteRoutes);
+app.use('/api/history', loginGate, historyRoutes);
+app.use('/api', loginGate, commentRoutes);
+app.use('/api', loginGate, relatedRoutes);
+app.use('/api/me', loginGate, meRoutes);
+app.use('/api/home', loginGate, homeRoutes);
+app.use('/api/profile', loginGate, profileRoutes);
+app.use('/api/users', loginGate, userRoutes);
 
 // 404 Handler
 app.use((req, res) => {

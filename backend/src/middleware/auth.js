@@ -30,6 +30,10 @@ export const requireAuth = async (req, res, next) => {
       });
     }
 
+    if (user.isActive === false) {
+      return res.status(401).json({ success: false, message: 'Account has been deactivated' });
+    }
+
     if (tokenPredatesPasswordChange(decoded, user)) {
       return res.status(401).json({ success: false, message: 'Invalid or expired session token' }); // signed in before the password was changed
     }
@@ -39,7 +43,8 @@ export const requireAuth = async (req, res, next) => {
       email: user.email,
       name: user.name,
       username: user.username ?? null,
-      role: user.role || 'user'
+      role: user.role || 'user',
+      isActive: user.isActive !== false
     };
 
     next();
@@ -58,12 +63,30 @@ export const optionalAuth = async (req, res, next) => {
       const token = authHeader.split(' ')[1];
       const decoded = jwt.verify(token, config.jwtSecret);
       const user = await db.user.findUnique({ where: { id: decoded.userId } });
-      if (user && !tokenPredatesPasswordChange(decoded, user)) {
-        req.user = { id: user.id, email: user.email, name: user.name, username: user.username ?? null, role: user.role || 'user' };
+      if (user && user.isActive !== false && !tokenPredatesPasswordChange(decoded, user)) {
+        req.user = {
+          id: user.id,
+          email: user.email,
+          name: user.name,
+          username: user.username ?? null,
+          role: user.role || 'user',
+          isActive: true
+        };
       }
     }
   } catch (err) {
     // Ignore error for optional auth
   }
   next();
+};
+
+/**
+ * Gate that protects API endpoints when REQUIRE_LOGIN=true.
+ * When REQUIRE_LOGIN=false, acts as optionalAuth allowing guest browsing.
+ */
+export const loginGate = (req, res, next) => {
+  if (config.requireLogin) {
+    return requireAuth(req, res, next);
+  }
+  return optionalAuth(req, res, next);
 };

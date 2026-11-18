@@ -30,6 +30,12 @@ model User {
   isPublicProfile Boolean  @default(true)
   showHistory     Boolean  @default(false)
   role            String   @default("user") // user | artist | admin
+  isActive        Boolean  @default(true) @map("is_active")
+  failedLoginAttempts Int  @default(0) @map("failed_login_attempts")
+  lockedUntil     DateTime? @map("locked_until")
+  twoFactorSecret String?   @map("two_factor_secret")
+  twoFactorEnabled Boolean  @default(false) @map("two_factor_enabled")
+  twoFactorRecoveryCodes String[] @default([]) @map("two_factor_recovery_codes")
   passwordChangedAt DateTime? @map("password_changed_at") // sign-in tokens issued before this are no longer accepted
   passwordResetTokens PasswordResetToken[]
 
@@ -44,6 +50,7 @@ model User {
   queueState       QueueState?
   followers        Follow[]  @relation("Followed")
   following        Follow[]  @relation("Follower")
+  auditLogs        AuditLog[]
 
   @@map("users")
 }
@@ -66,6 +73,9 @@ model Song {
   movie    String?
   year     Int?
   language String?
+  isHidden Boolean  @default(false) @map("is_hidden")
+  deletedAt DateTime? @map("deleted_at")
+  canonicalGroupId String? @map("canonical_group_id")
 
   playlistSongs    PlaylistSong[]
   favorites        Favorite[]
@@ -73,6 +83,7 @@ model Song {
 
   @@index([composer])
   @@index([language, year])
+  @@index([canonicalGroupId])
   @@map("songs")
 }
 
@@ -103,6 +114,7 @@ model Playlist {
   description String?
   userId      String
   isPublic    Boolean  @default(false)
+  isFeatured  Boolean  @default(false) @map("is_featured")
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
 
@@ -300,4 +312,31 @@ model PasswordResetToken {
 
   @@index([userId])
   @@map("password_reset_tokens")
+}
+
+model AuditLog {
+  id         String   @id @default(uuid())
+  actorId    String?  @map("actor_id")
+  actorEmail String?  @map("actor_email")
+  action     String   @db.VarChar(100)
+  targetType String?  @map("target_type") @db.VarChar(50)
+  targetId   String?  @map("target_id") @db.VarChar(255)
+  details    Json     @default("{}")
+  ip         String?  @db.VarChar(45)
+  createdAt  DateTime @default(now()) @map("created_at")
+
+  actor User? @relation(fields: [actorId], references: [id], onDelete: SetNull)
+
+  @@index([createdAt(sort: Desc)])
+  @@index([action, createdAt(sort: Desc)])
+  @@index([targetType, targetId])
+  @@map("audit_logs")
+}
+
+model AppSetting {
+  key       String   @id @db.VarChar(100)
+  value     Json
+  updatedAt DateTime @default(now()) @updatedAt @map("updated_at")
+
+  @@map("app_settings")
 }

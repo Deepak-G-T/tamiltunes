@@ -47,6 +47,9 @@ const startServer = () => new Promise((resolve, reject) => {
 });
 
 async function setup(page) {
+  await page.addInitScript(() => {
+    localStorage.setItem('tamiltunes_require_login', 'false');
+  });
   await page.route('**/api/music/home', (r) => r.fulfill({ json: { success: true, data: FEED } }));
   await page.route('**/api/home**', (r) => r.fulfill({ json: { success: true, seed: 'test', hero: null, sections: [{ id: 'trending', title: 'Trending now', kind: 'songs', items: Q }] } }));
   await page.route('**/api/songs/*/related**', (r) => { const u = new URL(r.request().url()); relatedCalls.push({ limit: Number(u.searchParams.get('limit')), exclude: (u.searchParams.get('exclude') || '').split(',') }); return r.fulfill({ json: { success: true, items: R.slice(0, Number(u.searchParams.get('limit')) || 12) } }); });
