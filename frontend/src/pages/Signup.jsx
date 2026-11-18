@@ -1,145 +1,61 @@
 import React, { useState } from 'react';
-import { useNavigate, Link } from 'react-router-dom';
-import { Music2, Lock, Mail, User, Loader2, ArrowRight } from 'lucide-react';
+import { useNavigate } from 'react-router-dom';
+import { ArrowRight } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
+import { AuthShell, TextField, EmailField, PasswordField, SubmitButton, FormError, AuthLink } from '../components/auth/AuthParts';
+import { validateName, validateEmail, validateNewPassword, validateConfirm, rememberEmail, recallEmail } from '../lib/authForm';
 
 const Signup = () => {
   const navigate = useNavigate();
   const { signup } = useAuth();
-
   const [name, setName] = useState('');
-  const [email, setEmail] = useState('');
+  const [email, setEmail] = useState(() => recallEmail(window.sessionStorage));
   const [password, setPassword] = useState('');
+  const [confirm, setConfirm] = useState('');
+  const [touched, setTouched] = useState({});
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
+  const [exists, setExists] = useState(false);
+
+  const errors = { name: validateName(name), email: validateEmail(email), password: validateNewPassword(password), confirm: validateConfirm(password, confirm) };
+  const show = (f) => (touched[f] ? errors[f] : '');
+  const blur = (f) => () => setTouched((t) => ({ ...t, [f]: true }));
+  const onEmail = (e) => { setEmail(e.target.value); setExists(false); rememberEmail(window.sessionStorage, e.target.value); };
 
   const handleSubmit = async (e) => {
     e.preventDefault();
-    if (!name || !email || !password) {
-      setError('Please fill in all fields');
-      return;
-    }
-
-    if (password.length < 6) {
-      setError('Password must be at least 6 characters');
-      return;
-    }
-
+    setTouched({ name: true, email: true, password: true, confirm: true });
+    if (Object.values(errors).some(Boolean) || loading) return;
     setLoading(true);
     setError('');
-
-    const res = await signup(name, email, password);
+    setExists(false);
+    const res = await signup(name.trim(), email.trim(), password);
     setLoading(false);
-
-    if (res.success) {
-      navigate('/');
-    } else {
-      setError(res.error || 'Failed to create account');
-    }
+    if (res.success) navigate('/');
+    else if (res.code === 'EMAIL_EXISTS') setExists(true);
+    else setError(res.error || 'Failed to create account');
   };
 
   return (
-    <div className="min-h-[80vh] flex items-center justify-center p-4">
-      <div className="w-full max-w-md bg-surface-2 rounded-2xl border border-zinc-800 p-8 shadow-2xl animate-in fade-in zoom-in-95 duration-200">
-        {/* Brand */}
-        <div className="text-center mb-8">
-          <div className="w-12 h-12 rounded-2xl bg-gradient-to-tr from-brand-600 to-brand-400 flex items-center justify-center mx-auto shadow-lg shadow-brand-600/30 mb-3">
-            <Music2 className="w-6 h-6 text-white" />
-          </div>
-          <h2 className="text-2xl font-black text-white tracking-tight">Create your Account</h2>
-          <p className="text-xs text-zinc-400 mt-1">Start listening to authentic Tamil music with zero ads</p>
+    <AuthShell title="Create your Account" subtitle="Start listening to authentic Tamil music with zero ads"
+      footer={<>Already have an account? <AuthLink to="/login">Log in</AuthLink></>}>
+      <FormError>{error}</FormError>
+      {exists && (
+        <div role="alert" data-testid="email-exists" className="mb-5 p-3 rounded-xl bg-amber-500/10 border border-amber-500/30 text-amber-200 text-xs">
+          <p className="font-semibold">An account with this email already exists.</p>
+          <p className="mt-1.5 flex flex-wrap gap-x-4 gap-y-1"><AuthLink to="/login">Log in instead</AuthLink><AuthLink to="/forgot-password">Forgot password?</AuthLink></p>
         </div>
-
-        {error && (
-          <div className="mb-5 p-3 rounded-xl bg-rose-500/10 border border-rose-500/30 text-rose-400 text-xs text-center">
-            {error}
-          </div>
-        )}
-
-        <form onSubmit={handleSubmit} className="space-y-4">
-          <div>
-            <label className="block text-xs font-semibold text-zinc-300 mb-1.5">
-              Full Name
-            </label>
-            <div className="relative">
-              <div className="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none text-zinc-500">
-                <User className="w-4 h-4" />
-              </div>
-              <input
-                type="text"
-                required
-                value={name}
-                onChange={(e) => setName(e.target.value)}
-                placeholder="e.g. Sivakarthikeyan"
-                className="w-full pl-10 pr-4 py-2.5 rounded-xl bg-zinc-900 border border-zinc-700/80 text-white text-sm focus:outline-none focus:border-brand-500 focus:ring-1 focus:ring-brand-500 placeholder-zinc-500 transition-colors"
-              />
-            </div>
-          </div>
-
-          <div>
-            <label className="block text-xs font-semibold text-zinc-300 mb-1.5">
-              Email Address
-            </label>
-            <div className="relative">
-              <div className="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none text-zinc-500">
-                <Mail className="w-4 h-4" />
-              </div>
-              <input
-                type="email"
-                required
-                value={email}
-                onChange={(e) => setEmail(e.target.value)}
-                placeholder="name@example.com"
-                className="w-full pl-10 pr-4 py-2.5 rounded-xl bg-zinc-900 border border-zinc-700/80 text-white text-sm focus:outline-none focus:border-brand-500 focus:ring-1 focus:ring-brand-500 placeholder-zinc-500 transition-colors"
-              />
-            </div>
-          </div>
-
-          <div>
-            <label className="block text-xs font-semibold text-zinc-300 mb-1.5">
-              Password
-            </label>
-            <div className="relative">
-              <div className="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none text-zinc-500">
-                <Lock className="w-4 h-4" />
-              </div>
-              <input
-                type="password"
-                required
-                value={password}
-                onChange={(e) => setPassword(e.target.value)}
-                placeholder="At least 6 characters"
-                className="w-full pl-10 pr-4 py-2.5 rounded-xl bg-zinc-900 border border-zinc-700/80 text-white text-sm focus:outline-none focus:border-brand-500 focus:ring-1 focus:ring-brand-500 placeholder-zinc-500 transition-colors"
-              />
-            </div>
-          </div>
-
-          <button
-            type="submit"
-            disabled={loading}
-            className="w-full py-3 rounded-xl bg-brand-500 hover:bg-brand-400 text-black text-sm font-bold flex items-center justify-center gap-2 shadow-lg shadow-brand-600/30 transition-all hover:scale-[1.01] active:scale-[0.99] disabled:opacity-50 mt-2"
-          >
-            {loading ? (
-              <Loader2 className="w-4 h-4 animate-spin" />
-            ) : (
-              <>
-                <span>Sign Up Free</span>
-                <ArrowRight className="w-4 h-4" />
-              </>
-            )}
-          </button>
-        </form>
-
-        <div className="mt-6 pt-6 border-t border-zinc-800 text-center">
-          <p className="text-xs text-zinc-400">
-            Already have an account?{' '}
-            <Link to="/login" className="text-brand-400 font-semibold hover:underline">
-              Log in
-            </Link>
-          </p>
-        </div>
-      </div>
-    </div>
+      )}
+      <form onSubmit={handleSubmit} noValidate className="space-y-4">
+        <TextField label="Your name" value={name} onChange={(e) => setName(e.target.value)} onBlur={blur('name')} error={show('name')} autoComplete="name" placeholder="Your name" />
+        <EmailField value={email} onChange={onEmail} onBlur={blur('email')} error={show('email')} />
+        <PasswordField value={password} onChange={(e) => setPassword(e.target.value)} onBlur={blur('password')} error={show('password')} autoComplete="new-password" placeholder="At least 8 characters" showStrength />
+        <PasswordField label="Confirm password" value={confirm} onChange={(e) => setConfirm(e.target.value)} onBlur={blur('confirm')} error={show('confirm')} autoComplete="new-password" placeholder="Type it again" />
+        <SubmitButton loading={loading} loadingText="Creating account...">
+          <span>Sign Up Free</span><ArrowRight className="w-4 h-4" aria-hidden="true" />
+        </SubmitButton>
+      </form>
+    </AuthShell>
   );
 };
 

@@ -113,3 +113,10 @@ Songs may carry an optional `videoId`. It comes from the curated map `backend/sr
 - UNTESTED: the live JioSaavn pools; how full each shelf is with real data (thin shelves are hidden).
 - Queue feel: Undo messages for every queue change, row motion (`hooks/useFlip.js`), `useQueue` context (panel is not redrawn on the song clock),
   autoplay variety and "Added N similar songs" (notes in `docs/QUEUE_V2.md`). UNTESTED: real-phone haptics, swipe reveal and drag feel.
+
+## Auth (fix/auth-login)
+- Emails are trimmed + lower-cased everywhere (`backend/src/services/auth/credentials.js` is the only place that hashes or checks passwords). Password reset by email
+  (Brevo or Resend over HTTPS; env `EMAIL_PROVIDER`, `RESET_EMAIL_FROM`, `BREVO_API_KEY` / `RESEND_API_KEY`, `FRONTEND_URL`). Notes and the owner scripts
+  (`reset-password`, `verify-password`, `report:email-collisions`): `docs/AUTH.md`. Migrations `20261123000000_password_reset`, `20261123000100_email_lower_unique`
+  (take the Neon backup BEFORE merging; the second one skips itself if two emails would collide). `npm run test:auth --prefix frontend` is the sign in / sign up browser audit.
+- UNTESTED: a real reset email from the provider; the migrations on Neon (they passed on a scratch Postgres 16).

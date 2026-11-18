@@ -12,6 +12,7 @@
     "test:ui": "vite build && node scripts/run-ui-audits.mjs",
     "test:queue": "vite build && node scripts/queue-audit.mjs",
     "test:search": "vite build && node scripts/search-audit.mjs",
+    "test:auth": "vite build && node scripts/auth-audit.mjs",
     "test:home": "vite build && node scripts/home-audit.mjs"
   },
   "dependencies": {

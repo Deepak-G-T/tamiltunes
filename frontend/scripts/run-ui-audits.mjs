@@ -7,6 +7,7 @@ const suites = [
   ['fix/youtube-feed audit', 'src/test/runPlaywrightAudit.mjs'],
   ['video toggle audit', 'scripts/ui-audit.mjs'],
   ['play queue audit', 'scripts/queue-audit.mjs'],
+  ['sign in / sign up audit', 'scripts/auth-audit.mjs'],
   ['recent searches audit', 'scripts/search-audit.mjs'],
   ['home feed audit', 'scripts/home-audit.mjs']
 ];

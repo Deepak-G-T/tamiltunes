@@ -24,6 +24,8 @@ const Favorites = lazy(() => import('./pages/Favorites'));
 const History = lazy(() => import('./pages/History'));
 const Login = lazy(() => import('./pages/Login'));
 const Signup = lazy(() => import('./pages/Signup'));
+const ForgotPassword = lazy(() => import('./pages/ForgotPassword'));
+const ResetPassword = lazy(() => import('./pages/ResetPassword'));
 const Profile = lazy(() => import('./pages/Profile'));
 const UserProfile = lazy(() => import('./pages/UserProfile'));
 
@@ -47,6 +49,8 @@ function App() {
                 <Route path="history" element={<History />} />
                 <Route path="login" element={<Login />} />
                 <Route path="signup" element={<Signup />} />
+                <Route path="forgot-password" element={<ForgotPassword />} />
+                <Route path="reset-password" element={<ResetPassword />} />
                 <Route path="profile" element={<Profile />} />
                 <Route path="u/:username" element={<UserProfile />} />
                 <Route path="*" element={<Navigate to="/" replace />} />
