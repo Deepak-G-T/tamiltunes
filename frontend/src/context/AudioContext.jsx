@@ -1,11 +1,12 @@
 import React, { createContext, useContext, useState, useRef, useEffect, useCallback, useMemo } from 'react';
 import api from '../services/api';
 import YouTubePlayer from '../components/player/YouTubePlayer';
+import DuplicateQueuePrompt from '../components/player/DuplicateQueuePrompt';
 import {
   createQueueState, playFromSearch, playFromContext, switchToRadio, advance, previous, jumpTo,
   addToQueue as queueAdd, playNext as queuePlayNext, removeFromUpcoming, removeFromHistory, reorderUpcoming,
   clearUserQueue, setShuffle as queueSetShuffle, setRepeat as queueSetRepeat, nextRepeat, setAutoplay as queueSetAutoplay,
-  needsRefill, runRefill, toFlatQueue, getSections
+  needsRefill, runRefill, toFlatQueue, getSections, isQueueFull, findQueued, moveToQueue, indexOfUid, MAX_QUEUE
 } from '../lib/radioQueue';
 import { fetchRelated } from '../lib/radioApi';
 import Toast from '../components/common/Toast';
@@ -718,8 +719,25 @@ export const AudioProvider = ({ children }) => {
     updateQs((q) => queueSetAutoplay(q, on));
   };
 
-  const addToQueue = (song) => { if (song) updateQs((q) => queueAdd(q, song)); };
-  const playNext = (song) => { if (song) updateQs((q) => queuePlayNext(q, song)); };
+  // Add a song to the user's queue block. A song that is already queued asks first: add it again, or move it.
+  const [dupPrompt, setDupPrompt] = useState(null); // { song, where: 'next' | 'end', uid }
+  const requestQueueAdd = (song, where) => {
+    if (!song) return;
+    const q = qsRef.current;
+    if (isQueueFull(q)) { showToast(`The queue is full (${MAX_QUEUE} songs). Remove some to add more.`); return; }
+    const at = findQueued(q, song.id);
+    if (at >= 0) { setDupPrompt({ song, where, uid: q.upcoming[at].uid }); return; }
+    updateQs((s) => (where === 'next' ? queuePlayNext(s, song) : queueAdd(s, song)));
+  };
+  const addToQueue = (song) => requestQueueAdd(song, 'end');
+  const playNext = (song) => requestQueueAdd(song, 'next');
+  const resolveDuplicate = (choice) => {
+    const p = dupPrompt;
+    setDupPrompt(null);
+    if (!p || choice === 'cancel') return;
+    if (choice === 'again') updateQs((s) => (p.where === 'next' ? queuePlayNext(s, p.song) : queueAdd(s, p.song)));
+    else updateQs((s) => { const i = indexOfUid(s, p.uid); return i >= 0 ? moveToQueue(s, i, p.where) : s; });
+  };
   const clearQueue = () => updateQs(clearUserQueue); // clears the songs the user added; the radio / list carries on
 
   // Index-based helpers for views that list "upcoming" (what the queue panel uses)
@@ -967,6 +985,7 @@ export const AudioProvider = ({ children }) => {
       />
       {children}
       <Toast toast={toast} onDismiss={() => setToast(null)} />
+      <DuplicateQueuePrompt prompt={dupPrompt} onChoose={resolveDuplicate} />
     </AudioContext.Provider>
   );
 };

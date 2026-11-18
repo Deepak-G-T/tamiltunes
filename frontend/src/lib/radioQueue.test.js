@@ -3,7 +3,7 @@ import {
   createQueueState, playFromSearch, playFromContext, switchToRadio, advance, previous, jumpTo, addToQueue, playNext,
   removeFromUpcoming, reorderUpcoming, clearUserQueue, setShuffle, setRepeat, nextRepeat, setAutoplay, needsRefill,
   startRefill, applyRefill, refillFailed, runRefill, getSections, peekNext, toSnapshot, fromSnapshot, shuffled,
-  applyFallback, toFlatQueue, removeFromHistory, indexOfUid,
+  applyFallback, toFlatQueue, removeFromHistory, indexOfUid, findQueued, moveToQueue, isQueueFull, MAX_QUEUE,
   REFILL_THRESHOLD, MAX_EXCLUDE, REFILL_BACKOFF_MS,
 } from './radioQueue';
 
@@ -455,5 +455,58 @@ describe('queue item ids (queue v2)', () => {
     for (let i = 1; i <= 60; i++) s = playFromSearch(s, S(`s${i}`));
     expect(s.history).toHaveLength(50);
     expect(s.history[49].id).toBe('s59');
+  });
+});
+
+describe('duplicates and the 500 cap (queue v2)', () => {
+  it('finds a queued song, but not the one that is playing', () => {
+    const s = addToQueue(radio('a', 'r1', 'r2'), S('x'));
+    expect(findQueued(s, 'r2')).toBe(2);
+    expect(findQueued(s, 'x')).toBe(0);
+    expect(findQueued(s, 'a')).toBe(-1);
+    expect(findQueued(s, 'zzz')).toBe(-1);
+  });
+
+  it('"add again" really queues a second copy', () => {
+    let s = addToQueue(radio('a', 'r1'), S('x'));
+    s = addToQueue(s, S('x'));
+    expect(ids(s.upcoming)).toEqual(['x', 'x', 'r1']);
+    expect(s.userCount).toBe(2);
+  });
+
+  it('moving a radio song to Play next puts it first and marks it user-added', () => {
+    let s = radio('a', 'r1', 'r2', 'r3');
+    const uid = s.upcoming[2].uid;
+    s = moveToQueue(s, 2, 'next');
+    expect(ids(s.upcoming)).toEqual(['r3', 'r1', 'r2']);
+    expect(s.userCount).toBe(1);
+    expect(s.upcoming[0].origin).toBe('user');
+    expect(s.upcoming[0].uid).toBe(uid);
+  });
+
+  it('moving to the end of "Next in queue" lands after the other added songs, before the radio songs', () => {
+    let s = radio('a', 'r1', 'r2');
+    s = addToQueue(addToQueue(s, S('u1')), S('u2'));
+    s = moveToQueue(s, 3, 'end'); // r2
+    expect(ids(s.upcoming)).toEqual(['u1', 'u2', 'r2', 'r1']);
+    expect(s.userCount).toBe(3);
+    // moving a user song to the end keeps the count right
+    s = moveToQueue(s, 0, 'end');
+    expect(ids(s.upcoming)).toEqual(['u2', 'r2', 'u1', 'r1']);
+    expect(s.userCount).toBe(3);
+  });
+
+  it('ignores a bad index', () => {
+    const s = radio('a', 'r1');
+    expect(moveToQueue(s, 9, 'next')).toBe(s);
+  });
+
+  it('refuses to grow past 500 songs', () => {
+    let s = radio('a');
+    s = { ...s, upcoming: Array.from({ length: MAX_QUEUE }, (_, i) => ({ uid: `u${i}`, song: S(`q${i}`), origin: 'radio' })) };
+    expect(isQueueFull(s)).toBe(true);
+    expect(addToQueue(s, S('x'))).toBe(s);
+    expect(playNext(s, S('x'))).toBe(s);
+    expect(isQueueFull(removeFromUpcoming(s, 0))).toBe(false);
   });
 });

@@ -224,9 +224,28 @@ export function jumpTo(state, index) {
 
 // ---------------------------------------------------------------- editing the queue
 
+export const isQueueFull = (state) => state.upcoming.length >= MAX_QUEUE;
+
+/** Index in the upcoming list of a song that is already queued (-1 when it is not). The playing song does not count. */
+export const findQueued = (state, songId) => state.upcoming.findIndex((e) => e.song.id === songId);
+
+/**
+ * Move a queued song (from anywhere in the upcoming list) into the user's queue block, as "Play next" ('next') or
+ * "Add to queue" ('end'). Used when the user adds a song that is already queued and chooses to move it.
+ */
+export function moveToQueue(state, index, where = 'end') {
+  if (index < 0 || index >= state.upcoming.length) return state;
+  const moved = state.upcoming[index];
+  const rest = state.upcoming.filter((_, i) => i !== index);
+  const userCount = index < state.userCount ? state.userCount - 1 : state.userCount;
+  const at = where === 'next' ? 0 : userCount;
+  const upcoming = [...rest.slice(0, at), entry(moved.song, 'user', moved.uid), ...rest.slice(at)];
+  return { ...state, upcoming, userCount: userCount + 1 };
+}
+
 /** "Add to queue": after the user's other queued songs, before the radio / playlist songs. */
 export function addToQueue(state, song) {
-  if (!song) return state;
+  if (!song || isQueueFull(state)) return state;
   const upcoming = [...state.upcoming];
   upcoming.splice(state.userCount, 0, entry(song, 'user'));
   return { ...state, upcoming, userCount: state.userCount + 1 };
@@ -234,7 +253,7 @@ export function addToQueue(state, song) {
 
 /** "Play next": at the very front of the queue. */
 export function playNext(state, song) {
-  if (!song) return state;
+  if (!song || isQueueFull(state)) return state;
   return { ...state, upcoming: [entry(song, 'user'), ...state.upcoming], userCount: state.userCount + 1 };
 }
 
