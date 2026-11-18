@@ -47,6 +47,7 @@ window.YT = { PlayerState: { ENDED: 0, PLAYING: 1, PAUSED: 2, BUFFERING: 3, CUED
       const f = document.createElement('div'); f.id = 'fake-yt-iframe'; f.style.cssText = 'width:100%;height:100%;background:#111';
       host.appendChild(f);
       window.__yt.handlers = opts.events;
+      window.__yt.host = opts.host;
       this._ev = opts.events;
       // The app creates the player WITH a videoId (autoplay/start in playerVars): model that like the real API
       if (opts.videoId) {
@@ -91,11 +92,12 @@ const startServer = () =>
 const state = (page) =>
   page.evaluate(() => {
     const a = window.__tamiltunes_audio;
-    return { audioPlaying: !!a && !a.paused && !a.ended, audioTime: a ? a.currentTime : 0, ytPlaying: window.__yt.playing, ytTime: window.__yt.time };
+    return { audioPlaying: !!a && !a.paused && !a.ended, audioTime: a ? a.currentTime : 0, ytPlaying: Boolean(window.__yt?.playing), ytTime: window.__yt?.time ?? 0 };
   });
 
 const box = async (loc) => (await loc.boundingBox());
 
+const reports = []; // video-report requests the app sent
 async function setupRoutes(page) {
   await page.addInitScript(() => {
     localStorage.setItem('tamiltunes_token', 'audit_token');
@@ -120,6 +122,7 @@ async function setupRoutes(page) {
     return r.fulfill({ status: 200, contentType: 'audio/wav', body: wav, headers: { 'Accept-Ranges': 'bytes' } });
   });
   await page.route('https://images.unsplash.com/**', (r) => r.abort());
+  await page.route('**/api/songs/*/video-report', (r) => { reports.push({ url: r.request().url(), body: JSON.parse(r.request().postData() || '{}') }); return r.fulfill({ json: { success: true, reports: 1, hidden: false, needed: 2 } }); });
 }
 
 async function runViewport(browser, width, height) {
@@ -147,90 +150,98 @@ async function runViewport(browser, width, height) {
   await page.waitForSelector('[aria-label="Open now playing full screen"]');
   check(`[${tag}] no toggle for a song without videoId`, (await page.locator('[data-testid=video-toggle], [data-testid=mode-video], [data-testid=mode-audio]').count()) === 0);
 
-  // 2. song WITH videoId -> toggle in mini player
+  // 2. song WITH videoId: the mini player stays audio-style (no toggle); the toggle is in Now Playing
   await page.getByText('Badass (Leo)').first().click();
   await page.waitForFunction(() => { const a = window.__tamiltunes_audio; return a && !a.paused && a.currentTime > 0.3; }, null, { timeout: 8000 });
   const mini = page.locator('[aria-label="Open now playing full screen"]');
   const titleBox = await box(mini.locator('h4'));
-  check(`[${tag}] MiniPlayer song title keeps >= 80px of room next to the toggle`, titleBox && titleBox.width >= 80, JSON.stringify(titleBox));
-  check(`[${tag}] toggle visible in MiniPlayer for a song with videoId`, await mini.locator('[data-testid=mode-video]').isVisible());
+  check(`[${tag}] MiniPlayer song title keeps >= 80px of room`, titleBox && titleBox.width >= 80, JSON.stringify(titleBox));
+  check(`[${tag}] the mini player has no Audio / Video toggle (stays audio-style)`, (await mini.locator('[data-testid=mode-video], [data-testid=mode-audio]').count()) === 0);
   let s = await state(page);
   check(`[${tag}] starts in audio mode (audio playing, YouTube idle)`, s.audioPlaying && !s.ytPlaying, JSON.stringify(s));
   check(`[${tag}] YouTube container parked offscreen in audio mode`, (await page.locator('[data-testid=yt-player-container]').getAttribute('data-visible')) === 'false');
+  check(`[${tag}] the YouTube script is not loaded before Video is first opened`, await page.evaluate(() => typeof window.__yt === 'undefined' && !document.getElementById('youtube-iframe-api')));
+  await mini.click({ position: { x: 20, y: 10 } });
+  await page.waitForSelector('[aria-label="Close now playing"]');
+  const fsText = await page.locator('[aria-label="Close now playing"]').evaluate((el) => (el.closest('div[style*="z-index"]') || document.body).innerText);
+  check(`[${tag}] full-screen player never shows the provider/licence line`, !/cyberboysumanjay|High-Quality Tamil Audio Stream/i.test(fsText), fsText.slice(0, 200));
+  check(`[${tag}] toggle visible in Now Playing for a song with a video`, await page.locator('[data-testid=video-toggle]').last().isVisible());
+  const vid = () => page.locator('[data-testid=mode-video]').last();
+  const aud = () => page.locator('[data-testid=mode-audio]').last();
 
-  // 3. switch to Video while PLAYING: audio stops, YouTube starts by itself at the same time, visible >=200x200
+  // 3. switch to Video while PLAYING: audio stops, YouTube starts by itself at the same time, visible >=200x200, 16:9
   const tBefore = (await state(page)).audioTime;
-  await mini.locator('[data-testid=mode-video]').click();
+  await vid().click();
   await page.waitForTimeout(700);
   s = await state(page);
   const calls = await page.evaluate(() => window.__yt.calls);
-  // Position is carried by loadVideoById({startSeconds}) or by creating the player with start= and autoplay=1
   const started = calls.filter((c) => c[0] === 'load' || (c[0] === 'init' && c[1].autoplay)).pop();
   check(`[${tag}] switch to Video while playing: YouTube plays by itself, audio stops`, s.ytPlaying && !s.audioPlaying, JSON.stringify(s));
   check(`[${tag}] switch to Video keeps position (start ~ audio time)`, started && Math.abs(started[1].startSeconds - tBefore) <= 1.5, `call=${JSON.stringify(started)} audioTime=${tBefore}`);
+  check(`[${tag}] the embed uses youtube-nocookie.com (privacy-enhanced mode)`, await page.evaluate(() => window.__yt.host === 'https://www.youtube-nocookie.com'), await page.evaluate(() => String(window.__yt.host)));
   const container = page.locator('[data-testid=yt-player-container]');
   check(`[${tag}] YouTube container visible in video mode`, (await container.getAttribute('data-visible')) === 'true');
   const vb = await box(container);
-  check(`[${tag}] video surface >= 200x200`, vb && vb.width >= 199.5 && vb.height >= 199.5, JSON.stringify(vb));
-  check(`[${tag}] video surface inside viewport`, vb && vb.x >= 0 && vb.y >= 0 && vb.x + vb.width <= width + 0.5 && vb.y + vb.height <= height + 0.5, JSON.stringify(vb));
+  check(`[${tag}] video surface >= 200x200 and inside the viewport`, vb && vb.width >= 199.5 && vb.height >= 199.5 && vb.x >= 0 && vb.y >= 0 && vb.x + vb.width <= width + 0.5 && vb.y + vb.height <= height + 0.5, JSON.stringify(vb));
+  const slot = await box(page.locator('[data-testid=video-slot]').last());
+  // 16:9, except where 16:9 would be shorter than YouTube's 200 px minimum: then exactly 200 px tall
+  check(`[${tag}] the video area is 16:9 (never below YouTube's 200 px minimum)`, slot && (slot.width * 9 / 16 >= 200 ? Math.abs(slot.width / slot.height - 16 / 9) < 0.03 : Math.abs(slot.height - 200) < 1), JSON.stringify(slot));
+  const fsBtn = await box(page.locator('[data-testid=video-fullscreen]'));
+  check(`[${tag}] a Full screen button (44px) under the video`, fsBtn && fsBtn.height >= 44, JSON.stringify(fsBtn));
   await page.screenshot({ path: path.join(OUT, `video-mode-${tag}.png`) });
+  const notice = page.locator('[data-testid=screen-lock-notice]');
+  check(`[${tag}] video shows "This song pauses when the screen locks" (with the audio hint)`, (await notice.count()) === 1 && /pauses when the screen locks/.test(await notice.innerText()) && /Switch to audio/.test(await notice.innerText()));
 
   // 4. switch back to Audio while playing: audio plays by itself at the same time, YouTube stops
   const ytT = (await state(page)).ytTime;
-  await mini.locator('[data-testid=mode-audio]').click();
+  await aud().click();
   await page.waitForTimeout(700);
   s = await state(page);
   check(`[${tag}] switch to Audio while playing: audio plays by itself, YouTube stops`, s.audioPlaying && !s.ytPlaying, JSON.stringify(s));
   check(`[${tag}] switch to Audio keeps position`, Math.abs(s.audioTime - ytT) <= 2, `audio=${s.audioTime} yt=${ytT}`);
+  check(`[${tag}] and the notice is gone again on the audio engine`, (await notice.count()) === 0);
 
   // 5. PAUSED songs stay paused when switching either way
-  await page.locator('button[aria-label="Pause"]').first().click();
+  await page.locator('button[aria-label="Pause"]').last().click();
   await page.waitForTimeout(400);
-  await mini.locator('[data-testid=mode-video]').click();
+  await vid().click();
   await page.waitForTimeout(600);
   s = await state(page);
   check(`[${tag}] switch to Video while paused: stays paused`, !s.audioPlaying && !s.ytPlaying, JSON.stringify(s));
-  await mini.locator('[data-testid=mode-audio]').click();
+  await aud().click();
   await page.waitForTimeout(600);
   s = await state(page);
   check(`[${tag}] switch to Audio while paused: stays paused`, !s.audioPlaying && !s.ytPlaying, JSON.stringify(s));
-  await page.locator('button[aria-label="Play"]').first().click();
+  await page.locator('button[aria-label="Play"]').last().click();
   await page.waitForTimeout(700);
   s = await state(page);
   check(`[${tag}] tap play in Audio mode: only audio plays`, s.audioPlaying && !s.ytPlaying, JSON.stringify(s));
 
-  // 6. full-screen player: toggle present, video surface >=200x200 in video mode
+  // 6. closing Now Playing while a video plays switches to audio at the same spot (no hidden player)
+  await vid().click();
+  await page.waitForTimeout(700);
+  const ytBeforeClose = (await state(page)).ytTime;
+  await page.locator('[aria-label="Close now playing"]').click();
+  await page.waitForTimeout(800);
+  s = await state(page);
+  check(`[${tag}] closing Now Playing during a video: audio carries on, YouTube stops`, s.audioPlaying && !s.ytPlaying, JSON.stringify(s));
+  check(`[${tag}] ...at the same position`, Math.abs(s.audioTime - ytBeforeClose) <= 2, `audio=${s.audioTime} yt=${ytBeforeClose}`);
+  check(`[${tag}] ...and the YouTube player is parked, not hidden while playing`, (await container.getAttribute('data-visible')) === 'false');
+
+  // 7. an embed error while the video PLAYS: back to audio (keeps playing), toast, toggle hidden for that song, remembered here, no report for a guest
   await mini.click({ position: { x: 20, y: 10 } });
   await page.waitForSelector('[aria-label="Close now playing"]');
-  const fsText = await page.locator('[aria-label="Close now playing"]').evaluate((el) => {
-    const root = el.closest('div[style*="z-index"]') || document.body;
-    return root.innerText;
-  });
-  check(`[${tag}] full-screen player never shows the provider/licence line`, !/cyberboysumanjay|High-Quality Tamil Audio Stream/i.test(fsText), fsText.slice(0, 200));
-  check(`[${tag}] toggle visible in FullScreenPlayer`, await page.locator('[data-testid=video-toggle]').last().isVisible());
-  await page.locator('[data-testid=mode-video]').last().click(); // portal is last in DOM
+  await vid().click();
   await page.waitForTimeout(700);
-  s = await state(page);
-  check(`[${tag}] full-screen switch to Video while playing: YouTube plays by itself`, s.ytPlaying && !s.audioPlaying, JSON.stringify(s));
-  const fb = await box(page.locator('[data-testid=yt-player-container]'));
-  check(`[${tag}] full-screen video surface >= 200x200 and in viewport`, fb && fb.width >= 199.5 && fb.height >= 199.5 && fb.x >= 0 && fb.x + fb.width <= width + 0.5 && fb.y >= 0 && fb.y + fb.height <= height + 0.5, JSON.stringify(fb));
-  await page.screenshot({ path: path.join(OUT, `fullscreen-video-${tag}.png`) });
-  const notice = page.locator('[data-testid=screen-lock-notice]');
-  check(`[${tag}] YouTube playback shows "This song pauses when the screen locks" (with the audio hint)`, (await notice.count()) === 1 && /pauses when the screen locks/.test(await notice.innerText()) && /Switch to audio/.test(await notice.innerText()), await notice.allInnerTexts().then((t) => t.join('|')));
-  await page.locator('[data-testid=mode-audio]').last().click();
-  await page.waitForTimeout(600);
-  check(`[${tag}] and the notice is gone again on the audio engine`, (await page.locator('[data-testid=screen-lock-notice]').count()) === 0);
-  await page.locator('[data-testid=mode-video]').last().click();
-  await page.waitForTimeout(600);
-
-  // 7. error 101 while the video is PLAYING -> back to audio (keeps playing) + toast, toggle hidden for that song
-  await page.evaluate(() => window.__ytFail(101));
+  await page.evaluate(() => window.__ytFail(150));
   await page.waitForSelector('[data-testid=toast]', { timeout: 3000 });
   await page.waitForTimeout(500);
   s = await state(page);
-  check(`[${tag}] error 101: toast shown`, await page.locator('[data-testid=toast]').isVisible());
-  check(`[${tag}] error 101: fell back to audio and keeps playing, YouTube stopped`, s.audioPlaying && !s.ytPlaying, JSON.stringify(s));
-  check(`[${tag}] error 101: toggle hidden for the failed video`, (await page.locator('[data-testid=video-toggle], [data-testid=mode-video], [data-testid=mode-audio]').count()) === 0);
+  check(`[${tag}] embed error: toast "Video isn't available for this song"`, /Video isn.t available for this song/.test(await page.locator('[data-testid=toast]').innerText()), await page.locator('[data-testid=toast]').innerText());
+  check(`[${tag}] embed error: fell back to audio and keeps playing, YouTube stopped`, s.audioPlaying && !s.ytPlaying, JSON.stringify(s));
+  check(`[${tag}] embed error: toggle hidden for the failed video`, (await page.locator('[data-testid=video-toggle], [data-testid=mode-video], [data-testid=mode-audio]').count()) === 0);
+  check(`[${tag}] embed error: remembered in this browser (hidden for this person only)`, await page.evaluate(() => Object.keys(JSON.parse(localStorage.getItem('tamiltunes_video_hidden_v1') || '{}')).length === 1));
+  check(`[${tag}] a guest sends no report (only signed-in people can)`, reports.length === 0, JSON.stringify(reports));
   const title = await box(page.locator('[data-testid=toast]'));
   check(`[${tag}] toast fits the viewport`, title && title.x >= 0 && title.x + title.width <= width + 0.5, JSON.stringify(title));
   check(`[${tag}] YouTube container parked offscreen again`, (await page.locator('[data-testid=yt-player-container]').getAttribute('data-visible')) === 'false');
@@ -260,6 +271,39 @@ const center = async (loc) => {
   const b = await loc.boundingBox();
   return { x: b.x + b.width / 2, y: b.y + b.height / 2, w: b.width, h: b.height };
 };
+
+// Signed in: a failed embed is reported to the server once (the served video, with the YouTube error code)
+async function runSignedInReport(browser) {
+  const tag = 'signed in';
+  const ctx = await browser.newContext({ viewport: { width: 390, height: 844 }, deviceScaleFactor: 1, isMobile: true, hasTouch: true });
+  const page = await ctx.newPage();
+  await setupRoutes(page);
+  await page.route('**/api/auth/me', (r) => r.fulfill({ json: { success: true, user: { id: 'u1', name: 'Test User', email: 'test@example.com', role: 'user', username: 'testuser' } } }));
+  await page.addInitScript(() => { localStorage.setItem('tamiltunes_token', 'TEST_TOKEN_NOT_REAL'); });
+  const before = reports.length;
+  await page.goto(`http://127.0.0.1:${PORT}/`);
+  await page.waitForSelector('text=Badass (Leo)');
+  await page.getByText('Badass (Leo)').first().click();
+  await page.waitForFunction(() => { const a = window.__tamiltunes_audio; return a && !a.paused && a.currentTime > 0.3; }, null, { timeout: 8000 });
+  await page.locator('[aria-label="Open now playing full screen"]').click({ position: { x: 20, y: 10 } });
+  await page.waitForSelector('[aria-label="Close now playing"]');
+  await page.locator('[data-testid=mode-video]').last().click();
+  await page.waitForTimeout(700);
+  await page.evaluate(() => window.__ytFail(150));
+  await page.waitForTimeout(800);
+  const sent = reports.slice(before);
+  check(`[${tag}] a failed embed is reported once, for the served video, with the error code`, sent.length === 1 && /\/api\/songs\/tt_video_1\/video-report$/.test(sent[0].url) && sent[0].body.videoId === 'IqwIOlhfCak' && sent[0].body.code === 150, JSON.stringify(sent));
+  // the same person, after a reload: the video stays hidden for them (7 days) and nothing is reported again
+  await page.reload();
+  await page.waitForSelector('text=Badass (Leo)');
+  await page.getByText('Badass (Leo)').first().click();
+  await page.waitForTimeout(800);
+  await page.locator('[aria-label="Open now playing full screen"]').click({ position: { x: 20, y: 10 } });
+  await page.waitForSelector('[aria-label="Close now playing"]');
+  check(`[${tag}] after a reload the failed video stays hidden for this person`, (await page.locator('[data-testid=video-toggle]').count()) === 0);
+  check(`[${tag}] ...and is not reported again`, reports.length - before === 1);
+  await ctx.close();
+}
 
 async function runGestures(browser, width, height) {
   const tag = `${width}x${height}`;
@@ -411,6 +455,7 @@ try {
     await runViewport(browser, w, h);
     await runGestures(browser, w, h);
   }
+  await runSignedInReport(browser);
 } catch (err) {
   console.error("UI audit crashed:", String(err.message).split("\n").slice(0,12).join("\n"));
   results.push({ name: 'audit run', ok: false, detail: String(err) });

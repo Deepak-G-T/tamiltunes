@@ -16,12 +16,13 @@ import { haptic } from '../lib/haptics';
 import { peekNext } from '../lib/radioQueue';
 import { fetchRelated } from '../lib/radioApi';
 import { useAuth } from './AuthContext';
+import { loadHidden, rememberHidden } from '../lib/videoHides';
 import { toSaved, fromSaved, sameQueue, savedIds, readGuestQueue, writeGuestQueue, getDeviceId, shouldAskToContinue, SAVE_DEBOUNCE_MS, SYNC_CHECK_MIN_MS } from '../lib/queuePersist';
 import { loadServerQueue, loadServerQueueMeta, saveServerQueue, saveServerQueueOnExit, resolveSongIds } from '../lib/queueApi';
 import ContinueHerePrompt from '../components/player/ContinueHerePrompt';
 import Toast from '../components/common/Toast';
 import { getCoverColor, rgbVar } from '../lib/coverColor';
-import { engineFor, canToggleVideo, getVideoId, planSwitch, planEmbedError } from '../lib/playbackLogic';
+import { engineFor, canToggleVideo, getVideoId, planSwitch, planEmbedError, hasAudioStream } from '../lib/playbackLogic';
 import { getToken } from '../lib/tokenStore';
 
 const AudioContext = createContext();
@@ -80,7 +81,8 @@ export const AudioProvider = ({ children }) => {
   // Video/Audio mode (only meaningful for songs that have both an audio stream and a videoId)
   const [playbackMode, setPlaybackModeState] = useState('audio'); // 'audio' | 'video'
   const playbackModeRef = useRef('audio');
-  const unavailableVideosRef = useRef(new Set()); // videoIds that failed to embed (101/150)
+  const unavailableVideosRef = useRef(null); // videoIds that failed to embed: this session, plus the last 7 days in this browser
+  if (unavailableVideosRef.current === null) unavailableVideosRef.current = new Set(typeof window === 'undefined' ? [] : loadHidden(window.localStorage));
   const [unavailableVersion, setUnavailableVersion] = useState(0);
   const [toast, setToast] = useState(null);
   const [videoSlots, setVideoSlots] = useState([]); // registered <VideoSlot> elements; last wins
@@ -650,6 +652,47 @@ export const AudioProvider = ({ children }) => {
     return true;
   };
 
+  // Video is shown only in Now Playing: closing it while a video plays switches back to audio at the same spot (never a hidden player).
+  // A YouTube-only song has no audio to switch to, so it keeps its small visible player.
+  const wasFullScreenRef = useRef(false);
+  useEffect(() => {
+    if (wasFullScreenRef.current && !isFullScreen && playbackModeRef.current === 'video' && hasAudioStream(currentSongRef.current)) switchPlaybackMode('audio');
+    wasFullScreenRef.current = isFullScreen;
+  }, [isFullScreen]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  // Keep the screen awake only while a video is actually playing (and let it sleep again as soon as it stops)
+  const videoPlaying = activeEngine === 'youtube' && isPlaying;
+  useEffect(() => {
+    if (!videoPlaying || typeof navigator === 'undefined' || !navigator.wakeLock?.request) return undefined;
+    let lock = null;
+    let stopped = false;
+    const take = async () => {
+      if (stopped || document.visibilityState !== 'visible') return;
+      try { lock = await navigator.wakeLock.request('screen'); } catch { /* not allowed (battery saver, no permission): fine */ }
+    };
+    const onVisible = () => { if (document.visibilityState === 'visible') take(); }; // the system drops the lock when the page is hidden
+    take();
+    document.addEventListener('visibilitychange', onVisible);
+    return () => { stopped = true; document.removeEventListener('visibilitychange', onVisible); lock?.release?.().catch?.(() => {}); };
+  }, [videoPlaying]);
+
+  // YouTube pauses when the screen locks or the app goes to the background (by design; no workaround). Coming back, offer audio in one tap.
+  const pausedByBackgroundRef = useRef(false);
+  useEffect(() => {
+    const onChange = () => {
+      if (document.visibilityState === 'hidden') {
+        pausedByBackgroundRef.current = playbackModeRef.current === 'video' && isPlayingRef.current && hasAudioStream(currentSongRef.current);
+      } else if (pausedByBackgroundRef.current) {
+        pausedByBackgroundRef.current = false;
+        if (playbackModeRef.current === 'video') {
+          showToast('Video pauses when the screen locks. Switch to Audio for background play.', { label: 'Switch to audio', onClick: () => switchPlaybackMode('audio') });
+        }
+      }
+    };
+    document.addEventListener('visibilitychange', onChange);
+    return () => document.removeEventListener('visibilitychange', onChange);
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
+
   const handleYouTubeError = (event) => {
     const song = currentSongRef.current;
     if (!isYouTubeSong(song)) return;
@@ -663,6 +706,10 @@ export const AudioProvider = ({ children }) => {
       const requestId = (playRequestIdRef.current += 1); // invalidate any in-flight play request
       ytPlayerRef.current?.pause();
       unavailableVideosRef.current.add(plan.videoId);
+      rememberHidden(window.localStorage, plan.videoId); // hidden for this person for 7 days
+      if (isAuthRef.current) { // signed in: tell the server; after 2 different people it is hidden for everyone until an admin checks it
+        api.post(`/songs/${encodeURIComponent(song.id)}/video-report`, { videoId: plan.videoId, code: Number(event?.data) }).catch(() => { /* best effort */ });
+      }
       setUnavailableVersion((v) => v + 1);
       playbackModeRef.current = 'audio';
       setPlaybackModeState('audio');
@@ -670,15 +717,13 @@ export const AudioProvider = ({ children }) => {
       setIsBuffering(wasPlaying);
       setCurrentTime(t);
       seekAudioWhenReady(t);
+      showToast('Video isn’t available for this song');
       if (wasPlaying) {
-        showToast('This video can’t be played here. Switched back to audio.');
         safeAudioPlay(audioRef.current, requestId).catch(() => {
           setIsPlaying(false);
           setIsBuffering(false);
-          showToast('This video can’t be played here. Switched to audio: tap play to continue.');
+          showToast('Video isn’t available for this song. Tap play to continue with audio.');
         });
-      } else {
-        showToast('This video can’t be played here. Switched to audio.');
       }
       return;
     }

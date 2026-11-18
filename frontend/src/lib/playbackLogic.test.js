@@ -54,11 +54,9 @@ describe('mode switching', () => {
 });
 
 describe('embed errors', () => {
-  it('101 and 150 are fatal embed errors', () => {
-    expect(isFatalEmbedError(101)).toBe(true);
-    expect(isFatalEmbedError(150)).toBe(true);
-    expect(isFatalEmbedError(2)).toBe(false);
-    expect(isFatalEmbedError(undefined)).toBe(false);
+  it('bad id (2), removed (100) and embedding off / region block (101, 150) are fatal embed errors', () => {
+    for (const c of [2, 100, 101, 150]) expect(isFatalEmbedError(c)).toBe(true);
+    for (const c of [5, 0, undefined, null]) expect(isFatalEmbedError(c)).toBe(false);
   });
   it('falls back to audio for a toggleable song', () =>
     expect(planEmbedError({ song: jioVideo, code: 101 })).toEqual({ action: 'fallback-audio', videoId: 'IqwIOlhfCak' }));
@@ -66,8 +64,8 @@ describe('embed errors', () => {
     expect(planEmbedError({ song: jioVideo, code: 150 }).action).toBe('fallback-audio'));
   it('YouTube-only songs keep the existing skip behaviour', () =>
     expect(planEmbedError({ song: ytOnly, code: 101 })).toEqual({ action: 'skip' }));
-  it('other codes keep the existing skip behaviour', () =>
-    expect(planEmbedError({ song: jioVideo, code: 2 })).toEqual({ action: 'skip' }));
+  it('other codes (5 = player error) keep the existing skip behaviour', () =>
+    expect(planEmbedError({ song: jioVideo, code: 5 })).toEqual({ action: 'skip' }));
 });
 
 describe('screen-lock notice (YouTube pauses when the screen locks)', () => {

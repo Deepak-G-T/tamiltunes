@@ -119,6 +119,15 @@ async function run(browser) {
   // ---- the Back button, in order
   await page.locator('[aria-label="Open now playing full screen"]').tap();
   await page.waitForSelector('[aria-label="Close now playing"]');
+  // a video in full screen: Back leaves full screen first and keeps Now Playing open
+  await native(() => {
+    const el = document.body;
+    Object.defineProperty(document, 'fullscreenElement', { configurable: true, get: () => (window.__fsOn ? el : null) });
+    window.__fsOn = true;
+    document.exitFullscreen = async () => { window.__fsOn = false; window.__fsExited = (window.__fsExited || 0) + 1; };
+  });
+  await fire('backButton', { canGoBack: true });
+  check('Back 0: a video in full screen leaves full screen first (Now Playing stays open)', await until(() => native(() => window.__fsExited === 1)) && (await page.locator('[aria-label="Close now playing"]').count()) === 1);
   await fire('backButton', { canGoBack: true });
   check('Back 1: the full-screen player closes first (and the page does not change)', await until(async () => (await page.locator('[aria-label="Close now playing"]').count()) === 0) && (await path()) === '/');
   await page.locator('[aria-label="Show queue"]').tap();

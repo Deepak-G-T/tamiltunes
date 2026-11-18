@@ -2,6 +2,7 @@ import { describe, it, expect } from 'vitest';
 import { decideBack, topOverlay } from './backAction';
 
 describe('Android Back button order', () => {
+  it('a video in full screen leaves full screen before anything else', () => expect(decideBack({ videoFullscreen: true, overlayOpen: true, fullScreen: true, queueOpen: true, canGoBack: true })).toBe('exit-fullscreen'));
   it('a menu or dialog on top closes first, even over the player', () => expect(decideBack({ overlayOpen: true, fullScreen: true, queueOpen: true, canGoBack: true })).toBe('close-overlay'));
   it('then the full-screen player', () => expect(decideBack({ fullScreen: true, queueOpen: true, canGoBack: true })).toBe('close-player'));
   it('then the queue panel', () => expect(decideBack({ queueOpen: true, canGoBack: true })).toBe('close-queue'));

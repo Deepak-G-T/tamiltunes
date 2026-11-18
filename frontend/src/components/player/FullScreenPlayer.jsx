@@ -15,12 +15,14 @@ import {
   Heart,
   Disc,
   MessageCircle,
-  MoreHorizontal
+  MoreHorizontal,
+  Maximize
 } from 'lucide-react';
 import { useAudio } from '../../context/AudioContext';
 import ProgressBar from './ProgressBar';
 import VolumeSlider from './VolumeSlider';
 import VideoSlot from './VideoSlot';
+import { enterVideoFullscreen } from '../../lib/videoFullscreen';
 import VideoModeToggle from './VideoModeToggle';
 import ScreenLockNotice from './ScreenLockNotice';
 import CommentsPanel from '../comments/CommentsPanel';
@@ -194,7 +196,14 @@ const FullScreenPlayer = ({ isOpen, onClose: onCloseProp, onToggleFavorite, isFa
       <div className="relative z-10 flex flex-col items-center justify-center my-auto max-w-sm sm:max-w-md mx-auto w-full py-4">
         {/* Video surface (YouTube engine active) or album cover */}
         {activeEngine === 'youtube' && (
-          <VideoSlot className="w-full aspect-video mb-6 shadow-2xl border border-zinc-800/80" />
+          <>
+            {/* 16:9 space reserved before the video loads, so nothing jumps */}
+            <VideoSlot className="w-full aspect-video mb-2 shadow-2xl border border-zinc-800/80" />
+            <button type="button" onClick={() => enterVideoFullscreen()} aria-label="Full screen video" data-testid="video-fullscreen"
+              className="press self-end mb-4 inline-flex items-center gap-1.5 min-h-11 px-3 rounded-full text-xs font-semibold text-zinc-300 hover:text-white hover:bg-white/10">
+              <Maximize className="w-4 h-4" aria-hidden="true" /> Full screen
+            </button>
+          </>
         )}
         {activeEngine !== 'youtube' && (
         <div

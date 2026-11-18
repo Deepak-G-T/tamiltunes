@@ -1,13 +1,15 @@
 /**
  * What the Android Back button does, in this order:
- *   1. a menu or dialog that is open on top (song menu, "Add to playlist", ...) closes first;
+ *   0. a video in full screen leaves full screen first;
+ *   1. a menu or dialog that is open on top (song menu, "Add to playlist", ...) closes next;
  *   2. then the full-screen player closes;
  *   3. then the queue panel closes;
  *   4. then the app goes back one page;
  *   5. and only when there is nowhere to go back to, the app exits.
- * @returns {'close-overlay' | 'close-player' | 'close-queue' | 'back' | 'exit'}
+ * @returns {'exit-fullscreen' | 'close-overlay' | 'close-player' | 'close-queue' | 'back' | 'exit'}
  */
-export function decideBack({ overlayOpen = false, fullScreen = false, queueOpen = false, canGoBack = false } = {}) {
+export function decideBack({ videoFullscreen = false, overlayOpen = false, fullScreen = false, queueOpen = false, canGoBack = false } = {}) {
+  if (videoFullscreen) return 'exit-fullscreen';
   if (overlayOpen) return 'close-overlay';
   if (fullScreen) return 'close-player';
   if (queueOpen) return 'close-queue';

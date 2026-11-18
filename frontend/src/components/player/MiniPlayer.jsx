@@ -1,7 +1,6 @@
 import React from 'react';
 import { Play, Pause, SkipForward, ChevronUp, ListMusic } from 'lucide-react';
 import { useAudio } from '../../context/AudioContext';
-import VideoModeToggle from './VideoModeToggle';
 import Equalizer from '../common/Equalizer';
 import { useSwipe } from '../../lib/swipe';
 import { haptic } from '../../lib/haptics';
@@ -92,7 +91,6 @@ const MiniPlayer = () => {
 
         {/* Right: Controls + Expand hint */}
         <div className="flex items-center gap-1.5" onClick={(e) => e.stopPropagation()}>
-          <VideoModeToggle compact />
           <button
             onClick={() => {
               haptic(10);

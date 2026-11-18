@@ -40,7 +40,8 @@ export const engineFor = (song, mode = 'audio', unavailable = new Set()) => {
   return mode === 'video' && canToggleVideo(song, unavailable) ? 'youtube' : 'audio';
 };
 
-export const isFatalEmbedError = (code) => code === 101 || code === 150;
+// 2 = bad id, 100 = removed or private, 101 / 150 = embedding turned off by the owner (also how a region block shows up)
+export const isFatalEmbedError = (code) => code === 2 || code === 100 || code === 101 || code === 150;
 
 // Decide whether a mode switch is allowed. Whether to keep playing is decided by the caller (it continues
 // only if the song was playing).
@@ -52,7 +53,7 @@ export const planSwitch = ({ song, currentMode, targetMode, unavailable = new Se
   return { ok: true };
 };
 
-// YouTube IFrame error handling: 101/150 mean "embedding disabled by owner".
+// YouTube IFrame error handling: a fatal embed error on a song that also has audio falls back to audio.
 export const planEmbedError = ({ song, code }) => {
   if (isFatalEmbedError(code) && hasAudioStream(song) && getVideoId(song)) {
     return { action: 'fallback-audio', videoId: getVideoId(song) };
