@@ -1,0 +1,349 @@
+import { describe, it, expect } from 'vitest';
+import {
+  createQueueState, playFromSearch, playFromContext, switchToRadio, advance, previous, jumpTo, addToQueue, playNext,
+  removeFromUpcoming, reorderUpcoming, clearUserQueue, setShuffle, setRepeat, nextRepeat, setAutoplay, needsRefill,
+  startRefill, applyRefill, refillFailed, runRefill, getSections, peekNext, toSnapshot, fromSnapshot, shuffled,
+  REFILL_THRESHOLD, MAX_EXCLUDE, REFILL_BACKOFF_MS,
+} from './radioQueue';
+
+const S = (id) => ({ id, title: `Song ${id}` });
+const list = (...ids) => ids.map(S);
+const ids = (entries) => entries.map((e) => e.song.id);
+const deepFreeze = (o) => { Object.freeze(o); Object.values(o).forEach((v) => v && typeof v === 'object' && !Object.isFrozen(v) && deepFreeze(v)); return o; };
+// radio batch helper: state with `current` and radio songs queued
+const radio = (current, ...upcoming) => applyRefill(playFromSearch(createQueueState(), S(current)), list(...upcoming));
+// deterministic rng
+const seeded = (seed = 1) => () => { seed = (seed * 16807) % 2147483647; return seed / 2147483647; };
+
+describe('playing from search', () => {
+  it('starts the song and leaves the radio to fill the queue', () => {
+    const s = playFromSearch(createQueueState(), S('a'));
+    expect(s.current.id).toBe('a');
+    expect(s.mode).toBe('radio');
+    expect(s.upcoming).toEqual([]);
+    expect(s.played).toEqual(['a']);
+    expect(needsRefill(s)).toBe(true); // nothing queued yet: ask the radio for songs
+  });
+
+  it('keeps user-added songs when a new search result is played, and moves the old song to history', () => {
+    let s = radio('a', 'r1', 'r2');
+    s = addToQueue(s, S('u1'));
+    s = playFromSearch(s, S('b'));
+    expect(s.current.id).toBe('b');
+    expect(ids(s.upcoming)).toEqual(['u1']); // radio songs from the old seed are dropped
+    expect(s.userCount).toBe(1);
+    expect(s.history.map((h) => h.id)).toEqual(['a']);
+  });
+
+  it('never mutates its input', () => {
+    const frozen = deepFreeze(radio('a', 'r1', 'r2'));
+    expect(() => { advance(frozen); previous(frozen, { currentTime: 0 }); addToQueue(frozen, S('x')); reorderUpcoming(frozen, 0, 1); }).not.toThrow();
+  });
+});
+
+describe('advancing', () => {
+  it('plays the queue in order, tracking history and played ids', () => {
+    let s = radio('a', 'b', 'c');
+    let r = advance(s);
+    expect(r.status).toBe('playing');
+    expect(r.song.id).toBe('b');
+    r = advance(r.state);
+    expect(r.song.id).toBe('c');
+    expect(r.state.history.map((h) => h.id)).toEqual(['a', 'b']);
+    expect(r.state.played).toEqual(['a', 'b', 'c']);
+  });
+
+  it('user-added songs play before radio songs, in the order they were added', () => {
+    let s = radio('a', 'r1', 'r2');
+    s = addToQueue(s, S('u1'));
+    s = addToQueue(s, S('u2'));
+    expect(ids(s.upcoming)).toEqual(['u1', 'u2', 'r1', 'r2']);
+    expect(advance(s).song.id).toBe('u1');
+    const second = advance(advance(s).state);
+    expect(second.song.id).toBe('u2');
+    expect(second.state.userCount).toBe(0);
+    expect(advance(second.state).song.id).toBe('r1');
+  });
+
+  it('"Play next" goes in front of earlier user-added songs', () => {
+    let s = radio('a', 'r1');
+    s = addToQueue(s, S('u1'));
+    s = playNext(s, S('u0'));
+    expect(ids(s.upcoming)).toEqual(['u0', 'u1', 'r1']);
+    expect(s.userCount).toBe(2);
+  });
+
+  it('asks for a refill ("waiting") when the radio queue runs dry, and ends when autoplay is off', () => {
+    const s = radio('a');
+    expect(advance(s).status).toBe('waiting');
+    const off = setAutoplay(s, false);
+    const r = advance(off);
+    expect(r.status).toBe('ended');
+    expect(r.state.ended).toBe(true);
+    expect(r.state.offerRadio).toBe(false);
+  });
+
+  it('repeat one replays the song when it ends, but a manual skip still moves on', () => {
+    const s = setRepeat(radio('a', 'b'), 'one');
+    expect(advance(s, { reason: 'ended' })).toMatchObject({ status: 'repeat-one', song: { id: 'a' } });
+    expect(advance(s, { reason: 'skip' })).toMatchObject({ status: 'playing', song: { id: 'b' } });
+  });
+
+  it('cycles repeat modes off -> all -> one -> off', () => {
+    expect([nextRepeat('off'), nextRepeat('all'), nextRepeat('one')]).toEqual(['all', 'one', 'off']);
+    expect(setRepeat(createQueueState(), 'bogus').repeat).toBe('off');
+  });
+});
+
+describe('previous', () => {
+  it('restarts the current song after a few seconds, otherwise goes back', () => {
+    let s = advance(radio('a', 'b', 'c')).state; // now on b, history [a]
+    expect(previous(s, { currentTime: 10 })).toMatchObject({ status: 'restart', song: { id: 'b' } });
+    const back = previous(s, { currentTime: 1 });
+    expect(back.status).toBe('playing');
+    expect(back.song.id).toBe('a');
+    // "previous, then next" returns to the song you left
+    expect(advance(back.state).song.id).toBe('b');
+  });
+
+  it('restarts when there is no history', () => {
+    expect(previous(radio('a', 'b'), { currentTime: 0 }).status).toBe('restart');
+    expect(previous(createQueueState()).status).toBe('none');
+  });
+});
+
+describe('jumping and editing the queue', () => {
+  it('tapping a queued song plays it; songs skipped over count as played', () => {
+    const s = addToQueue(radio('a', 'r1', 'r2', 'r3'), S('u1'));
+    const { state, song } = jumpTo(s, 2); // u1, r1, [r2]
+    expect(song.id).toBe('r2');
+    expect(ids(state.upcoming)).toEqual(['r3']);
+    expect(state.userCount).toBe(0);
+    expect(state.played).toEqual(expect.arrayContaining(['a', 'u1', 'r1', 'r2']));
+    expect(state.history.map((h) => h.id)).toEqual(['a', 'u1', 'r1']);
+    expect(jumpTo(s, 99).song).toBeNull();
+  });
+
+  it('removing keeps the user-queue count right', () => {
+    let s = addToQueue(addToQueue(radio('a', 'r1'), S('u1')), S('u2'));
+    s = removeFromUpcoming(s, 0);
+    expect(ids(s.upcoming)).toEqual(['u2', 'r1']);
+    expect(s.userCount).toBe(1);
+    s = removeFromUpcoming(s, 1); // a radio song
+    expect(s.userCount).toBe(1);
+    expect(removeFromUpcoming(s, 50)).toBe(s);
+  });
+
+  it('dragging between sections moves a song between "Next in queue" and "Next from radio"', () => {
+    let s = addToQueue(radio('a', 'r1', 'r2', 'r3'), S('u1')); // [u1 | r1 r2 r3]
+    let r = reorderUpcoming(s, 2, 0); // drag r2 to the very top
+    expect(ids(r.upcoming)).toEqual(['r2', 'u1', 'r1', 'r3']);
+    expect(r.userCount).toBe(2);
+    expect(r.upcoming[0].origin).toBe('user');
+    r = reorderUpcoming(r, 0, 3); // drag it back to the end of the radio section
+    expect(r.userCount).toBe(1);
+    expect(r.upcoming[3].origin).toBe('radio');
+    expect(reorderUpcoming(s, 1, 1)).toBe(s);
+    expect(reorderUpcoming(s, -1, 2)).toBe(s);
+  });
+
+  it('can clear only the user-added songs', () => {
+    const s = clearUserQueue(addToQueue(radio('a', 'r1'), S('u1')));
+    expect(ids(s.upcoming)).toEqual(['r1']);
+    expect(s.userCount).toBe(0);
+  });
+});
+
+describe('radio refill', () => {
+  it('refills only when fewer than 3 songs remain, never while one is in flight', () => {
+    expect(needsRefill(radio('a', 'b', 'c', 'd', 'e'))).toBe(false); // 4 queued
+    expect(needsRefill(radio('a', 'b', 'c', 'd'))).toBe(false); // 3 queued: exactly the threshold
+    const low = radio('a', 'b', 'c'); // 2 queued
+    expect(low.upcoming.length).toBeLessThan(REFILL_THRESHOLD);
+    expect(needsRefill(low)).toBe(true);
+    const { state: inFlight } = startRefill(low);
+    expect(needsRefill(inFlight)).toBe(false);
+    // playing a song also uses one up
+    expect(needsRefill(advance(radio('a', 'b', 'c', 'd')).state)).toBe(true);
+  });
+
+  it('does not refill for playlists / albums, with autoplay off, or with nothing playing', () => {
+    expect(needsRefill(playFromContext(createQueueState(), { songs: list('a', 'b') }))).toBe(false);
+    expect(needsRefill(setAutoplay(radio('a'), false))).toBe(false);
+    expect(needsRefill(createQueueState())).toBe(false);
+  });
+
+  it('the request seeds from the playing song and excludes everything already played or queued', () => {
+    let s = radio('a', 'b', 'c');
+    s = advance(advance(s).state).state; // playing c, played a b c
+    const { request } = startRefill(s);
+    expect(request.seedId).toBe('c');
+    expect(request.exclude).toEqual(expect.arrayContaining(['a', 'b', 'c']));
+    expect(request.limit).toBe(20);
+  });
+
+  it('caps the exclude list at what the endpoint accepts, keeping the most recent plays', () => {
+    let s = playFromSearch(createQueueState(), S('s0'));
+    s = { ...s, played: Array.from({ length: 400 }, (_, i) => `p${i}`) };
+    const { request } = startRefill(s);
+    expect(request.exclude.length).toBe(MAX_EXCLUDE);
+    expect(request.exclude).toContain('p399');
+    expect(request.exclude).not.toContain('p0');
+  });
+
+  it('never repeats a song already played this session, even if the server suggests it', () => {
+    let s = radio('a', 'b');
+    s = advance(s).state; // played a, b
+    s = applyRefill(s, list('a', 'b', 'c', 'c', 'd')); // a, b already played; c duplicated
+    expect(ids(s.upcoming)).toEqual(['c', 'd']);
+  });
+
+  it('an empty or all-duplicate batch backs off instead of hammering the server', () => {
+    const s = radio('a', 'b');
+    const empty = applyRefill(startRefill(s).state, [], { now: 1000 });
+    expect(empty.refill.pending).toBe(false);
+    expect(empty.refill.failures).toBe(1);
+    expect(needsRefill(empty, { now: 1000 })).toBe(false);
+    expect(needsRefill(empty, { now: 1000 + REFILL_BACKOFF_MS(1) })).toBe(true);
+    // backoff grows and is capped
+    expect([1, 2, 3, 4, 10].map(REFILL_BACKOFF_MS)).toEqual([1000, 2000, 4000, 8000, 30000]);
+    expect(refillFailed(empty, { now: 0 }).refill.failures).toBe(2);
+  });
+
+  it('runRefill: fetches once, applies the batch, and ignores concurrent calls', async () => {
+    let state = playFromSearch(createQueueState(), S('seed'));
+    const calls = [];
+    const io = { get: () => state, update: (fn) => { state = fn(state); }, fetchRelated: async (req) => { calls.push(req); return list('x1', 'x2', 'x3', 'x4'); } };
+    const [a, b] = await Promise.all([runRefill(io), runRefill(io)]);
+    expect([a, b].filter(Boolean)).toHaveLength(1);
+    expect(calls).toHaveLength(1);
+    expect(calls[0].seedId).toBe('seed');
+    expect(ids(state.upcoming)).toEqual(['x1', 'x2', 'x3', 'x4']);
+    expect(state.refill.pending).toBe(false);
+    expect(await runRefill(io)).toBe(false); // enough songs queued: nothing to do
+    expect(calls).toHaveLength(1);
+  });
+
+  it('runRefill: a failing fetch is contained and the radio retries later', async () => {
+    let state = playFromSearch(createQueueState(), S('seed'));
+    let t = 5000;
+    const io = { get: () => state, update: (fn) => { state = fn(state); }, fetchRelated: async () => { throw new Error('offline'); }, now: () => t };
+    expect(await runRefill(io)).toBe(false);
+    expect(state.refill).toMatchObject({ pending: false, failures: 1 });
+    expect(await runRefill(io)).toBe(false); // still inside the backoff window: no new request
+    t += REFILL_BACKOFF_MS(1);
+    io.fetchRelated = async () => list('y1', 'y2', 'y3');
+    expect(await runRefill(io)).toBe(true);
+    expect(state.refill.failures).toBe(0);
+  });
+
+  it('keeps refilling as songs are played: music never stops', async () => {
+    let state = playFromSearch(createQueueState(), S('s0'));
+    let n = 0;
+    const io = { get: () => state, update: (fn) => { state = fn(state); }, fetchRelated: async ({ exclude }) => Array.from({ length: 20 }, () => S(`g${++n}`)).filter((x) => !exclude.includes(x.id)) };
+    const playedIds = [];
+    for (let i = 0; i < 100; i++) {
+      await runRefill(io);
+      const r = advance(state);
+      expect(r.status).toBe('playing');
+      state = r.state;
+      playedIds.push(state.current.id);
+    }
+    expect(new Set(playedIds).size).toBe(100); // 100 songs, none repeated
+  });
+});
+
+describe('playing a playlist or album', () => {
+  const songs = list('p1', 'p2', 'p3', 'p4');
+
+  it('follows the playlist order from the chosen song, not the radio', () => {
+    let s = playFromContext(createQueueState(), { songs, index: 1, type: 'playlist', label: 'My mix' });
+    expect(s.current.id).toBe('p2');
+    expect(ids(s.upcoming)).toEqual(['p3', 'p4']);
+    expect(s.mode).toBe('context');
+    expect(getSections(s).nextFrom.label).toBe('Next from My mix');
+    expect(needsRefill(s)).toBe(false);
+    expect(advance(s).song.id).toBe('p3');
+  });
+
+  it('ends after the last song and offers to continue with radio', () => {
+    let s = playFromContext(createQueueState(), { songs: list('p1', 'p2') });
+    s = advance(s).state; // on p2, queue empty
+    const end = advance(s);
+    expect(end.status).toBe('ended');
+    expect(end.state.offerRadio).toBe(true);
+    expect(end.state.current.id).toBe('p2'); // still showing the last song
+    // accepting the offer: radio takes over, seeded from the last song
+    const r = switchToRadio(end.state);
+    expect(r.mode).toBe('radio');
+    expect(needsRefill(r)).toBe(true);
+    expect(startRefill(r).request.seedId).toBe('p2');
+  });
+
+  it('repeat all loops the playlist', () => {
+    let s = setRepeat(playFromContext(createQueueState(), { songs: list('p1', 'p2') }), 'all');
+    s = advance(s).state; // p2
+    const wrap = advance(s);
+    expect(wrap.status).toBe('playing');
+    expect(wrap.song.id).toBe('p1');
+    expect(ids(wrap.state.upcoming)).toEqual(['p2']);
+    expect(peekNext(s).id).toBe('p1');
+  });
+
+  it('shuffle permutes the remaining songs and restores the original order when turned off', () => {
+    const many = list(...Array.from({ length: 12 }, (_, i) => `m${i}`));
+    let s = playFromContext(createQueueState(), { songs: many });
+    const original = ids(s.upcoming);
+    s = setShuffle(s, true, { rng: seeded(7) });
+    const shuf = ids(s.upcoming);
+    expect(shuf).not.toEqual(original);
+    expect([...shuf].sort()).toEqual([...original].sort());
+    expect(s.current.id).toBe('m0'); // the playing song is untouched
+    s = setShuffle(s, false);
+    expect(ids(s.upcoming)).toEqual(original);
+  });
+
+  it('starting a playlist with shuffle on plays the chosen song first, then the rest shuffled', () => {
+    const many = list(...Array.from({ length: 10 }, (_, i) => `m${i}`));
+    const s = playFromContext(setShuffle(createQueueState(), true), { songs: many, index: 4, rng: seeded(3) });
+    expect(s.current.id).toBe('m4');
+    expect(s.upcoming).toHaveLength(9);
+    expect(ids(s.upcoming)).not.toContain('m4');
+  });
+
+  it('user-added songs still play first inside a playlist', () => {
+    let s = playFromContext(createQueueState(), { songs: list('p1', 'p2', 'p3') });
+    s = addToQueue(s, S('u1'));
+    expect(advance(s).song.id).toBe('u1');
+    expect(getSections(s).nextInQueue.map((x) => x.id)).toEqual(['u1']);
+  });
+});
+
+describe('sections, snapshot and helpers', () => {
+  it('splits the queue into Now playing / Next in queue / Next from radio', () => {
+    const s = addToQueue(radio('a', 'r1', 'r2'), S('u1'));
+    const sec = getSections(s);
+    expect(sec.nowPlaying.id).toBe('a');
+    expect(sec.nextInQueue.map((x) => x.id)).toEqual(['u1']);
+    expect(sec.nextFrom.label).toBe('Next from radio');
+    expect(sec.nextFrom.items.map((x) => x.id)).toEqual(['r1', 'r2']);
+    expect(peekNext(s).id).toBe('u1');
+  });
+
+  it('round-trips a snapshot (for resuming elsewhere later)', () => {
+    const s = setRepeat(addToQueue(radio('a', 'r1', 'r2'), S('u1')), 'all');
+    const back = fromSnapshot(JSON.parse(JSON.stringify(toSnapshot(s))));
+    expect(back.current.id).toBe('a');
+    expect(ids(back.upcoming)).toEqual(['u1', 'r1', 'r2']);
+    expect(back.userCount).toBe(1);
+    expect(back.repeat).toBe('all');
+    expect(back.history).toEqual([]);
+  });
+
+  it('shuffled() is a permutation and does not change its input', () => {
+    const src = [1, 2, 3, 4, 5, 6];
+    const out = shuffled(src, seeded(11));
+    expect([...out].sort()).toEqual(src);
+    expect(src).toEqual([1, 2, 3, 4, 5, 6]);
+  });
+});

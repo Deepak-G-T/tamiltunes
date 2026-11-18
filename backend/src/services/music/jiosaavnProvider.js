@@ -93,11 +93,20 @@ export class JioSaavnProvider extends MusicProvider {
       streamUrl = raw.media_preview_url;
     }
 
+    // Music director (composer) when the provider tells us, for related-song ranking
+    const composerFromMap = Array.isArray(raw.more_info?.artistMap?.artists)
+      ? raw.more_info.artistMap.artists.filter((a) => a.role === 'music').map((a) => a.name).join(', ')
+      : '';
+    const composer = decodeHtml(composerFromMap || raw.music || raw.more_info?.music || '') || null;
+    const playCount = parseInt(raw.play_count || raw.more_info?.play_count || 0, 10) || 0;
+
     return {
       id: `saavn_${raw.id}`,
       title,
       artist,
       singers: artist,
+      composer,
+      playCount,
       album,
       duration: duration > 0 ? duration : 210,
       image,
@@ -321,6 +330,18 @@ export class JioSaavnProvider extends MusicProvider {
 
   async getSong(id) {
     return this.getSongById(id);
+  }
+
+  /**
+   * Provider-side recommendations (JioSaavn `reco.getreco`), used as candidates for the radio.
+   * UNTESTED against the live API: it can only be checked from a network that reaches JioSaavn.
+   */
+  async getRecommendations(id, limit = 30) {
+    const pid = String(id).replace(/^saavn_/, '');
+    if (!pid) return [];
+    const data = await this._fetchDirect('reco.getreco', { pid, language: 'tamil' });
+    const list = Array.isArray(data) ? data : Array.isArray(data?.data) ? data.data : Array.isArray(data?.songs) ? data.songs : [];
+    return list.map((raw) => this._formatSong(raw)).filter(Boolean).slice(0, limit);
   }
 
   async getSongById(id) {

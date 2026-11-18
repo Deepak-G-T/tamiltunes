@@ -63,3 +63,10 @@ export const usernameCheckLimiter = perUser({
   max: 30,
   message: 'Too many username checks, please slow down.',
 });
+
+// Radio refills: one batch per few songs per listener, so 60/min is generous but stops scraping
+export const relatedLimiter = perUser({
+  windowMs: 60 * 1000,
+  max: 60,
+  message: 'Too many radio requests, please slow down.',
+});

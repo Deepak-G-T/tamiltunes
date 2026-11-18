@@ -470,6 +470,24 @@ export class LocalAudioProvider extends MusicProvider {
     return CURATED_ARTISTS.filter((a) => a.name.toLowerCase().includes(q)).slice(0, limit);
   }
 
+  /** Offline "radio": other curated songs sharing the film, a singer or the home-feed shelf. */
+  async getRecommendations(id, limit = 30) {
+    const seed = CURATED_TAMIL_SONGS.find((s) => s.id === id);
+    if (!seed) return [];
+    const names = (v) => String(v || '').split(/,|&/).map((n) => n.trim().toLowerCase()).filter(Boolean);
+    const seedNames = new Set(names(seed.singers || seed.artist));
+    return CURATED_TAMIL_SONGS
+      .filter((s) => s.id !== id)
+      .map((s) => ({
+        song: s,
+        weight: (s.album === seed.album ? 2 : 0) + (names(s.singers || s.artist).some((n) => seedNames.has(n)) ? 1 : 0) + (s.category && s.category === seed.category ? 1 : 0)
+      }))
+      .filter((x) => x.weight > 0)
+      .sort((a, b) => b.weight - a.weight)
+      .slice(0, limit)
+      .map((x) => x.song);
+  }
+
   async getSong(id) {
     return CURATED_TAMIL_SONGS.find((s) => s.id === id) || null;
   }

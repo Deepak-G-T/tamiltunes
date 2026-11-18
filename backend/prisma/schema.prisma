@@ -37,6 +37,7 @@ model User {
   comments         Comment[]
   commentLikes     CommentLike[]
   reports          Report[]
+  playEvents       PlayEvent[]
   followers        Follow[]  @relation("Followed")
   following        Follow[]  @relation("Follower")
 
@@ -55,10 +56,19 @@ model Song {
   licenseNotice String?
   createdAt     DateTime @default(now())
 
+  // Metadata used by the related-songs ranking (filled from the music provider when known)
+  composer String?
+  singers  String[] @default([])
+  movie    String?
+  year     Int?
+  language String?
+
   playlistSongs    PlaylistSong[]
   favorites        Favorite[]
   listeningHistory ListeningHistory[]
 
+  @@index([composer])
+  @@index([language, year])
   @@map("songs")
 }
 
@@ -210,4 +220,22 @@ model Report {
 
   @@unique([commentId, reporterId])
   @@map("reports")
+}
+
+// What a user actually did with a song: lets the radio learn from completions and skips.
+// songId is a plain string (no FK) so events can be recorded for any playable song.
+model PlayEvent {
+  id           String   @id @default(uuid())
+  userId       String
+  songId       String
+  playedAt     DateTime @default(now())
+  completed    Boolean  @default(false)
+  skippedAtSec Int?
+  source       String?  // radio | search | playlist | album | queue
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, playedAt(sort: Desc)])
+  @@index([songId, playedAt(sort: Desc)])
+  @@map("play_events")
 }
