@@ -11,6 +11,10 @@ export class LruCacheService {
     this.misses = 0;
   }
 
+  delete(key) {
+    return this.cache.delete(key);
+  }
+
   get(key) {
     const item = this.cache.get(key);
     if (!item) {
