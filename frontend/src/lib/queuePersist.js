@@ -1,6 +1,6 @@
 // Saving and restoring the play queue. Pure functions, no network or React: tested in queuePersist.test.js.
 // Only song ids are saved. Titles, covers and stream URLs are fetched again on restore, so stale or tampered data is never reused.
-import { createQueueState, newUid, MAX_HISTORY, MAX_QUEUE } from './radioQueue';
+import { createQueueState, cleanRadioDuplicates, newUid, MAX_HISTORY, MAX_QUEUE } from './radioQueue';
 
 export const GUEST_QUEUE_KEY = 'tamiltunes_queue_v1';
 export const DEVICE_KEY = 'tamiltunes_device';
@@ -67,7 +67,8 @@ export function fromSaved(saved, songsById, { autoplay = true } = {}) {
   const upcoming = after.map((it, i) => ({ uid: newUid(), song: songsById[it.id], origin: i < userCount ? 'user' : sourceOrigin }));
   const historySongs = before.map((it) => songsById[it.id]);
 
-  const state = createQueueState({
+  // Autoplay rows that repeat the playing song or an earlier row (same song under another id, spelling or album) are dropped; songs you added stay
+  const state = cleanRadioDuplicates(createQueueState({
     autoplay,
     current,
     history: historySongs,
@@ -80,7 +81,7 @@ export function fromSaved(saved, songsById, { autoplay = true } = {}) {
       : null,
     shuffle: Boolean(saved.shuffle),
     repeat: ['off', 'all', 'one'].includes(saved.repeat) ? saved.repeat : 'off',
-  });
+  }));
   return { state, currentSong: current, positionSec, dropped };
 }
 

@@ -15,7 +15,7 @@
  * @typedef {ReturnType<typeof createQueueState>} QueueState
  */
 
-import { createIdentitySet, movieOf, sameSong } from './songIdentity';
+import { createIdentitySet, collapseDuplicates, movieOf, sameSong } from './songIdentity';
 
 export const REFILL_THRESHOLD = 3; // refill when fewer than this many songs remain
 export const REFILL_BATCH = 10; // songs requested per refill (the panel then says "Added 10 similar songs")
@@ -425,7 +425,8 @@ export function filterNewSongs(state, items) {
   const knownIds = new Set([state.current?.id, ...state.played, ...state.upcoming.map((e) => e.song.id), ...(state.refill.avoid || [])].filter(Boolean));
   const blocked = blockedSet(state);
   const out = [];
-  for (const song of items || []) {
+  // the batch itself keeps one copy per song: the best version (original release over a compilation), not just the first
+  for (const song of collapseDuplicates((items || []).filter((x) => x?.id))) {
     if (!song?.id || knownIds.has(song.id) || blocked.hasVariant(song)) continue;
     knownIds.add(song.id);
     blocked.add(song);
