@@ -59,3 +59,12 @@ export const planEmbedError = ({ song, code }) => {
   }
   return { action: 'skip' }; // YouTube-only song or other error codes: keep existing skip-to-next behaviour
 };
+
+/**
+ * YouTube's player pauses when the screen locks or the app goes to the background, and YouTube's rules do not allow working around that.
+ * So a song that plays through YouTube gets a small notice instead of silently stopping. `canSwitchToAudio`: the song also has an audio stream.
+ */
+export const screenLockNotice = (song, engine) =>
+  song && engine === 'youtube'
+    ? { text: 'This song pauses when the screen locks.', canSwitchToAudio: hasAudioStream(song) }
+    : null;

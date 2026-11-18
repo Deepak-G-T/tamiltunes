@@ -22,6 +22,7 @@ import ProgressBar from './ProgressBar';
 import VolumeSlider from './VolumeSlider';
 import VideoSlot from './VideoSlot';
 import VideoModeToggle from './VideoModeToggle';
+import ScreenLockNotice from './ScreenLockNotice';
 import CommentsPanel from '../comments/CommentsPanel';
 import QueueContent from './queue/QueueContent';
 import MarqueeText from '../common/MarqueeText';
@@ -236,6 +237,7 @@ const FullScreenPlayer = ({ isOpen, onClose: onCloseProp, onToggleFavorite, isFa
         )}
 
         <VideoModeToggle className="mb-4" />
+        <ScreenLockNotice song={currentSong} engine={activeEngine} className="mb-4 px-1" />
 
         {/* Title, Artist, & Favorite */}
         <div className="w-full flex items-start justify-between mb-3 px-1">

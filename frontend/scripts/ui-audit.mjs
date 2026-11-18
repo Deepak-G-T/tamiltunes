@@ -207,6 +207,13 @@ async function runViewport(browser, width, height) {
   const fb = await box(page.locator('[data-testid=yt-player-container]'));
   check(`[${tag}] full-screen video surface >= 200x200 and in viewport`, fb && fb.width >= 199.5 && fb.height >= 199.5 && fb.x >= 0 && fb.x + fb.width <= width + 0.5 && fb.y >= 0 && fb.y + fb.height <= height + 0.5, JSON.stringify(fb));
   await page.screenshot({ path: path.join(OUT, `fullscreen-video-${tag}.png`) });
+  const notice = page.locator('[data-testid=screen-lock-notice]');
+  check(`[${tag}] YouTube playback shows "This song pauses when the screen locks" (with the audio hint)`, (await notice.count()) === 1 && /pauses when the screen locks/.test(await notice.innerText()) && /Switch to audio/.test(await notice.innerText()), await notice.allInnerTexts().then((t) => t.join('|')));
+  await page.locator('[data-testid=mode-audio]').last().click();
+  await page.waitForTimeout(600);
+  check(`[${tag}] and the notice is gone again on the audio engine`, (await page.locator('[data-testid=screen-lock-notice]').count()) === 0);
+  await page.locator('[data-testid=mode-video]').last().click();
+  await page.waitForTimeout(600);
 
   // 7. error 101 while the video is PLAYING -> back to audio (keeps playing) + toast, toggle hidden for that song
   await page.evaluate(() => window.__ytFail(101));
