@@ -137,9 +137,18 @@ async function pullToRefresh(browser) {
   const page = await ctx.newPage();
   const errors = [];
   page.on('pageerror', (e) => errors.push(e.message));
-  await page.route('**/api/music/home', (r) => r.fulfill({ json: { success: true, data: FEED } }));
-  await page.route('**/api/home**', homeHandler);
-  await page.route('**/api/**', (r) => (/music\/home|\/api\/home/.test(r.request().url()) ? r.fallback() : r.fulfill({ json: { success: true } })));
+  await page.addInitScript(() => {
+    localStorage.setItem('tamiltunes_token', 'audit_token');
+    localStorage.setItem('tamiltunes_user', JSON.stringify({ id: 'u1', name: 'Tester', email: 'tester@example.com', role: 'user' }));
+  });
+  await page.route('**/api/**', (r) => {
+    const u = r.request().url();
+    if (/\/auth\/me/.test(u)) return r.fulfill({ json: { success: true, user: { id: 'u1', name: 'Tester', email: 'tester@example.com', role: 'user' } } });
+    if (/\/me\/speed-dial/.test(u)) return r.fulfill({ json: { success: true, items: H.slice(0, 9).map((s) => ({ ...s, isPinned: false, isHidden: false })) } });
+    if (/\/music\/home/.test(u)) return r.fulfill({ json: { success: true, data: FEED } });
+    if (/\/api\/home/.test(u)) return homeHandler(r);
+    return r.fulfill({ json: { success: true } });
+  });
   await page.route('https://aac.saavncdn.com/**', (r) => r.abort());
   calls.length = 0;
   await page.goto(`${BASE}/`);
