@@ -52,3 +52,14 @@ Other knobs: `VARIETY.maxRun` (3), `VARIETY.discoveryRatio` (0.3), `VARIETY.simi
 - `reco.getreco` (provider recommendations) is **UNTESTED against the live JioSaavn API** from this repo's sandbox.
   If it returns nothing in production the ranking still works from search + shelves + co-listening.
 - `play_events` (completions and skips) is created now; the app starts writing to it in the player phase.
+
+## Queue engine (frontend)
+`frontend/src/lib/radioQueue.js` is the pure, tested state machine behind the player queue (no React): current song,
+`upcoming` (user-added songs first, then radio or playlist songs), history and a session-wide "already played" list.
+- Playing a search result starts radio; playing from a playlist or album follows its order, then offers radio.
+- The radio refills in the background when fewer than 3 songs remain (`needsRefill` / `runRefill`), asks for
+  related songs seeded from the song now playing, and excludes every song already played, queued or playing.
+- A refill that fails or finds nothing new backs off (1 s, 2 s, 4 s ... up to 30 s) instead of hammering the server.
+- "Add to queue", "Play next", remove and drag-to-reorder keep the user-added songs ahead of the radio ones.
+- Shuffle reorders the remaining playlist songs (and restores the order when turned off); repeat is off / all / one.
+- The queue is not yet wired into the player UI: that is phase 3.
