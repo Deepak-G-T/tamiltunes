@@ -85,9 +85,9 @@ const SpeedDialTile = ({ item, index, isCurrent, isPlaying, onPlay, onOpenMenu, 
         onClick={() => onOpenMenu(item, index)}
         aria-label={`More actions for ${item.title}`}
         aria-haspopup="dialog"
-        className="absolute top-1 right-1 p-1.5 rounded-full bg-black/45 text-white hover:bg-black/70 md:opacity-0 md:group-hover:opacity-100 md:focus-visible:opacity-100 transition-opacity focus-visible:outline focus-visible:outline-2 focus-visible:outline-brand-400"
+        className="group/more absolute -top-1 -right-1 w-11 h-11 flex items-center justify-center md:opacity-0 md:group-hover:opacity-100 md:focus-visible:opacity-100 transition-opacity focus-visible:outline focus-visible:outline-2 focus-visible:outline-brand-400 rounded-full" /* 44px hit area, 28px circle */
       >
-        <MoreHorizontal className="w-4 h-4" />
+        <span className="w-7 h-7 rounded-full bg-black/45 group-hover/more:bg-black/70 text-white flex items-center justify-center"><MoreHorizontal className="w-4 h-4" /></span>
       </button>
     </li>
   );

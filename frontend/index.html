@@ -10,11 +10,16 @@
     <meta name="description" content="TamilTunes - Discover, search, and stream your favorite Tamil songs, legendary 90s melodies, and Kollywood hits with zero ads." />
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-    <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Noto+Sans+Tamil:wght@400;600;700&display=swap" />
+    <link rel="preload" as="style" href="https://fonts.googleapis.com/css2?family=Noto+Sans+Tamil:wght@400;600;700&display=swap" onload="this.onload=null;this.rel='stylesheet'" />
+    <noscript><link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Noto+Sans+Tamil:wght@400;600;700&display=swap" /></noscript>
     <title>TamilTunes – Pure Tamil Music Streaming</title>
   </head>
   <body class="bg-[#09090B] text-white">
-    <div id="root"></div>
+    <div id="root"><!-- painted at once, before any script runs; React replaces it -->
+      <div role="status" aria-label="Loading TamilTunes" style="height:100dvh;display:flex;align-items:center;justify-content:center;background:#09090B">
+        <svg width="64" height="64" viewBox="0 0 48 48" aria-hidden="true"><defs><linearGradient id="splash-g" x1="0" y1="1" x2="1" y2="0"><stop offset="0" stop-color="#17a34a"/><stop offset="1" stop-color="#1ed760"/></linearGradient></defs><rect width="48" height="48" rx="16" fill="url(#splash-g)"/><g transform="translate(12 12)" fill="none" stroke="#fff" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m19 6-5.2-3.9a.5.5 0 0 0-.8.4V18"/><circle cx="9" cy="18" r="4"/></g></svg>
+      </div>
+    </div>
     <script type="module" src="/src/main.jsx"></script>
   </body>
 </html>

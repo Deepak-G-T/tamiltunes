@@ -104,9 +104,9 @@ const SongCard = ({ song, playlist, radio = false, onAddToPlaylist, onToggleFavo
       <div className="min-w-0">
         <div className="flex items-center gap-1.5 min-w-0">
           {isCurrent && isPlaying && <Equalizer />}
-          <h4 className={`text-sm font-bold truncate ${isCurrent ? 'text-brand-400' : 'text-white'}`}>
+          <h3 className={`text-sm font-bold truncate ${isCurrent ? 'text-brand-400' : 'text-white'}`}>
             {song.title}
-          </h4>
+          </h3>
         </div>
         <p className="text-[13px] text-zinc-400 line-clamp-2 mt-1 leading-snug">
           {song.artist || song.singers || song.subtitle}

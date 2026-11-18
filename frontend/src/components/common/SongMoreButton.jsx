@@ -11,7 +11,7 @@ const SongMoreButton = ({ song, onAddToPlaylist, className = '' }) => {
       onClick={(e) => { e.stopPropagation(); actions.open(song, { onAddToPlaylist }); }}
       aria-label={`More actions for ${song.title}`}
       aria-haspopup="menu"
-      className={`press p-1.5 rounded-full text-zinc-400 hover:text-white hover:bg-white/10 focus-visible:outline focus-visible:outline-2 focus-visible:outline-brand-400 ${className}`}
+      className={`press p-3.5 -m-2 rounded-full text-zinc-400 hover:text-white hover:bg-white/10 focus-visible:outline focus-visible:outline-2 focus-visible:outline-brand-400 ${className}`}
     >
       <MoreHorizontal className="w-4 h-4" aria-hidden="true" />
     </button>
