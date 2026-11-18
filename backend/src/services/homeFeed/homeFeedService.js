@@ -9,6 +9,11 @@ import { getSignalsStore } from '../related/signalsStore.js';
 import { getHomeSignals } from './signals.js';
 import { assembleHome, MIN_ITEMS, ROTATION_PLAYS } from './assemble.js';
 import { dayKey } from './seed.js';
+import { videoLookup } from '../music/videoLookup.js';
+
+export const VIDEO_SHELF_MIN = 4; // a video shelf needs fewer songs than the others: only some songs have an official video
+/** Songs that have a video right now (curated map, cache, admin choice; no network), never a flagged one. */
+const withVideos = (list) => videoLookup.attach(list || []).filter((s) => s?.videoId);
 
 export const FEED_TTL_MS = 3 * 60 * 1000;
 const MAX_CACHE_ENTRIES = 300;
@@ -24,6 +29,7 @@ export const TAB_TITLES = {
   folk: 'Folk & kuthu beats',
   love: 'Love songs',
   instrumental: 'Instrumental',
+  videos: 'Video songs',
 };
 
 // Extra searches per pool: used to top a pool up when the feed's own list is short.
@@ -115,7 +121,13 @@ export async function buildHome({ userId = null, exclude = [], tab = null, now =
 
   let plan;
   let pools;
-  if (tab && TAB_TITLES[tab]) {
+  if (tab === 'videos') {
+    // the "Videos" chip: every pool we have, only songs with a video, shown as 16:9 thumbnails
+    const all = (await Promise.all(['trending', 'new', 'melodies', 'nineties', 'twoThousands', 'gana', 'love', 'folk'].map((n) => poolFor(n, feed)))).flat();
+    const pool = withVideos(all);
+    pools = { videos: pool };
+    plan = [{ id: 'videos', title: TAB_TITLES.videos, display: 'video', pool, min: 1, max: TAB_MAX, caps: false }];
+  } else if (tab && TAB_TITLES[tab]) {
     const pool = await poolFor(tab, feed);
     pools = { [tab]: pool };
     plan = [{ id: tab, title: TAB_TITLES[tab], pool, min: 1, max: TAB_MAX, caps: false }];
@@ -138,6 +150,9 @@ export async function buildHome({ userId = null, exclude = [], tab = null, now =
       ...(mixes.length
         ? mixes.map((m, i) => ({ id: m.id, title: m.title, subtitle: m.subtitle, pool: mixPools[i] }))
         : [{ id: 'made-for-you', title: 'Made for you', pool: mixPool }]),
+      // before Trending, so the songs with a video are not all taken by the shelves above it; the shared "already shown" set
+      // (canonical-song dedupe) still keeps every song to one place on the page
+      { id: 'videos', title: 'Video songs', display: 'video', pool: withVideos([...trending, ...newPool, ...ninetiesPool, ...aughtsPool]), min: VIDEO_SHELF_MIN, max: 12 },
       { id: 'trending', title: 'Trending now', pool: trending, heroFrom: true },
       { id: 'new', title: 'New releases', pool: newPool.filter(inYears(currentYear - 1, currentYear)).sort((a, b) => yearOf(b) - yearOf(a)) },
       { id: 'nineties', title: '90s melodies', pool: ninetiesPool.filter(inYears(1990, 1999)) },

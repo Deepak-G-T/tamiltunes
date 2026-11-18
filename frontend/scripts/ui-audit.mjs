@@ -376,6 +376,66 @@ async function runVideoSettings(browser) {
   await ctx.close();
 }
 
+// Video songs in lists: Home shelf, song card icon, Search "videos" chip, artist page. Thumbnails only: nothing from YouTube plays or loads until a tap.
+async function runVideoLists(browser) {
+  const tag = 'video lists';
+  // several page loads in one window: block the service worker, or it would answer the mocked API itself (page.route cannot see its requests)
+  const ctx = await browser.newContext({ viewport: { width: 390, height: 844 }, deviceScaleFactor: 1, isMobile: true, hasTouch: true, serviceWorkers: 'block' });
+  const page = await ctx.newPage();
+  const errors = [];
+  page.on('pageerror', (e) => errors.push(e.message));
+  await setupRoutes(page);
+  const more = [2, 3, 4].map((i) => ({ ...SONG_VIDEO, id: `tt_video_${i}`, title: `Video Song ${i}`, videoId: `VIDEOid000${i}`.slice(0, 11) }));
+  const videoSongs = [SONG_VIDEO, ...more];
+  const thumbs = [];
+  await page.route('https://i.ytimg.com/**', (r) => { thumbs.push(r.request().url()); return r.abort(); }); // abort: the fallback must take over
+  await page.route('**/api/home**', (r) => r.fulfill({ json: { success: true, seed: 'test', hero: null, sections: [
+    { id: 'videos', title: 'Video songs', display: 'video', kind: 'songs', items: videoSongs },
+    { id: 'trending', title: 'Trending now', kind: 'songs', items: FEED.trending },
+  ] } }));
+  const searchTypes = [];
+  await page.route('**/api/music/search**', (r) => { searchTypes.push(new URL(r.request().url()).searchParams.get('type')); return r.fulfill({ json: { success: true, data: { songs: [SONG_PLAIN, ...videoSongs], albums: [], artists: [], playlists: [] } } }); });
+  await page.route('**/api/music/artists/**', (r) => r.fulfill({ json: { success: true, artist: { id: 'a1', name: 'Anirudh Ravichander', image: '', topSongs: [SONG_PLAIN, ...videoSongs], albums: [] } } }));
+
+  await page.goto(`http://127.0.0.1:${PORT}/`);
+  await page.waitForSelector('section[aria-label="Video songs"]');
+  const cards = page.locator('section[aria-label="Video songs"] [data-testid=video-thumb-card]');
+  check(`[${tag}] Home has a "Video songs" shelf of thumbnails`, (await cards.count()) === 4);
+  const img = await page.locator('section[aria-label="Video songs"] img').first().evaluate((el) => ({ loading: el.getAttribute('loading'), src: el.getAttribute('src') })).catch(() => null);
+  check(`[${tag}] thumbnails use the standard YouTube thumbnail address, loaded lazily`, thumbs.some((u) => /i\.ytimg\.com\/vi\/IqwIOlhfCak\/mqdefault\.jpg$/.test(u)) && (!img || img.loading === 'lazy'), JSON.stringify({ img, thumbs: thumbs.slice(0, 2) }));
+  check(`[${tag}] a thumbnail that cannot load falls back (no broken picture)`, await page.locator('section[aria-label="Video songs"] img').evaluateAll((els) => els.every((e) => !/ytimg/.test(e.src)) || els.length === 0));
+  const tb = await box(cards.first());
+  const pic = await box(cards.first().locator('span').first());
+  check(`[${tag}] thumbnails are 16:9`, pic && Math.abs(pic.width / pic.height - 16 / 9) < 0.03, JSON.stringify(pic));
+  check(`[${tag}] nothing from YouTube is loaded on Home (no autoplay, no embed)`, await page.evaluate(() => typeof window.__yt === 'undefined' && !document.getElementById('youtube-iframe-api') && !document.querySelector('iframe')));
+  check(`[${tag}] a song card shows a small video icon when the song has a video`, (await page.locator('section[aria-label="Trending now"] [data-testid=song-video-icon]').count()) === 1);
+  check(`[${tag}] ...and none on a song without one`, (await page.locator('section[aria-label="Trending now"] [data-testid=song-video-icon]').count()) < (await page.locator('section[aria-label="Trending now"] li, section[aria-label="Trending now"] [role=listitem], section[aria-label="Trending now"] .snap-start').count() || 2));
+  await cards.first().click();
+  await page.waitForSelector('[aria-label="Close now playing"]');
+  await page.waitForTimeout(900);
+  const s = await state(page);
+  check(`[${tag}] tapping a thumbnail opens Now Playing and plays the video (the embed loads only now)`, s.ytPlaying && !s.audioPlaying, JSON.stringify(s));
+  check(`[${tag}] ...at a size YouTube allows`, ((await box(page.locator('[data-testid=yt-player-container]')))?.width || 0) >= 199.5);
+  await page.locator('[aria-label="Close now playing"]').click();
+  await page.waitForTimeout(500);
+
+  // Search: the "videos" chip shows only songs with a video
+  await page.goto(`http://127.0.0.1:${PORT}/search?q=leo`);
+  const videosChip = page.locator('button[aria-pressed]', { hasText: /^\s*videos\s*$/i }); // the filter chip, not any button mentioning videos
+  await videosChip.waitFor();
+  await videosChip.click();
+  await page.waitForSelector('[data-testid=search-videos]');
+  check(`[${tag}] Search: the videos chip asks the server for songs (it has no "videos" type)`, searchTypes.at(-1) === 'songs' && !searchTypes.includes('videos'), searchTypes.join(','));
+  check(`[${tag}] Search: the videos chip shows only the songs with a video`, (await page.locator('[data-testid=search-videos] [data-testid=video-thumb-card]').count()) === 4 && (await page.locator('text=Plain Audio Song').count()) === 0);
+
+  // Artist page: a Videos section
+  await page.goto(`http://127.0.0.1:${PORT}/artist/a1`);
+  await page.waitForSelector('[data-testid=artist-videos]');
+  check(`[${tag}] artist page: a Videos section with only the video songs`, (await page.locator('[data-testid=artist-videos] [data-testid=video-thumb-card]').count()) === 4);
+  check(`[${tag}] no page errors`, errors.length === 0, errors.join(' | '));
+  await ctx.close();
+}
+
 async function runGestures(browser, width, height) {
   const tag = `${width}x${height}`;
   const ctx = await browser.newContext({ viewport: { width, height }, deviceScaleFactor: 1, isMobile: true, hasTouch: true });
@@ -522,12 +582,16 @@ try {
     ...(process.env.CHROMIUM_PATH ? { executablePath: process.env.CHROMIUM_PATH } : {}),
     args: ['--autoplay-policy=no-user-gesture-required']
   });
-  for (const [w, h] of [[360, 640], [390, 844]]) {
-    await runViewport(browser, w, h);
-    await runGestures(browser, w, h);
+  const only = process.env.UI_AUDIT_ONLY; // optional: viewports | report | settings | lists
+  if (!only || only === 'viewports') {
+    for (const [w, h] of [[360, 640], [390, 844]]) {
+      await runViewport(browser, w, h);
+      await runGestures(browser, w, h);
+    }
   }
-  await runSignedInReport(browser);
-  await runVideoSettings(browser);
+  if (!only || only === 'report') await runSignedInReport(browser);
+  if (!only || only === 'settings') await runVideoSettings(browser);
+  if (!only || only === 'lists') await runVideoLists(browser);
 } catch (err) {
   console.error("UI audit crashed:", String(err.message).split("\n").slice(0,12).join("\n"));
   results.push({ name: 'audit run', ok: false, detail: String(err) });

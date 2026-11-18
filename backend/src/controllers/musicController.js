@@ -102,7 +102,7 @@ export const getAlbumById = async (req, res, next) => {
 
     res.json({
       success: true,
-      album
+      album: Array.isArray(album.songs) ? { ...album, songs: videoLookup.attach(album.songs) } : album // videoId where known (no network)
     });
   } catch (err) {
     next(err);
@@ -123,7 +123,7 @@ export const getArtistById = async (req, res, next) => {
 
     res.json({
       success: true,
-      artist
+      artist: Array.isArray(artist.topSongs) ? { ...artist, topSongs: videoLookup.attach(artist.topSongs) } : artist // videoId where known (no network)
     });
   } catch (err) {
     next(err);

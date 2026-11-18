@@ -14,6 +14,7 @@ import { useStartRadio } from '../hooks/useStartRadio';
 import { useHomeFeed } from '../hooks/useHomeFeed';
 import { usePullToRefresh } from '../hooks/usePullToRefresh';
 import { topGuestArtists } from '../lib/guestPlays';
+import VideoThumbCard from '../components/cards/VideoThumbCard';
 import { setShownOnHome } from '../lib/shownOnHome';
 import { ErrorState } from '../components/common/StateViews';
 import api from '../services/api';
@@ -27,7 +28,8 @@ const CATEGORIES = [
   { id: '2000s', label: '✨ 2000s Hits' },
   { id: 'love', label: '💌 Love Songs' },
   { id: 'folk', label: '🥁 Folk & Kuthu' },
-  { id: 'instrumental', label: '🎻 Instrumental' }
+  { id: 'instrumental', label: '🎻 Instrumental' },
+  { id: 'videos', label: '🎬 Videos' }
 ];
 
 const greeting = () => {
@@ -175,6 +177,13 @@ const Home = () => {
       return (
         <Shelf key={section.id} title={section.title}>
           {section.items.slice(0, 12).map((album) => <AlbumCard key={album.id} album={album} />)}
+        </Shelf>
+      );
+    }
+    if (section.display === 'video') {
+      return (
+        <Shelf key={section.id} title={section.title} subtitle={section.subtitle}>
+          {section.items.map((song) => <div key={song.id} className="w-[72vw] max-w-[320px] sm:w-[300px]"><VideoThumbCard song={song} list={section.items} /></div>)}
         </Shelf>
       );
     }

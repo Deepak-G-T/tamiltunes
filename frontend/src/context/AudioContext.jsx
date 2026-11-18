@@ -99,6 +99,7 @@ export const AudioProvider = ({ children }) => {
   const videoBlockedRef = useRef(videoBlocked);
   videoBlockedRef.current = videoBlocked;
   const userChoseAudioRef = useRef(null); // the song the person switched to audio themselves: "Prefer video" leaves it alone
+  const videoRequestRef = useRef(null); // a song tapped on a video thumbnail: play it as video once Now Playing is open
   const [unavailableVersion, setUnavailableVersion] = useState(0);
   const [toast, setToast] = useState(null);
   const [videoSlots, setVideoSlots] = useState([]); // registered <VideoSlot> elements; last wins
@@ -626,7 +627,7 @@ export const AudioProvider = ({ children }) => {
   // Switch between Audio and Video. Both engines are stopped first, then ONLY the new one is started at the
   // same position, and only if the song was playing (the tap on the toggle is the user action). A paused song
   // stays paused.
-  const switchPlaybackMode = (target, { user = false } = {}) => {
+  const switchPlaybackMode = (target, { user = false, autoplay = false } = {}) => {
     const song = currentSongRef.current;
     if (target === 'video' && videoBlockedRef.current) {
       showToast('Video is set to Wi-Fi only. You can change this in Video settings.');
@@ -641,7 +642,7 @@ export const AudioProvider = ({ children }) => {
     });
     if (!plan.ok) return false;
 
-    const wasPlaying = isPlayingRef.current;
+    const wasPlaying = isPlayingRef.current || autoplay; // autoplay: a tapped video thumbnail starts playing even if the song had not started yet
     const t = Math.max(0, getActiveTime());
     const requestId = (playRequestIdRef.current += 1); // invalidate any in-flight audio play request
     audioRef.current.pause();
@@ -691,10 +692,14 @@ export const AudioProvider = ({ children }) => {
   // Prefer video: while Now Playing is open, a song that has a video plays it (unless the person picked audio for this song)
   useEffect(() => {
     const song = currentSongRef.current;
-    if (!isFullScreen || !videoPrefs.preferVideo || videoBlocked || !song) return;
-    if (playbackModeRef.current === 'video' || userChoseAudioRef.current === song.id) return;
+    const requested = song && videoRequestRef.current === song.id;
+    if (requested && isFullScreen) videoRequestRef.current = null;
+    if (!isFullScreen || !(videoPrefs.preferVideo || requested) || !song) return;
+    if (videoBlocked) { if (requested) showToast('Video is set to Wi-Fi only. You can change this in Video settings.'); return; }
+    if (playbackModeRef.current === 'video' || (!requested && userChoseAudioRef.current === song.id)) return;
     if (!canToggleVideo(song, unavailableVideosRef.current)) return;
-    switchPlaybackMode('video');
+    // A tapped video thumbnail always plays (the song may still be starting, so it is not "playing" yet)
+    switchPlaybackMode('video', { autoplay: requested });
   }, [isFullScreen, currentSong?.id, videoPrefs.preferVideo, videoBlocked, unavailableVersion]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // Keep the screen awake only while a video is actually playing (and let it sleep again as soon as it stops)
@@ -901,6 +906,13 @@ export const AudioProvider = ({ children }) => {
 
   /** Play a song and let the radio fill the queue after it. `fallback` songs are queued if the radio has nothing. */
   const startRadio = (song, { fallback = [] } = {}) => playSong(song, null, { fallback });
+  /** A video thumbnail was tapped: play the song and show it as video in Now Playing (the embed loads only now). */
+  const playAsVideo = (song, list = null) => {
+    if (!song) return;
+    videoRequestRef.current = song.id;
+    if (currentSongRef.current?.id === song.id) setIsFullScreen(true);
+    else { playSong(song, list); setIsFullScreen(true); }
+  };
 
   const goNext = async (reason = 'skip') => {
     if (reason === 'ended' && qsRef.current.stopAfter) {
@@ -1329,6 +1341,7 @@ export const AudioProvider = ({ children }) => {
         videoPrefs,
         setVideoPrefs,
         videoBlocked,
+        playAsVideo,
         switchPlaybackMode,
         registerVideoSlot,
         unavailableVersion

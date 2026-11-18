@@ -1,5 +1,5 @@
 import React from 'react';
-import { Play, Pause, Heart, Plus, MoreHorizontal } from 'lucide-react';
+import { Play, Pause, Heart, Plus, MoreHorizontal, Video } from 'lucide-react';
 import { useAudio } from '../../context/AudioContext';
 import Equalizer from '../common/Equalizer';
 import { useSongActions } from '../common/SongActionsSheet';
@@ -104,6 +104,7 @@ const SongCard = ({ song, playlist, radio = false, onAddToPlaylist, onToggleFavo
       <div className="min-w-0">
         <div className="flex items-center gap-1.5 min-w-0">
           {isCurrent && isPlaying && <Equalizer />}
+          {song.videoId && <Video className="w-3.5 h-3.5 flex-shrink-0 text-zinc-300" role="img" aria-label="Has a video" data-testid="song-video-icon" />}
           <h3 className={`text-sm font-bold truncate ${isCurrent ? 'text-brand-400' : 'text-white'}`}>
             {song.title}
           </h3>
