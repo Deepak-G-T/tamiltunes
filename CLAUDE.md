@@ -18,9 +18,10 @@ Music providers: jiosaavn (unlicensed, personal/portfolio only), youtube (IFrame
 - UI audit: `npm run test:ui --prefix frontend` (Playwright at 360x640 and 390x844, mock backend, stubbed YouTube API)
 
 ## Known open items
-- `prisma migrate diff` is untested. The backend suite has run against real PostgreSQL (Neon Postgres 18 branch):
-  set `TEST_DATABASE_URL` to a SCRATCH database or Neon branch, run `npm run build --prefix backend`
-  (prisma generate) first, then `npm test --prefix backend`. Never point it at production.
+- Real Postgres: the queue, playlist-search, related and Speed Dial suites passed on a scratch Postgres 16 (run the suites file by file with TEST_DATABASE_URL:
+  `community-api.test.js` reads the in-memory store directly and does not run on Postgres). All migrations are applied on Neon production.
+  `prisma migrate diff` against the schema shows one older drift (`speed_dial_overrides.updatedAt` default); it is not caused by recent work.
+- Render runs `prisma migrate deploy` on every deploy, so a merge applies new migrations: take the Neon backup BEFORE merging a PR that has a migration.
 - audit/golden_labeled.csv needs hand labels from the owner.
 - Mobile full-screen player and YouTube autoplay must be tested on a real phone.
 - Stream proxy: keep ENABLE_EXTERNAL_STREAMS off in production.
@@ -86,21 +87,22 @@ Songs may carry an optional `videoId`. It comes from the curated map `backend/sr
 ## Radio (feature/player-radio)
 - `GET /api/songs/:id/related` ranks related songs; weights and tuning guide: `docs/RADIO.md`, knobs in
   `backend/src/services/related/weights.js`. Migration `20261119000000_radio_foundation` adds song metadata columns and `play_events`.
-- UNTESTED: `reco.getreco` against live JioSaavn, the Prisma signals queries on real Postgres (run the suite with TEST_DATABASE_URL).
+- UNTESTED: `reco.getreco` against live JioSaavn. (The Prisma signals queries passed on a scratch Postgres 16.)
 
 ## Speed Dial (feature/speed-dial, stacked on feature/player-radio)
 - Home shows the user's most-played songs: ranking, pins, hide, reorder and tuning guide in `docs/SPEED_DIAL.md`; knobs in
   `backend/src/services/speedDial/config.js`. A play counts after 30 s or 50% of the song (server re-checks it).
 - Migration `20261120000000_speed_dial` (play_events columns + `speed_dial_overrides`). Needs the radio migration first.
-- UNTESTED: the ranking SQL on real Postgres (run the backend suite with TEST_DATABASE_URL: the same tests compare it with the
-  JavaScript reference), the 30 s counting with real audio on a phone, long-press on real devices.
+- UNTESTED: the 30 s counting with real audio on a phone, long-press on real devices. (The ranking SQL matched the JavaScript reference on a
+  scratch Postgres 16.)
 
 ## Player queue (feature/player-queue, stacked on feature/speed-dial)
 - Engine `frontend/src/lib/radioQueue.js` (tests in `radioQueue.test.js`), notes in `docs/PLAYER_QUEUE.md`. Search returns `playlists` (public only).
-- UNTESTED: drawer drag/swipe on real devices, playlist search on real Postgres.
+- UNTESTED: drawer drag/swipe on real devices. (Playlist search passed on a scratch Postgres 16.)
 
 ## Play queue v2 (feature/queue-v2, on master)
 - Notes, API table and shortcuts: `docs/QUEUE_V2.md`. Migration `20261121000000_queue_state` (additive; run with the UNPOOLED url). Library: `@dnd-kit`.
 - Only song ids are saved (`PUT /api/me/queue`); metadata is re-fetched on restore. `POST /api/music/songs/resolve` is public (guests), rate limited.
 - `npm run test:queue --prefix frontend` runs the queue Playwright audit (also part of `npm run test:ui`).
-- UNTESTED: real-phone drag/swipe, a second real device for "Continue on this device?", Neon (only a scratch local Postgres 16 was used).
+- UNTESTED: real-phone drag/swipe, a second real device for "Continue on this device?". The `queue_state` migration is applied on Neon; the API passed on a scratch Postgres 16.
+- A song that cannot be played is skipped with the toast `Couldn't play "<title>", skipped.`
