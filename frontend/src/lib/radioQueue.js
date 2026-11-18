@@ -37,6 +37,7 @@ export function createQueueState(overrides = {}) {
     shuffle: false,
     repeat: 'off', // 'off' | 'all' | 'one'
     refill: { pending: false, failures: 0, retryAt: 0 },
+    fallback: [], // songs to queue if the radio returns nothing (e.g. the other Speed Dial tiles)
     ended: false, // nothing left to play
     offerRadio: false, // a playlist / album finished: the UI may offer to continue with radio
     ...overrides,
@@ -63,8 +64,11 @@ const sourceEntries = (state) => state.upcoming.slice(state.userCount);
 
 // ---------------------------------------------------------------- starting playback
 
-/** The user played a song from search: it starts now and radio fills the queue after it. User-added songs are kept. */
-export function playFromSearch(state, song) {
+/**
+ * The user played a song from search (or a Speed Dial tile): it starts now and radio fills the queue after it.
+ * User-added songs are kept. `fallback` songs are queued if the radio returns nothing.
+ */
+export function playFromSearch(state, song, { fallback = [] } = {}) {
   if (!song) return state;
   return {
     ...state,
@@ -74,6 +78,7 @@ export function playFromSearch(state, song) {
     upcoming: userEntries(state),
     mode: 'radio',
     context: null,
+    fallback: fallback.filter((s) => s?.id && s.id !== song.id),
     ended: false,
     offerRadio: false,
     refill: { pending: false, failures: 0, retryAt: 0 },
@@ -90,9 +95,13 @@ export function playFromContext(state, { songs, index = 0, type = 'playlist', id
   const i = Math.min(Math.max(index, 0), songs.length - 1);
   const song = songs[i];
   const rest = state.shuffle ? shuffled(songs.filter((_, k) => k !== i), rng) : songs.slice(i + 1);
+  // Songs before the chosen one sit in history (not "played"), so Previous walks back through the list like a player does
+  let history = pushHistory(state.history, state.current && state.current.id !== song.id ? state.current : null);
+  if (!state.shuffle) for (const s of songs.slice(0, i)) history = pushHistory(history, s);
   return {
     ...state,
-    history: pushHistory(state.history, state.current && state.current.id !== song.id ? state.current : null),
+    history,
+    fallback: [],
     played: withPlayed(state.played, song.id),
     current: song,
     upcoming: [...userEntries(state), ...rest.map((s) => entry(s, 'context'))],
@@ -111,6 +120,7 @@ export function switchToRadio(state) {
     mode: 'radio',
     context: null,
     upcoming: userEntries(state),
+    fallback: [],
     ended: false,
     offerRadio: false,
     refill: { pending: false, failures: 0, retryAt: 0 },
@@ -256,6 +266,32 @@ export function clearUserQueue(state) {
   return { ...state, upcoming: sourceEntries(state), userCount: 0 };
 }
 
+/** Remove a song from the history list (index into `history`). */
+export function removeFromHistory(state, index) {
+  if (index < 0 || index >= state.history.length) return state;
+  return { ...state, history: state.history.filter((_, i) => i !== index) };
+}
+
+/**
+ * Queue the fallback songs (songs the radio could not replace), skipping anything already played or queued.
+ * Used when the related-songs request fails or returns nothing, so playback still carries on.
+ */
+export function applyFallback(state) {
+  if (!state.fallback.length) return state;
+  const known = new Set([state.current?.id, ...state.played, ...state.upcoming.map((e) => e.song.id)].filter(Boolean));
+  const fresh = state.fallback.filter((s) => s?.id && !known.has(s.id)).map((s) => entry(s, 'radio'));
+  return { ...state, fallback: [], upcoming: [...state.upcoming, ...fresh], ended: fresh.length ? false : state.ended };
+}
+
+/**
+ * One flat list for views that show "the whole queue": already-played songs, the current one, then what is coming.
+ * `queueIndex` points at the current song (-1 when nothing plays).
+ */
+export function toFlatQueue(state) {
+  if (!state.current) return { queue: [], queueIndex: -1 };
+  return { queue: [...state.history, state.current, ...state.upcoming.map((e) => e.song)], queueIndex: state.history.length };
+}
+
 // ---------------------------------------------------------------- settings
 
 /** Shuffle reorders the REMAINING playlist / album songs; turning it off restores their original order. */
@@ -348,11 +384,11 @@ export async function runRefill({ get, update, fetchRelated, now = Date.now }) {
     update((s) => {
       const next = applyRefill(s, items, { now: now() });
       added = next.upcoming.length - s.upcoming.length;
-      return next;
+      return added ? next : applyFallback(next); // the radio had nothing new: play on through the fallback songs
     });
     return added > 0;
   } catch {
-    update((s) => refillFailed(s, { now: now() }));
+    update((s) => applyFallback(refillFailed(s, { now: now() })));
     return false;
   }
 }
