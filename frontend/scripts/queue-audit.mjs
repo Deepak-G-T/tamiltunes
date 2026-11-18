@@ -386,6 +386,26 @@ async function longList(browser) {
   await ctx.close();
 }
 
+async function failedStream(browser) {
+  const tag = '[failed stream]';
+  const ctx = await browser.newContext({ viewport: { width: 1280, height: 800 } });
+  const page = await ctx.newPage();
+  await setup(page);
+  currentPage = page;
+  await page.route('https://aac.saavncdn.com/q2_*', (r) => r.fulfill({ status: 404, body: 'gone' })); // this one song cannot be played
+  await page.goto(`${BASE}/`);
+  await page.waitForSelector('text=Queue Song 1');
+  await songMenu(page, 'Queue Song 1', 'Start radio from this song');
+  await songMenu(page, 'Queue Song 2', 'Play next');
+  await page.waitForFunction(() => window.__tamiltunes_audio && window.__tamiltunes_audio.currentTime > 0.5, null, { timeout: 8000 });
+  await page.keyboard.press('n'); // next: Queue Song 2, which fails
+  await page.getByText('Couldn\'t play "Queue Song 2", skipped.').waitFor({ timeout: 8000 })
+    .then(() => check(`${tag} the toast names the song that could not be played`, true), () => check(`${tag} the toast names the song that could not be played`, false, 'no toast'));
+  await sleep(page, 1500);
+  check(`${tag} playback carries on with the next song`, !/Queue Song 2/.test(await page.locator('footer h4').first().innerText().catch(() => '')), await page.locator('footer h4').first().innerText().catch(() => ''));
+  await ctx.close();
+}
+
 async function phone(browser, width, height) {
   const tag = `[${width}x${height}]`;
   const ctx = await browser.newContext({ viewport: { width, height }, deviceScaleFactor: 1, isMobile: true, hasTouch: true });
@@ -465,6 +485,7 @@ try {
   if (!only || only === 'desktop') await desktop(browser);
   if (!only || only === 'restore') await persistence(browser);
   if (!only || only === 'long') await longList(browser);
+  if (!only || only === 'stream') await failedStream(browser);
   if (!only || only === 'phone') { await phone(browser, 360, 640); await phone(browser, 390, 844); }
 } catch (err) {
   console.error('Queue audit crashed:', String(err.message).split('\n').slice(0, 12).join('\n'));

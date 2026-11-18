@@ -359,7 +359,7 @@ export const AudioProvider = ({ children }) => {
   const handleExpiredStream = async (song) => {
     if (!song || song._hasRetriedFreshFetch) {
       setPlaybackError('Stream unavailable or expired. Skipping to next track...');
-      showToast('That song could not be played. Skipping to the next one.');
+      showToast(song?.title ? `Couldn't play "${song.title}", skipped.` : "Couldn't play that song, skipped.");
       setTimeout(() => {
         nextTrack();
       }, 1500);
@@ -391,7 +391,7 @@ export const AudioProvider = ({ children }) => {
     }
 
     setPlaybackError('Stream expired. Skipping to next track...');
-    showToast('That song could not be played. Skipping to the next one.');
+    showToast(song?.title ? `Couldn't play "${song.title}", skipped.` : "Couldn't play that song, skipped.");
     setTimeout(() => {
       nextTrack();
     }, 1500);
