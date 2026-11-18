@@ -7,7 +7,7 @@ import { CURATED_ARTISTS } from '../music/localAudioProvider.js';
 import { musicCache } from '../cacheService.js';
 import { getSignalsStore } from '../related/signalsStore.js';
 import { getHomeSignals } from './signals.js';
-import { assembleHome, MIN_ITEMS } from './assemble.js';
+import { assembleHome, MIN_ITEMS, ROTATION_PLAYS } from './assemble.js';
 import { dayKey } from './seed.js';
 
 export const FEED_TTL_MS = 3 * 60 * 1000;
@@ -76,19 +76,41 @@ async function resolveExclude(ids, pools) {
   return found;
 }
 
+export const MAX_MIXES = 3;
+export const MAX_AVOID = 80;
+
 /**
- * @param {{ userId?: string | null, exclude?: string[], tab?: string | null, now?: number }} args
+ * Daily Mix 1..3: each mix is built from two of the person's favourite artists (most played and liked), like Spotify's Daily Mix.
+ * @returns {{ id: string, title: string, subtitle: string, artists: string[] }[]}
  */
-export async function buildHome({ userId = null, exclude = [], tab = null, now = Date.now() } = {}) {
+export function planMixes(artists) {
+  const names = [...new Set((artists || []).filter(Boolean))];
+  const mixes = [];
+  for (let i = 0; i < names.length && mixes.length < MAX_MIXES; i += 2) {
+    const pair = names.slice(i, i + 2);
+    mixes.push({ id: `daily-mix-${mixes.length + 1}`, title: `Daily Mix ${mixes.length + 1}`, subtitle: `${pair.join(', ')} and more`, artists: pair });
+  }
+  return mixes;
+}
+
+/**
+ * @param {{ userId?: string | null, exclude?: string[], tab?: string | null, now?: number, visit?: string | null, avoid?: string[], hintArtists?: string[] }} args
+ *   visit: a fresh token for each app open / pull to refresh: a new token is a new mix (the seed changes).
+ *   avoid: songs shown last time: pushed down, not removed, so a thin shelf still fills.
+ *   hintArtists: favourite artists of a logged-out listener (kept in the browser), used for Daily Mix.
+ */
+export async function buildHome({ userId = null, exclude = [], tab = null, now = Date.now(), visit = null, avoid = [], hintArtists = [] } = {}) {
   const ex = [...new Set(exclude)].slice(0, 60).sort();
+  const av = [...new Set(avoid)].slice(0, MAX_AVOID);
+  const hints = [...new Set(hintArtists)].slice(0, 6);
   const day = dayKey(now);
-  const cacheKey = `${userId || 'guest'}|${tab || 'all'}|${day}|${musicService.providerName}|${ex.join(',')}`;
+  const cacheKey = `${userId || 'guest'}|${tab || 'all'}|${day}|${visit || ''}|${musicService.providerName}|${ex.join(',')}|${av.join(',')}|${hints.join(',')}`;
   const hit = cache.get(cacheKey);
   if (hit && now - hit.at < FEED_TTL_MS) return hit.value;
 
   const signals = getHomeSignals();
   const feed = await musicService.getHomeFeed();
-  const seed = `${userId || 'guest'}:${day}`;
+  const seed = `${userId || 'guest'}:${day}${visit ? `:${visit}` : ''}`;
   const weekPlays = userId ? await signals.weekPlays(userId, now).catch(() => new Map()) : new Map();
 
   let plan;
@@ -101,16 +123,21 @@ export async function buildHome({ userId = null, exclude = [], tab = null, now =
     const [trendingPool, newPool, ninetiesPool, aughtsPool, recent, topArtists, trendingNow] = await Promise.all([
       poolFor('trending', feed), poolFor('new', feed), poolFor('nineties', feed), poolFor('twoThousands', feed),
       userId ? signals.recentSongs(userId, 30).catch(() => []) : [],
-      userId ? signals.topArtists(userId, 3, now).catch(() => []) : [],
+      userId ? signals.topArtists(userId, MAX_MIXES * 2, now).catch(() => []) : [],
       signals.globalTrending(30, now).catch(() => []),
     ]);
-    const mixPool = playable((await Promise.all(topArtists.map((a) => search(`${a} tamil songs`)))).flat()).filter((s) => !weekPlays.has(s.id));
+    const favourites = topArtists.length ? topArtists : hints; // a new account or a guest: the artists they play in this browser
+    const mixes = planMixes(favourites);
+    const mixPools = await Promise.all(mixes.map(async (m) => playable((await Promise.all(m.artists.flatMap((a) => [search(`${a} tamil songs`), search(`${a} hits`)]))).flat()).filter((s) => !weekPlays.has(s.id))));
+    const mixPool = playable((await Promise.all(favourites.slice(0, 3).map((a) => search(`${a} tamil songs`)))).flat()).filter((s) => !weekPlays.has(s.id));
     const trending = playable([...trendingNow.map((t) => t.song), ...trendingPool]); // real plays first, the provider's trending fills the rest
     const currentYear = new Date(now).getUTCFullYear();
-    pools = { continue: recent, mix: mixPool, trending, new: newPool, nineties: ninetiesPool, aughts: aughtsPool };
+    pools = { continue: recent, mix: mixPool, ...Object.fromEntries(mixes.map((m, i) => [m.id, mixPools[i]])), trending, new: newPool, nineties: ninetiesPool, aughts: aughtsPool };
     plan = [
       { id: 'continue', title: 'Continue listening', pool: recent, min: 4 },
-      { id: 'made-for-you', title: 'Made for you', pool: mixPool },
+      ...(mixes.length
+        ? mixes.map((m, i) => ({ id: m.id, title: m.title, subtitle: m.subtitle, pool: mixPools[i] }))
+        : [{ id: 'made-for-you', title: 'Made for you', pool: mixPool }]),
       { id: 'trending', title: 'Trending now', pool: trending, heroFrom: true },
       { id: 'new', title: 'New releases', pool: newPool.filter(inYears(currentYear - 1, currentYear)).sort((a, b) => yearOf(b) - yearOf(a)) },
       { id: 'nineties', title: '90s melodies', pool: ninetiesPool.filter(inYears(1990, 1999)) },
@@ -121,7 +148,10 @@ export async function buildHome({ userId = null, exclude = [], tab = null, now =
   }
 
   const excluded = await resolveExclude(ex, pools);
-  const result = assembleHome(plan, { exclude: excluded, seed, weekPlays, hero: !tab });
+  // songs shown last time count like songs played a lot this week: they sink, but stay if a shelf would be thin
+  const penalty = new Map(weekPlays);
+  for (const id of av) penalty.set(id, Math.max(penalty.get(id) || 0, ROTATION_PLAYS));
+  const result = assembleHome(plan, { exclude: excluded, seed, weekPlays: penalty, hero: !tab });
   const value = { seed, ...result };
   if (cache.size >= MAX_CACHE_ENTRIES) cache.delete(cache.keys().next().value);
   cache.set(cacheKey, { at: now, value });
