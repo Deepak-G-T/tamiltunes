@@ -13,7 +13,7 @@ import {
   ShieldCheck,
   AlertCircle
 } from 'lucide-react';
-import { useAudio } from '../../context/AudioContext';
+import { useAudio, useQueue } from '../../context/AudioContext';
 import { useAuth } from '../../context/AuthContext';
 import ProgressBar from './ProgressBar';
 import VolumeSlider from './VolumeSlider';
@@ -48,6 +48,7 @@ const MusicPlayer = ({ onAddToPlaylist }) => {
     isQueueOpen,
     setIsQueueOpen
   } = useAudio();
+  const nextUp = useQueue().queueSections.nextUp; // "Next up: <song>" under the title, so you always know what is coming
 
   const { isAuthenticated } = useAuth();
   const [isFavorite, setIsFavorite] = useState(false);
@@ -169,10 +170,18 @@ const MusicPlayer = ({ onAddToPlaylist }) => {
                 <span className="truncate">{playbackError}</span>
               </p>
             ) : (
-              <span className="text-[10px] text-zinc-400 flex items-center gap-1">
-                <ShieldCheck className="w-3 h-3 text-emerald-500/80" />
-                <span>Ad-Free</span>
-              </span>
+              nextUp ? (
+                <button type="button" onClick={() => setIsQueueOpen(true)} title="Open the queue" data-testid="next-up"
+                  className="text-[10px] text-zinc-400 hover:text-white flex items-center gap-1 max-w-full text-left">
+                  <span className="font-semibold text-brand-300 flex-shrink-0">Next up</span>
+                  <span dir="auto" className="truncate">{nextUp.title}</span>
+                </button>
+              ) : (
+                <span className="text-[10px] text-zinc-400 flex items-center gap-1">
+                  <ShieldCheck className="w-3 h-3 text-emerald-500/80" />
+                  <span>Ad-Free</span>
+                </span>
+              )
             )}
           </div>
 

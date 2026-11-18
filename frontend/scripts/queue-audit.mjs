@@ -14,7 +14,9 @@ const PORT = 4174;
 const BASE = `http://127.0.0.1:${PORT}`;
 const song = (id, title, extra = {}) => ({ id, title, artist: 'Test Artist', album: 'Test Album', duration: 200, image: '', streamUrl: `https://aac.saavncdn.com/${id}_320.mp4`, source: 'audio', ...extra });
 const Q = Array.from({ length: 6 }, (_, i) => song(`q${i + 1}`, `Queue Song ${i + 1}`));
-const R = Array.from({ length: 12 }, (_, i) => song(`r${i + 1}`, `Radio Song ${i + 1}`, { duration: 180 }));
+const RADIO_ARTISTS = ['Artist A', 'Artist A', 'Artist A', 'Artist A', 'Artist A', 'Artist B', 'Artist B', 'Artist C', 'Artist C', 'Artist C', 'Artist D', 'Artist D']; // five in a row by one artist: autoplay must spread them
+const R = Array.from({ length: 12 }, (_, i) => song(`r${i + 1}`, `Radio Song ${i + 1}`, { duration: 180, artist: RADIO_ARTISTS[i] }));
+const relatedCalls = [];
 const FEED = { trending: Q, latest: [], gana: [], nineties: [], twoThousands: [], melodies: [], love: [], sad: [], folk: [], instrumental: [], popularAlbums: [], popularArtists: [], albums: [], artists: [] };
 
 const wav = (() => {
@@ -47,7 +49,7 @@ const startServer = () => new Promise((resolve, reject) => {
 async function setup(page) {
   await page.route('**/api/music/home', (r) => r.fulfill({ json: { success: true, data: FEED } }));
   await page.route('**/api/home**', (r) => r.fulfill({ json: { success: true, seed: 'test', hero: null, sections: [{ id: 'trending', title: 'Trending now', kind: 'songs', items: Q }] } }));
-  await page.route('**/api/songs/*/related**', (r) => r.fulfill({ json: { success: true, items: R } }));
+  await page.route('**/api/songs/*/related**', (r) => { const u = new URL(r.request().url()); relatedCalls.push({ limit: Number(u.searchParams.get('limit')), exclude: (u.searchParams.get('exclude') || '').split(',') }); return r.fulfill({ json: { success: true, items: R.slice(0, Number(u.searchParams.get('limit')) || 12) } }); });
   await page.route('**/api/music/songs/resolve', (r) => {
     const ids = JSON.parse(r.request().postData() || '{}').ids || [];
     const songs = Object.fromEntries(ids.filter((i) => !i.startsWith('gone')).map((id) => [id, song(id, `Seed ${id}`, { duration: 100 })]));
@@ -97,7 +99,7 @@ async function desktop(browser) {
   const tag = '[desktop]';
 
   await page.goto(`${BASE}/`);
-  await page.waitForSelector('text=Queue Song 1');
+  await page.waitForSelector('section[aria-label="Trending now"] button[aria-label="More actions for Queue Song 1"]');
   await songMenu(page, 'Queue Song 1', 'Start radio from this song');
   await page.waitForSelector('[aria-label="Toggle Queue"]');
   await page.locator('[aria-label="Toggle Queue"]').click();
@@ -308,7 +310,7 @@ async function persistence(browser) {
   await setup(page);
   currentPage = page;
   await page.goto(`${BASE}/`);
-  await page.waitForSelector('text=Queue Song 1');
+  await page.waitForSelector('section[aria-label="Trending now"] button[aria-label="More actions for Queue Song 1"]');
   check(`${tag} nothing is saved before anything has played`, (await page.evaluate(() => localStorage.getItem('tamiltunes_queue_v1'))) === null);
   await page.locator('[aria-label="Toggle Queue"]').count();
   await page.keyboard.press('q');
@@ -396,6 +398,167 @@ async function longList(browser) {
   await ctx.close();
 }
 
+
+async function feel(browser) {
+  const tag = '[feel]';
+  const ctx = await browser.newContext({ viewport: { width: 1280, height: 800 } });
+  const page = await ctx.newPage();
+  const errors = [];
+  page.on('pageerror', (e) => errors.push(e.message));
+  await page.addInitScript(() => { window.__QUEUE_PROFILE__ = true; });
+  await setup(page);
+  currentPage = page;
+  relatedCalls.length = 0;
+  await page.goto(`${BASE}/`);
+  await page.waitForSelector('section[aria-label="Trending now"] button[aria-label="More actions for Queue Song 1"]');
+  await songMenu(page, 'Queue Song 1', 'Start radio from this song');
+  await page.waitForFunction(() => window.__tamiltunes_audio && window.__tamiltunes_audio.currentTime > 0.5, null, { timeout: 8000 });
+
+  // how fast does the panel open? (measured inside the page, from the click to the first row)
+  await page.evaluate(() => {
+    window.__open = null;
+    document.addEventListener('click', (e) => { if (e.target.closest('[aria-label="Toggle Queue"]')) window.__open = { t0: performance.now(), t1: null }; }, true);
+    new MutationObserver(() => { if (window.__open && !window.__open.t1 && document.querySelector('aside[data-testid=queue-sheet] [data-testid=queue-row]')) window.__open.t1 = performance.now(); }).observe(document.body, { childList: true, subtree: true });
+  });
+  await page.locator('[aria-label="Toggle Queue"]').click();
+  await page.waitForSelector('aside[data-testid=queue-sheet] [data-testid=queue-row]');
+  const openMs = await page.evaluate(() => (window.__open?.t1 ?? NaN) - (window.__open?.t0 ?? NaN));
+  console.log(`      (panel opened in ${openMs.toFixed(0)} ms)`);
+  check(`${tag} the panel opens with its rows in under 150 ms`, openMs < 150, `${openMs} ms`);
+
+  // autoplay: says what it did, keeps variety, keeps what the home page shows out
+  check(`${tag} autoplay asked for 10 songs`, relatedCalls[0]?.limit === 10, JSON.stringify(relatedCalls[0]));
+  check(`${tag} songs shown on the home page are kept out of the suggestions`, relatedCalls[0]?.exclude.includes('q2') && relatedCalls[0]?.exclude.includes('q6'), relatedCalls[0]?.exclude.join(','));
+  check(`${tag} autoplay says "Added 10 similar songs"`, await page.getByText('Added 10 similar songs.').count() > 0);
+  const artists = await page.$$eval('[data-testid=queue-row]', (els) => els.map((e) => (e.getAttribute('aria-label') || '').split(', ')[1]));
+  let run = 1; let best = 1; artists.forEach((a, i) => { if (i) { run = a === artists[i - 1] ? run + 1 : 1; best = Math.max(best, run); } });
+  const nowArtist = await page.locator('[data-testid=queue-now-playing] p.text-sm').first().innerText();
+  check(`${tag} never more than 3 songs in a row by one artist (${artists.join(',')})`, best <= 3 && artists.length >= 8, `longest run ${best}`);
+
+  // instant feedback with Undo: the row is there at once, a message with Undo appears, Undo takes it back
+  await page.evaluate(() => {
+    window.__add = { t0: null, t1: null, before: document.querySelectorAll('[data-testid=queue-row]').length };
+    document.addEventListener('click', (e) => { if (e.target.closest('[role=menuitem]')) window.__add.t0 = performance.now(); }, true);
+    new MutationObserver(() => { if (window.__add.t0 && !window.__add.t1 && document.querySelectorAll('[data-testid=queue-row]').length > window.__add.before) window.__add.t1 = performance.now(); }).observe(document.body, { childList: true, subtree: true });
+  });
+  await songMenu(page, 'Queue Song 3', 'Add to queue');
+  const addMs = await page.evaluate(() => window.__add.t1 - window.__add.t0);
+  check(`${tag} "Add to queue" shows the song in the panel within 100 ms (no waiting on the network)`, addMs < 100, `${addMs} ms`);
+  check(`${tag} a message "Added to queue." with Undo appears`, await page.getByText('Added to queue.').count() === 1 && await page.getByRole('button', { name: 'Undo' }).count() === 1);
+  let t = await titles(page);
+  check(`${tag} the added song is first in "Next in queue"`, t[0] === 'Queue Song 3', t.slice(0, 3).join('|'));
+  await page.getByRole('button', { name: 'Undo' }).click();
+  await sleep(page, 250);
+  check(`${tag} Undo takes the added song back`, !(await titles(page)).includes('Queue Song 3'));
+  await songMenu(page, 'Queue Song 4', 'Play next');
+  check(`${tag} "Play next" says "Playing next." with Undo`, await page.getByText('Playing next.').count() === 1);
+  await sleep(page, 250);
+
+  // reorder with Undo; the current song stays highlighted through all changes
+  const first = page.locator('[data-testid=queue-row]').first();
+  const beforeOrder = await titles(page);
+  await first.focus();
+  await page.keyboard.press('Alt+ArrowDown');
+  await sleep(page, 300);
+  check(`${tag} a reorder says what moved and offers Undo`, await page.getByText(/Moved "/).count() === 1 && await page.getByRole('button', { name: 'Undo' }).count() === 1);
+  await page.getByRole('button', { name: 'Undo' }).click();
+  await sleep(page, 300);
+  check(`${tag} Undo puts the reordered song back`, (await titles(page)).join('|') === beforeOrder.join('|'));
+  check(`${tag} the playing song is still pinned and highlighted with its equalizer`, (await nowPlaying(page)) === 'Queue Song 1' && await page.locator('[data-testid=queue-now-playing] [data-testid=equalizer]').count() === 1 && /brand-500/.test(await page.locator('[data-testid=queue-now-playing]').getAttribute('class')));
+  // Undo stops working if the list changed since (never undoes something else)
+  await page.locator('[data-testid=queue-row]').first().focus();
+  await page.keyboard.press('Alt+ArrowDown');
+  await sleep(page, 200);
+  await page.locator('[data-testid=queue-row]').nth(2).locator('button[aria-label^="Remove"]').click();
+  await sleep(page, 200);
+  check(`${tag} the playing song is still highlighted after several changes`, (await nowPlaying(page)) === 'Queue Song 1');
+
+  // "Next up" in the player bar follows the queue
+  const nextUp = await page.locator('[data-testid=next-up]').innerText();
+  const firstTitle = (await titles(page))[0];
+  check(`${tag} the player bar shows "Next up: <song>"`, /Next up/.test(nextUp) && nextUp.includes(firstTitle), `${nextUp} vs ${firstTitle}`);
+
+  // the panel is not redrawn on every tick of the song clock
+  await page.evaluate(() => { window.__queueRenders = 0; });
+  await sleep(page, 3000);
+  const idleRenders = await page.evaluate(() => window.__queueRenders);
+  check(`${tag} 3 seconds of playing redraw the panel at most once (not on every clock tick)`, idleRenders <= 1, `${idleRenders} redraws`);
+  await page.evaluate(() => { window.__queueRenders = 0; });
+  await page.keyboard.press('n');
+  await sleep(page, 700);
+  const songChangeRenders = await page.evaluate(() => window.__queueRenders);
+  check(`${tag} a song change redraws the panel only a few times`, songChangeRenders <= 6, `${songChangeRenders} redraws`);
+  const nextTitle = await page.locator('[data-testid=next-up]').innerText();
+  check(`${tag} "Next up" moves on with the queue`, nextTitle !== nextUp, `${nextUp} -> ${nextTitle}`);
+  check(`${tag} no page errors`, errors.length === 0, errors.join(' | '));
+  await ctx.close();
+}
+
+async function stableScroll(browser) {
+  const tag = '[scroll]';
+  const ctx = await browser.newContext({ viewport: { width: 1280, height: 800 } });
+  const page = await ctx.newPage();
+  await setup(page);
+  currentPage = page;
+  await page.addInitScript(() => {
+    const items = Array.from({ length: 80 }, (_, i) => ({ id: `s${i}`, o: 'r' }));
+    localStorage.setItem('tamiltunes_queue_v1', JSON.stringify({ items, currentIndex: 0, positionSec: 0, shuffle: false, repeat: 'off', autoplay: false, mode: 'radio', sourceLabel: null, deviceId: 'x' }));
+  });
+  await page.goto(`${BASE}/`);
+  await page.waitForSelector('footer h4');
+  await page.keyboard.press('q');
+  await page.waitForSelector('[data-testid=queue-row]');
+  const topRow = () => page.evaluate(() => {
+    const list = document.querySelector('[data-testid=queue-list]');
+    const top = list.getBoundingClientRect().top;
+    const rows = [...document.querySelectorAll('[data-testid=queue-row]')].map((el) => ({ el, y: el.getBoundingClientRect().top - top })).filter((r) => r.y >= -2).sort((a, b) => a.y - b.y);
+    return { title: (rows[0].el.getAttribute('aria-label') || '').split(',')[0], y: Math.round(rows[0].y) };
+  });
+  await page.locator('[data-testid=queue-list]').evaluate((el) => { el.scrollTop = 1800; });
+  await sleep(page, 300);
+  const before = await topRow();
+  await page.keyboard.press('n'); // the song changes: the first row of the list goes away
+  await sleep(page, 900);
+  const after = await topRow();
+  check(`${tag} the list stays where it was when the song changes (top row ${before.title})`, after.title === before.title && Math.abs(after.y - before.y) <= 3, `${JSON.stringify(before)} -> ${JSON.stringify(after)}`);
+  const sc0 = await page.locator('[data-testid=queue-list]').evaluate((el) => el.scrollTop);
+  const visibleIdx = await page.evaluate(() => { const top = document.querySelector('[data-testid=queue-list]').getBoundingClientRect().top; return [...document.querySelectorAll('[data-testid=queue-row]')].findIndex((el) => el.getBoundingClientRect().top > top + 100); }); // a row that is on screen
+  await page.locator('[data-testid=queue-row]').nth(visibleIdx).focus({ timeout: 3000 });
+  await page.keyboard.press('Alt+ArrowDown');
+  await sleep(page, 400);
+  const sc1 = await page.locator('[data-testid=queue-list]').evaluate((el) => el.scrollTop);
+  check(`${tag} a reorder does not move the scroll position`, Math.abs(sc1 - sc0) <= 3, `${sc0} -> ${sc1}`);
+  await ctx.close();
+}
+
+async function motion(browser) {
+  const tag = '[motion]';
+  for (const reduced of [false, true]) {
+    const ctx = await browser.newContext({ viewport: { width: 1280, height: 800 }, reducedMotion: reduced ? 'reduce' : 'no-preference' });
+    const page = await ctx.newPage();
+    await setup(page);
+    currentPage = page;
+    await page.addInitScript(() => {
+      localStorage.setItem('tamiltunes_queue_v1', JSON.stringify({ items: Array.from({ length: 12 }, (_, i) => ({ id: `s${i}`, o: 'r' })), currentIndex: 0, positionSec: 0, shuffle: false, repeat: 'off', autoplay: false, mode: 'radio', sourceLabel: null, deviceId: 'x' }));
+    });
+    await page.goto(`${BASE}/`);
+    await page.waitForSelector('footer h4');
+    await page.keyboard.press('q');
+    await page.waitForSelector('[data-testid=queue-row]');
+    await page.locator('[data-testid=queue-row]').first().focus();
+    await page.keyboard.press('Alt+ArrowDown');
+    const moving = await page.evaluate(() => document.getAnimations().filter((a) => a.effect?.target?.matches?.('[data-queue-row]') && a.playState === 'running').length);
+    if (reduced) check(`${tag} with reduced motion the rows jump instead of sliding`, moving === 0, `${moving} animations`);
+    else check(`${tag} rows slide to their new place when reordered`, moving >= 2, `${moving} animations`);
+    if (!reduced) {
+      await page.keyboard.press('Delete');
+      const sliding = await page.evaluate(() => document.getAnimations().filter((a) => a.effect?.target?.matches?.('[data-queue-row]')).length);
+      check(`${tag} rows slide up when one is removed`, sliding >= 1, `${sliding} animations`);
+    }
+    await ctx.close();
+  }
+}
+
 async function failedStream(browser) {
   const tag = '[failed stream]';
   const ctx = await browser.newContext({ viewport: { width: 1280, height: 800 } });
@@ -404,7 +567,7 @@ async function failedStream(browser) {
   currentPage = page;
   await page.route('https://aac.saavncdn.com/q2_*', (r) => r.fulfill({ status: 404, body: 'gone' })); // this one song cannot be played
   await page.goto(`${BASE}/`);
-  await page.waitForSelector('text=Queue Song 1');
+  await page.waitForSelector('section[aria-label="Trending now"] button[aria-label="More actions for Queue Song 1"]');
   await songMenu(page, 'Queue Song 1', 'Start radio from this song');
   await songMenu(page, 'Queue Song 2', 'Play next');
   await page.waitForFunction(() => window.__tamiltunes_audio && window.__tamiltunes_audio.currentTime > 0.5, null, { timeout: 8000 });
@@ -426,7 +589,7 @@ async function phone(browser, width, height) {
   currentPage = page;
   if (process.env.QUEUE_AUDIT_THROTTLE) { const t = await ctx.newCDPSession(page); await t.send('Emulation.setCPUThrottlingRate', { rate: Number(process.env.QUEUE_AUDIT_THROTTLE) }); } // simulate a slower computer
   await page.goto(`${BASE}/`);
-  await page.waitForSelector('text=Queue Song 1');
+  await page.waitForSelector('section[aria-label="Trending now"] button[aria-label="More actions for Queue Song 1"]');
   await songMenu(page, 'Queue Song 1', 'Start radio from this song').catch(async () => { await page.locator(`button[aria-label="More actions for Queue Song 1"]`).last().tap(); await page.getByRole('menuitem', { name: 'Start radio from this song', exact: true }).tap(); });
   await page.waitForSelector('[aria-label="Show queue"]');
   await page.locator('[aria-label="Show queue"]').tap();
@@ -441,7 +604,7 @@ async function phone(browser, width, height) {
   check(`${tag} rows have a visible drag handle and at least 44 px touch targets for the main actions`, await (async () => {
     const h = await page.locator('[data-testid=queue-row]').first().locator('button[aria-label^="Reorder"]').boundingBox();
     const row = await page.locator('[data-testid=queue-row]').first().boundingBox();
-    return h && h.width >= 24 && row.height >= 56;
+    return h && h.width >= 40 && h.height >= 40 && row.height >= 56;
   })());
 
   const before = await titles(page);
@@ -501,9 +664,11 @@ try {
   if (!only || only === 'restore') await persistence(browser);
   if (!only || only === 'long') await longList(browser);
   if (!only || only === 'stream') await failedStream(browser);
+  if (!only || only === 'feel') { await feel(browser); await stableScroll(browser); await motion(browser); }
   if (!only || only === 'phone') { await phone(browser, 360, 640); await phone(browser, 390, 844); }
 } catch (err) {
   console.error('Queue audit crashed:', String(err.message).split('\n').slice(0, 12).join('\n'));
+  if (OUT && currentPage) await currentPage.screenshot({ path: path.join(OUT, 'crash.png') }).catch(() => {});
   results.push({ name: 'audit run', ok: false, detail: String(err) });
 } finally {
   await browser?.close();

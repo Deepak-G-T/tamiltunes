@@ -1,7 +1,7 @@
 import React, { memo, useRef, useState } from 'react';
 import { useSortable } from '@dnd-kit/sortable';
 import { CSS } from '@dnd-kit/utilities';
-import { GripVertical, MoreHorizontal, X, Check } from 'lucide-react';
+import { GripVertical, MoreHorizontal, X, Check, Trash2 } from 'lucide-react';
 import SafeImage from '../../common/SafeImage';
 import { formatClock, ROW_HEIGHT } from '../../../lib/queueView';
 
@@ -13,7 +13,9 @@ const SWIPE_REMOVE_PX = 90;
  */
 const QueueItem = ({ entry, index, tabStop, selectMode, selected, onPlay, onRemove, onToggleSelect, onOpenMenu, onFocusRow }) => {
   const { song, uid, origin } = entry;
-  const { attributes, listeners, setNodeRef, setActivatorNodeRef, transform, transition, isDragging } = useSortable({ id: uid, disabled: selectMode });
+  const { attributes, listeners, setNodeRef, setActivatorNodeRef, transform, transition, isDragging, isSorting, index: slot, overIndex, activeIndex } = useSortable({ id: uid, disabled: selectMode });
+  const dropHere = isSorting && !isDragging && overIndex === slot && activeIndex !== slot; // where the dragged song will land
+  const lineAtBottom = activeIndex < slot;
   const [dx, setDx] = useState(0);
   const start = useRef(null);
 
@@ -43,12 +45,17 @@ const QueueItem = ({ entry, index, tabStop, selectMode, selected, onPlay, onRemo
       onFocus={() => onFocusRow(uid)}
       aria-label={`${song.title}, ${song.artist || song.singers || 'unknown artist'}, position ${index + 1}`}
       style={{ transform: CSS.Transform.toString(transform), transition, height: ROW_HEIGHT, zIndex: isDragging ? 5 : undefined, listStyle: 'none' }}
-      className={`relative rounded-lg focus-visible:outline focus-visible:outline-2 focus-visible:outline-brand-400 ${isDragging ? 'opacity-90 shadow-2xl bg-surface-4' : ''}`}
+      className={`relative rounded-lg focus-visible:outline focus-visible:outline-2 focus-visible:outline-brand-400 ${isDragging ? 'scale-[1.02] shadow-2xl bg-surface-4 ring-1 ring-brand-500/60 opacity-95' : ''}`}
     >
+      {dropHere && <span aria-hidden="true" data-testid="drop-line" className={`absolute left-2 right-2 h-0.5 rounded-full bg-brand-400 z-10 ${lineAtBottom ? '-bottom-px' : '-top-px'}`} />}
+      {/* what a left swipe reveals: it grows as the row slides away */}
+      <div aria-hidden="true" className="absolute inset-0 rounded-lg bg-rose-500/20 flex items-center justify-end gap-1.5 pr-4 text-rose-300 text-xs font-bold" style={{ opacity: dx < 0 ? Math.min(1, -dx / SWIPE_REMOVE_PX) : 0 }}>
+        <Trash2 className="w-4 h-4" /> Remove
+      </div>
       <div
         onPointerDown={down} onPointerMove={move} onPointerUp={up} onPointerCancel={up} onPointerLeave={up}
         style={{ transform: dx ? `translateX(${dx}px)` : undefined, touchAction: 'pan-y', transition: dx ? 'none' : 'transform 0.18s' }}
-        className={`group flex items-center gap-2 h-full px-1.5 rounded-lg hover:bg-white/5 ${selected ? 'bg-brand-500/15 ring-1 ring-brand-500/60' : ''} ${dx <= -SWIPE_REMOVE_PX ? 'bg-rose-500/20' : ''}`}
+        className={`group relative flex items-center gap-1 h-full px-0.5 rounded-lg bg-surface-2 hover:bg-surface-3 ${selected ? 'bg-brand-500/15 ring-1 ring-brand-500/60' : ''} ${dx <= -SWIPE_REMOVE_PX ? 'bg-rose-500/20' : ''}`}
       >
         {selectMode ? (
           <button type="button" role="checkbox" aria-checked={selected} aria-label={`Select ${song.title}`} tabIndex={tab} onClick={() => onToggleSelect(uid)}
@@ -59,8 +66,8 @@ const QueueItem = ({ entry, index, tabStop, selectMode, selected, onPlay, onRemo
           <button type="button" ref={setActivatorNodeRef} {...attributes} {...listeners} tabIndex={tab}
             aria-label={`Reorder ${song.title}. Press space to pick up, arrow keys to move, space to drop.`}
             style={{ touchAction: 'none' }}
-            className={`${btn} p-1.5 cursor-grab active:cursor-grabbing flex-shrink-0`}>
-            <GripVertical className="w-4 h-4" aria-hidden="true" />
+            className={`${btn} w-10 h-10 inline-flex items-center justify-center cursor-grab active:cursor-grabbing flex-shrink-0`}>
+            <GripVertical className="w-5 h-5" aria-hidden="true" />
           </button>
         )}
 

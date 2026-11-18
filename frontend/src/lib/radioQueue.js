@@ -16,7 +16,8 @@
  */
 
 export const REFILL_THRESHOLD = 3; // refill when fewer than this many songs remain
-export const REFILL_BATCH = 20; // songs requested per refill
+export const REFILL_BATCH = 10; // songs requested per refill (the panel then says "Added 10 similar songs")
+export const MAX_ARTIST_RUN = 3; // never more than this many songs in a row by the same artist
 export const MAX_HISTORY = 50; // songs kept in the History tab
 export const MAX_QUEUE = 500; // songs allowed in the upcoming list
 export const MAX_PLAYED = 500;
@@ -435,15 +436,55 @@ export function needsRefill(state, { threshold = REFILL_THRESHOLD, now = Date.no
   );
 }
 
-/** Mark a refill as in flight and describe the request: seed = what is playing, exclude = everything already played. */
-export function startRefill(state, { limit = REFILL_BATCH } = {}) {
+/** The artist a song counts as for "not too many in a row": the first name in its artist field, lower-cased. */
+export const artistKey = (song) => String(song?.artist || song?.singers || '').split(/[,&]/)[0].normalize('NFC').trim().toLowerCase();
+
+/**
+ * Order `fresh` songs so that no more than `maxRun` in a row share an artist, counting the songs already queued before them
+ * (`tail`: what plays right before the new songs). Keeps the incoming order as much as possible; if only one artist is left it
+ * simply carries on (it never drops songs).
+ */
+export function spreadByArtist(tail, fresh, maxRun = MAX_ARTIST_RUN) {
+  const pool = [...fresh];
+  const keys = pool.map(artistKey);
+  const out = [];
+  let run = 0;
+  let last = null;
+  for (const s of tail.slice(-maxRun)) { const k = artistKey(s); run = k === last ? run + 1 : 1; last = k; }
+  const allowed = (k) => !(last && k === last && run >= maxRun);
+  while (pool.length) {
+    let i = keys.findIndex(allowed); // the incoming order, unless an artist would run too long
+    if (i < 0) i = 0; // only one artist is left: carry on, nothing is dropped
+    // Look ahead: when one artist has more songs than the other artists can separate, use it now instead of leaving it for the end
+    const counts = new Map();
+    for (const k of keys) counts.set(k, (counts.get(k) || 0) + 1);
+    const [bigKey, bigCount] = [...counts.entries()].sort((x, y) => y[1] - x[1])[0];
+    if (keys[i] !== bigKey && bigCount > maxRun * (pool.length - bigCount)) {
+      const j = keys.findIndex((k) => k === bigKey && allowed(k));
+      if (j >= 0) i = j;
+    }
+    const [song] = pool.splice(i, 1);
+    const [k] = keys.splice(i, 1);
+    run = k === last ? run + 1 : 1;
+    last = k;
+    out.push(song);
+  }
+  return out;
+}
+
+/**
+ * Mark a refill as in flight and describe the request: seed = what is playing, exclude = everything already played.
+ * `avoid`: more ids to keep out, such as songs just shown on the home page (they come after the recent plays when the list is capped).
+ */
+export function startRefill(state, { limit = REFILL_BATCH, avoid = [] } = {}) {
   const exclude = unique([
     state.current?.id,
     ...state.upcoming.map((e) => e.song.id),
     ...[...state.played].reverse(), // newest first, so the cap keeps the most recent plays
+    ...avoid,
   ].filter(Boolean)).slice(0, MAX_EXCLUDE);
   return {
-    state: { ...state, refill: { ...state.refill, pending: true } },
+    state: { ...state, refill: { ...state.refill, pending: true, avoid: avoid.slice(0, MAX_EXCLUDE) } },
     request: { seedId: state.current?.id ?? null, exclude, limit },
   };
 }
@@ -453,16 +494,17 @@ export function startRefill(state, { limit = REFILL_BATCH } = {}) {
  * A batch with nothing new counts as a failure so we back off instead of asking again immediately.
  */
 export function applyRefill(state, items, { now = Date.now() } = {}) {
-  const known = new Set([state.current?.id, ...state.played, ...state.upcoming.map((e) => e.song.id)].filter(Boolean));
+  const known = new Set([state.current?.id, ...state.played, ...state.upcoming.map((e) => e.song.id), ...(state.refill.avoid || [])].filter(Boolean));
   const fresh = [];
   for (const song of items || []) {
     if (song?.id && !known.has(song.id)) {
       known.add(song.id);
-      fresh.push(entry(song, 'radio'));
+      fresh.push(song);
     }
   }
   if (!fresh.length) return refillFailed(state, { now });
-  return { ...state, upcoming: [...state.upcoming, ...fresh], refill: { pending: false, failures: 0, retryAt: 0 }, ended: false };
+  const spread = spreadByArtist([state.current, ...state.upcoming.map((e) => e.song)].filter(Boolean), fresh);
+  return { ...state, upcoming: [...state.upcoming, ...spread.map((song) => entry(song, 'radio'))], refill: { pending: false, failures: 0, retryAt: 0 }, ended: false };
 }
 
 export const REFILL_BACKOFF_MS = (failures) => Math.min(30000, 1000 * 2 ** Math.max(0, failures - 1));
@@ -479,11 +521,11 @@ export function refillFailed(state, { now = Date.now() } = {}) {
  *   fetchRelated: (req: { seedId: string, exclude: string[], limit: number }) => Promise<Song[]>, now?: () => number }} io
  * @returns {Promise<boolean>} true when songs were added
  */
-export async function runRefill({ get, update, fetchRelated, now = Date.now }) {
+export async function runRefill({ get, update, fetchRelated, now = Date.now, avoid = () => [], onAdded }) {
   if (!needsRefill(get(), { now: now() })) return false;
   let request;
   update((s) => {
-    const started = startRefill(s);
+    const started = startRefill(s, { avoid: avoid() });
     request = started.request;
     return started.state;
   });
@@ -495,6 +537,7 @@ export async function runRefill({ get, update, fetchRelated, now = Date.now }) {
       added = next.upcoming.length - s.upcoming.length;
       return added ? next : applyFallback(next); // the radio had nothing new: play on through the fallback songs
     });
+    if (added > 0) onAdded?.(added);
     return added > 0;
   } catch {
     update((s) => applyFallback(refillFailed(s, { now: now() })));

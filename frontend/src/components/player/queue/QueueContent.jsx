@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useRef, useState, useCallback } from 'react';
+import React, { useEffect, useMemo, useRef, useState, useCallback, Profiler } from 'react';
 import { useNavigate } from 'react-router-dom';
 import {
   DndContext, PointerSensor, KeyboardSensor, useSensor, useSensors, closestCenter,
@@ -13,7 +13,9 @@ import SafeImage from '../../common/SafeImage';
 import Equalizer from '../../common/Equalizer';
 import QueueItem from './QueueItem';
 import QueueMenu from './QueueMenu';
-import { useAudio } from '../../../context/AudioContext';
+import { useFlip } from '../../../hooks/useFlip';
+import { haptic } from '../../../lib/haptics';
+import { useAudio, useQueue } from '../../../context/AudioContext';
 import { useAuth } from '../../../context/AuthContext';
 import api from '../../../services/api';
 import { sleepLabel, SLEEP_OPTIONS } from '../../../lib/sleepTimer';
@@ -37,16 +39,22 @@ const ToolButton = ({ icon: Icon, children, short, onClick, disabled, pressed })
   </button>
 );
 
+/** The only part of the panel that follows the song clock: "12 min left". */
+const TimeLeft = ({ current, upcoming }) => {
+  const { currentTime } = useAudio();
+  return <>{formatRemaining(remainingTime({ current, currentTime, upcoming }))}</>;
+};
+
 /**
  * The play queue: Now playing, Next in queue (added by you, plays first), Next from [source], and a History tab.
  * Used as a right-side panel (desktop), a bottom sheet (phone) and a tab inside the full-screen player.
  */
 const QueueContent = ({ onClose, embedded = false }) => {
   const {
-    queueSections, autoplay, setAutoplay, currentSong, currentTime, isPlaying, offerRadio, continueWithRadio, startRadio,
+    queueSections, autoplay, setAutoplay, currentSong, isPlaying, offerRadio, continueWithRadio, startRadio,
     jumpToUid, removeUids, moveUidsToQueue, reorderByUid, clearQueue, refreshRecommendations, removeCurrentSong,
     playFromHistoryAt, saveQueueAsPlaylist, toggleStopAfter, sleepTimer, startSleepTimer, cancelSleepTimer, showToast,
-  } = useAudio();
+  } = useQueue(); // steady: does not re-render on every tick of the song clock
   const { isAuthenticated } = useAuth();
   const navigate = useNavigate();
 
@@ -105,8 +113,13 @@ const QueueContent = ({ onClose, embedded = false }) => {
     focusUid.current = null;
   }, [rows]);
 
+  // Rows slide to their new place instead of jumping; the scroll position stays put when rows above the viewport go away
+  useFlip(scrollRef, rows, {
+    enabled: !virtual && !dragging && tab === 'queue',
+    onRemovedAbove: (px) => { if (scrollRef.current) scrollRef.current.scrollTop = Math.max(0, scrollRef.current.scrollTop - px); },
+  });
+
   const upcomingSongs = useMemo(() => songRows.map((r) => r.entry.song), [songRows]);
-  const remaining = remainingTime({ current: currentSong, currentTime, upcoming: upcomingSongs });
   const userCount = queueSections.nextInQueueEntries.length;
 
   // ---- last played song (for the empty state's "Start radio")
@@ -138,7 +151,7 @@ const QueueContent = ({ onClose, embedded = false }) => {
   };
   const onDragEnd = ({ active, over }) => {
     setDragging(false);
-    if (over && active.id !== over.id) reorderByUid(active.id, over.id);
+    if (over && active.id !== over.id) { haptic(12); reorderByUid(active.id, over.id); }
   };
 
   // ---- actions
@@ -209,7 +222,7 @@ const QueueContent = ({ onClose, embedded = false }) => {
   const history = queueSections.history;
   const empty = !currentSong;
 
-  return (
+  const body = (
     <div className="flex flex-col h-full min-h-0" data-testid="queue-content">
       {/* Header */}
       <div className="flex-shrink-0 px-4 pt-2 sm:pt-4 pb-2 space-y-2 sm:space-y-3">
@@ -234,7 +247,7 @@ const QueueContent = ({ onClose, embedded = false }) => {
             </div>
             <div className="flex items-center justify-between gap-3 text-xs text-zinc-400">
               <span data-testid="queue-remaining" aria-live="off">
-                {currentSong ? formatRemaining(remaining) : 'Nothing queued'}
+                {currentSong ? <TimeLeft current={currentSong} upcoming={upcomingSongs} /> : 'Nothing queued'}
                 {sleepTimer && <span className="ml-2 text-accent-300">· Sleep: {sleepLabel(sleepTimer)}</span>}
                 {queueSections.stopAfter && sleepTimer?.id !== 'song' && <span className="ml-2 text-accent-300">· Stops after this song</span>}
               </span>
@@ -300,7 +313,7 @@ const QueueContent = ({ onClose, embedded = false }) => {
               <div ref={scrollRef} onScroll={(e) => setScrollTop(e.currentTarget.scrollTop)} onKeyDown={onListKeyDown}
                 className="flex-1 min-h-0 overflow-y-auto overscroll-contain px-3 pb-4" data-testid="queue-list">
                 <DndContext sensors={sensors} collisionDetection={closestCenter} modifiers={[restrictToVerticalAxis, restrictToFirstScrollableAncestor]}
-                  accessibility={accessibility} onDragStart={() => setDragging(true)} onDragCancel={() => setDragging(false)} onDragEnd={onDragEnd}>
+                  accessibility={accessibility} onDragStart={() => { setDragging(true); haptic(8); }} onDragCancel={() => setDragging(false)} onDragEnd={onDragEnd}>
                   <SortableContext items={visibleIds} strategy={verticalListSortingStrategy}>
                     <ul role="list" aria-label="Upcoming songs" style={virtual ? { paddingTop: win.padTop, paddingBottom: win.padBottom } : undefined}>
                       {visible.map((r) => {
@@ -377,6 +390,11 @@ const QueueContent = ({ onClose, embedded = false }) => {
       <SaveQueueDialog open={saveOpen} onClose={() => setSaveOpen(false)} onSave={saveQueueAsPlaylist} count={(currentSong ? 1 : 0) + total} />
     </div>
   );
+  // Only for the audit: counts how often the panel is redrawn (window.__queueRenders), to prove it does not redraw on every tick of the song clock
+  if (typeof window !== 'undefined' && window.__QUEUE_PROFILE__) {
+    return <Profiler id="queue" onRender={() => { window.__queueRenders = (window.__queueRenders || 0) + 1; }}>{body}</Profiler>;
+  }
+  return body;
 };
 
 const SaveQueueDialog = ({ open, onClose, onSave, count }) => {

@@ -54,3 +54,25 @@ history, shortcuts, restore, 260-song list, phone layouts at 360x640 and 390x844
 ## UNTESTED
 Touch drag and swipe on a real phone, a second real device for "Continue on this device?", a signed-in account in the browser tests
 (the API is tested with real Postgres, the screens only as a guest), and Neon itself (a local scratch Postgres 16 was used).
+
+## Queue feel (Part H, part 2)
+- **Instant, with Undo.** Add to queue, Play next, remove, reorder, move several, and moving a queued song all change the panel at once
+  (no network wait) and show a short message with Undo ("Added to queue.", "Playing next.", `Moved "Song".`). Undo only works while nothing
+  else has changed the list (it never undoes something else). Jumping to a song shows no message: the playing song visibly changes.
+- **Motion.** Rows slide to their new place (200 ms, ease-out, `hooks/useFlip.js`), new rows fade in, a dragged row lifts (scale, shadow,
+  ring) and a green line shows where it will land. With `prefers-reduced-motion` the rows simply jump. Very long lists (over 100) skip the slide.
+- **Clear structure.** The playing song is pinned and green with an equalizer; "Next in queue" is separate from "Next from <source>";
+  auto-added songs say Autoplay; the desktop player bar shows "Next up: <song>" under the title.
+- **Stable.** Opening the panel scrolls to the top (the playing song is pinned above the list). When the song changes, or rows above the
+  visible part go away, the scroll position is adjusted so the list does not jump. The panel has its own context (`useQueue`) with stable
+  action functions, so it is not redrawn on every tick of the song clock; only the "time left" text follows the clock.
+- **Touch.** Rows are 60 px high with a 40 px drag handle; a left swipe reveals a red "Remove" layer that grows with the swipe; short
+  haptic taps on supported phones (add, remove, drag start/drop, jump).
+- **Smarter autoplay** (`lib/radioQueue.js`): each refill asks for 10 songs and says "Added 10 similar songs."; never more than 3 songs in a
+  row by one artist (`spreadByArtist`, counting what is already queued); keeps the last 50 (in fact 500) played songs and the songs
+  currently shown on the home page (`lib/shownOnHome.js`) out of the suggestions.
+- **Measured** (`npm run test:queue --prefix frontend`, headless Linux): the panel opens with its rows in about 25 ms; "Add to queue" shows the
+  song within 100 ms; 3 seconds of playing redraw the panel at most once.
+
+Not done: a first-use swipe tip (the red reveal while swiping is the hint), exit animations (rows leaving fade out of the list at once, the rest
+slide up), Undo for "jump to a song".

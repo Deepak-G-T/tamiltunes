@@ -3,7 +3,7 @@ import {
   createQueueState, playFromSearch, playFromContext, switchToRadio, advance, previous, jumpTo, addToQueue, playNext,
   removeFromUpcoming, reorderUpcoming, clearUserQueue, setShuffle, setRepeat, nextRepeat, setAutoplay, needsRefill,
   startRefill, applyRefill, refillFailed, runRefill, getSections, peekNext, toSnapshot, fromSnapshot, shuffled,
-  applyFallback, toFlatQueue, removeFromHistory, indexOfUid, findQueued, moveToQueue, isQueueFull, MAX_QUEUE, removeByUids, restoreRemoved, moveManyToQueue, clearRadio, removeCurrent, setStopAfter, playFromHistory,
+  applyFallback, toFlatQueue, removeFromHistory, indexOfUid, findQueued, moveToQueue, isQueueFull, MAX_QUEUE, removeByUids, restoreRemoved, moveManyToQueue, clearRadio, removeCurrent, setStopAfter, playFromHistory, spreadByArtist, artistKey, MAX_ARTIST_RUN, REFILL_BATCH,
   REFILL_THRESHOLD, MAX_EXCLUDE, REFILL_BACKOFF_MS,
 } from './radioQueue';
 
@@ -180,7 +180,7 @@ describe('radio refill', () => {
     const { request } = startRefill(s);
     expect(request.seedId).toBe('c');
     expect(request.exclude).toEqual(expect.arrayContaining(['a', 'b', 'c']));
-    expect(request.limit).toBe(20);
+    expect(request.limit).toBe(REFILL_BATCH);
   });
 
   it('caps the exclude list at what the endpoint accepts, keeping the most recent plays', () => {
@@ -622,5 +622,56 @@ describe('history replay (queue v2)', () => {
     for (let i = 1; i <= 55; i++) s = playFromSearch(s, S(`s${i}`));
     const r = playFromHistory(s, 10);
     expect(r.state.history.length).toBeLessThanOrEqual(50);
+  });
+});
+
+describe('smarter autoplay (queue feel)', () => {
+  const by = (id, artist) => ({ id, title: `T ${id}`, artist });
+  const runOf = (list) => { let best = 0; let run = 0; let last = null; for (const s of list) { const k = artistKey(s); run = k === last ? run + 1 : 1; last = k; best = Math.max(best, run); } return best; };
+
+  it('never puts more than 3 songs by one artist in a row', () => {
+    const fresh = [...Array.from({ length: 6 }, (_, i) => by(`a${i}`, 'Anirudh')), ...Array.from({ length: 4 }, (_, i) => by(`b${i}`, 'Rahman'))];
+    const out = spreadByArtist([], fresh);
+    expect(out).toHaveLength(10);
+    expect(runOf(out)).toBeLessThanOrEqual(MAX_ARTIST_RUN);
+    expect(new Set(out.map((s) => s.id)).size).toBe(10);
+  });
+  it('counts the songs already queued before the new ones', () => {
+    const tail = [by('x1', 'Anirudh'), by('x2', 'Anirudh'), by('x3', 'Anirudh')];
+    const out = spreadByArtist(tail, [by('a1', 'Anirudh'), by('b1', 'Rahman'), by('a2', 'Anirudh')]);
+    expect(out[0].artist).toBe('Rahman');
+    expect(runOf([...tail, ...out])).toBeLessThanOrEqual(MAX_ARTIST_RUN);
+  });
+  it('keeps the incoming order when there is no problem, and never drops songs when only one artist is left', () => {
+    const ok = [by('1', 'A'), by('2', 'B'), by('3', 'A')];
+    expect(spreadByArtist([], ok).map((s) => s.id)).toEqual(['1', '2', '3']);
+    const one = Array.from({ length: 6 }, (_, i) => by(`s${i}`, 'Same'));
+    expect(spreadByArtist([], one)).toHaveLength(6);
+  });
+  it('treats "Anirudh, Vishal" and "anirudh" as the same artist', () => {
+    expect(artistKey(by('1', 'Anirudh Ravichander, Vishal'))).toBe(artistKey(by('2', 'anirudh ravichander')));
+  });
+  it('a refill spreads artists out and says how many songs it added', async () => {
+    let s = playFromSearch(createQueueState(), by('cur', 'Anirudh'));
+    const batch = [...Array.from({ length: 5 }, (_, i) => by(`a${i}`, 'Anirudh')), ...Array.from({ length: 5 }, (_, i) => by(`b${i}`, 'Rahman'))];
+    let added = 0;
+    await runRefill({ get: () => s, update: (fn) => { s = fn(s); }, fetchRelated: async () => batch, onAdded: (n) => { added = n; } });
+    expect(added).toBe(10);
+    expect(runOf([s.current, ...s.upcoming.map((e) => e.song)])).toBeLessThanOrEqual(MAX_ARTIST_RUN);
+  });
+  it('asks for 10 songs, and keeps songs shown on the home page out (after the recent plays)', () => {
+    expect(REFILL_BATCH).toBe(10);
+    const s = playFromSearch(createQueueState(), by('cur', 'A'));
+    const { request, state } = startRefill(s, { avoid: ['home1', 'home2'] });
+    expect(request.limit).toBe(10);
+    expect(request.exclude).toEqual(['cur', 'home1', 'home2']);
+    const next = applyRefill(state, [by('home1', 'A'), by('fresh', 'B')]);
+    expect(next.upcoming.map((e) => e.song.id)).toEqual(['fresh']); // even if the server sent a home song, it is not added
+  });
+  it('the last 50 played are kept out too', () => {
+    let s = playFromSearch(createQueueState(), by('p0', 'A'));
+    for (let i = 1; i <= 60; i++) s = playFromSearch(s, by(`p${i}`, 'A'));
+    const { request } = startRefill(s);
+    for (let i = 11; i <= 60; i++) expect(request.exclude).toContain(`p${i}`);
   });
 });

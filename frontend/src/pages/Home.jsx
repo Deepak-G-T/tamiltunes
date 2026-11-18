@@ -11,6 +11,7 @@ import { useAuth } from '../context/AuthContext';
 import { useSpeedDial } from '../hooks/useSpeedDial';
 import { useStartRadio } from '../hooks/useStartRadio';
 import { useHomeFeed } from '../hooks/useHomeFeed';
+import { setShownOnHome } from '../lib/shownOnHome';
 import { ErrorState } from '../components/common/StateViews';
 import api from '../services/api';
 
@@ -150,6 +151,11 @@ const Home = () => {
   // Radio mixes start a radio from your three most-played songs (a different row from "Made for you")
   const mixSeeds = speedDial.items.filter((i) => i.source === 'played' && i.hot).slice(0, 3);
   const feedLoading = feed.status === 'loading';
+  // The radio keeps what this page shows out of its suggestions
+  useEffect(() => {
+    const ids = [feed.hero?.id, ...speedDial.items.map((i) => i.id), ...feed.sections.flatMap((sec) => (sec.kind === 'songs' ? sec.items.map((x) => x.id) : []))];
+    setShownOnHome(ids);
+  }, [feed.hero, feed.sections, speedDial.items]);
 
   const renderSection = (section) => {
     if (section.kind === 'artists') {
