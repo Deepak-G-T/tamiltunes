@@ -5,7 +5,7 @@ import { createPortal } from 'react-dom';
  * A small menu next to the button that opened it. Closes on Escape, outside click and scroll.
  * items: [{ label, icon, onSelect, danger?, checked?, disabled? }]
  */
-const QueueMenu = ({ anchor, items, onClose, label = 'Options' }) => {
+const QueueMenu = ({ anchor, items, onClose, label = 'Options', heading = null }) => {
   const ref = useRef(null);
   const [pos, setPos] = useState(null);
 
@@ -13,7 +13,7 @@ const QueueMenu = ({ anchor, items, onClose, label = 'Options' }) => {
     if (!anchor) return;
     const r = anchor.getBoundingClientRect();
     const w = 220;
-    const h = items.length * 44 + 8;
+    const h = items.length * 44 + 8 + (heading ? 72 : 0);
     const left = Math.min(Math.max(8, r.right - w), window.innerWidth - w - 8);
     const top = r.bottom + h > window.innerHeight - 8 ? Math.max(8, r.top - h) : r.bottom + 4;
     setPos({ left, top });
@@ -43,6 +43,12 @@ const QueueMenu = ({ anchor, items, onClose, label = 'Options' }) => {
   return createPortal(
     <div ref={ref} role="menu" aria-label={label} style={{ position: 'fixed', left: pos.left, top: pos.top, width: 220, zIndex: 100002 }}
       className="bg-surface-2 border border-white/10 rounded-xl shadow-2xl py-1">
+      {heading && (
+        <div className="px-3 py-2 mb-1 border-b border-white/10" data-testid="menu-heading">
+          <p dir="auto" className="text-sm font-semibold text-white break-words">{heading.title}</p>
+          {heading.subtitle && <p dir="auto" className="text-xs text-zinc-400 break-words">{heading.subtitle}</p>}
+        </div>
+      )}
       {items.map((it) => {
         const Icon = it.icon;
         return (

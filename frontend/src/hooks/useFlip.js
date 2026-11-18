@@ -1,3 +1,4 @@
+import { ROW_HEIGHT } from '../lib/queueView';
 import { useLayoutEffect, useRef } from 'react';
 
 /**
@@ -24,7 +25,7 @@ export function useFlip(scrollRef, signature, { enabled = true, onRemovedAbove }
     let removedAbove = 0;
     if (enabled) {
       for (const [uid, top] of previous.current) {
-        if (!now.has(uid) && top + 60 <= root.scrollTop) removedAbove += 60;
+        if (!now.has(uid) && top + ROW_HEIGHT <= root.scrollTop) removedAbove += ROW_HEIGHT;
       }
     }
     if (removedAbove && onRemovedAbove) onRemovedAbove(removedAbove);

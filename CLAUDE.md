@@ -123,3 +123,11 @@ Songs may carry an optional `videoId`. It comes from the curated map `backend/sr
 ## No repeats in autoplay (fix/queue-duplicates)
 - Song identity (fingerprint, variant key) in `frontend/src/lib/songIdentity.js` and a copy in `backend/src/services/related/identity.js`: keep the two in sync (both have tests with the same examples).
   Rules and limits in `docs/RADIO.md`. `npm run report:duplicate-songs --prefix backend` is report-only.
+
+## Duplicates v2 (fix/queue-duplicates-v2)
+- Fuzzy `isSameSong` + canonical groups (spelling variants, compilation copies): rules and where they are used are in `docs/RADIO.md` (last section). Migration
+  `20261124000000_songs_canonical_id` (additive; take the Neon backup BEFORE merging, as always). Report first: `npm run report:duplicate-songs --prefix backend`, then
+  `npm run backfill:canonical-ids --prefix backend` (dry run by default, `-- --apply` writes; nothing is ever deleted).
+- `songIdentity.js` and `backend/src/services/related/identity.js` are copies: change both. No Tamil script in source files (the English-only test): the transliteration table uses `\u` escapes.
+- Queue rows are 72px high (two-line title, one-line artists with the full list in the tooltip and at the top of the "..." menu); `useFlip` uses `ROW_HEIGHT`.
+- UNTESTED: the fuzzy rules against the live JioSaavn catalogue (tuned on the three reported pairs and fixtures; review the cluster report before trusting `--apply`), real-phone feel of the new rows.
