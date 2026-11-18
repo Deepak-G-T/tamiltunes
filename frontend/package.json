@@ -13,7 +13,8 @@
     "test:queue": "vite build && node scripts/queue-audit.mjs",
     "test:search": "vite build && node scripts/search-audit.mjs",
     "test:auth": "vite build && node scripts/auth-audit.mjs",
-    "test:home": "vite build && node scripts/home-audit.mjs"
+    "test:home": "vite build && node scripts/home-audit.mjs",
+    "test:pwa": "vite build && node scripts/pwa-audit.mjs"
   },
   "dependencies": {
     "@dnd-kit/core": "^6.3.1",
@@ -39,6 +40,14 @@
     "postcss": "^8.5.33",
     "tailwindcss": "^4.3.5",
     "vite": "^8.3.6",
-    "vitest": "^5.1.0"
+    "vite-plugin-pwa": "^2.0.0",
+    "vitest": "^5.1.0",
+    "workbox-build": "^7.4.1",
+    "workbox-cacheable-response": "^7.4.1",
+    "workbox-expiration": "^7.4.1",
+    "workbox-precaching": "^7.4.1",
+    "workbox-routing": "^7.4.1",
+    "workbox-strategies": "^7.4.1",
+    "workbox-window": "^7.4.1"
   }
 }

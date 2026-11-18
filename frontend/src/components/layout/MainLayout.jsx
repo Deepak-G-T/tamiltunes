@@ -4,6 +4,7 @@ import { RefreshCw } from 'lucide-react';
 import Sidebar from './Sidebar';
 import TopNav from './TopNav';
 import MobileNav from './MobileNav';
+import PwaBar from '../common/PwaBar';
 import MusicPlayer from '../player/MusicPlayer';
 import MiniPlayer from '../player/MiniPlayer';
 import CreatePlaylistModal from '../modals/CreatePlaylistModal';
@@ -57,6 +58,8 @@ const MainLayout = () => {
         <div aria-hidden="true" className="pointer-events-none absolute inset-x-0 top-0 h-80 cover-wash" />
         {/* Top Navbar */}
         <TopNav onToggleMobileSidebar={() => setMobileSidebarOpen(true)} />
+
+        <PwaBar />
 
         {/* Cold Start Indicator for Render Free Tier */}
         {isServerWaking && (
