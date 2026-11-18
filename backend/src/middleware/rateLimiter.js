@@ -105,3 +105,10 @@ export const playlistBulkLimiter = perUser({
   max: 6,
   message: 'Too many playlists created, please slow down.',
 });
+
+// The home page is assembled from cached data, but still: a modest per-address ceiling
+export const homeLimiter = perUser({
+  windowMs: 60 * 1000,
+  max: 40,
+  message: 'Too many requests, please slow down.',
+});
