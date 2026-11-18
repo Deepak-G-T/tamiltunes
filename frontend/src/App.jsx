@@ -30,6 +30,17 @@ const ResetPassword = lazy(() => import('./pages/ResetPassword'));
 const Profile = lazy(() => import('./pages/Profile'));
 const UserProfile = lazy(() => import('./pages/UserProfile'));
 
+// Lazy-loaded Admin Section (non-admins never download this code)
+const AdminRoute = lazy(() => import('./components/auth/AdminRoute'));
+const AdminLayout = lazy(() => import('./pages/admin/AdminLayout'));
+const AdminDashboard = lazy(() => import('./pages/admin/AdminDashboard'));
+const AdminUsers = lazy(() => import('./pages/admin/AdminUsers'));
+const AdminSongs = lazy(() => import('./pages/admin/AdminSongs'));
+const AdminHomeContent = lazy(() => import('./pages/admin/AdminHomeContent'));
+const AdminModeration = lazy(() => import('./pages/admin/AdminModeration'));
+const AdminSettings = lazy(() => import('./pages/admin/AdminSettings'));
+const Admin2FA = lazy(() => import('./pages/admin/Admin2FA'));
+
 function App() {
   return (
     <BrowserRouter>
@@ -44,6 +55,25 @@ function App() {
                 <Route path="/signup" element={<Signup />} />
                 <Route path="/forgot-password" element={<ForgotPassword />} />
                 <Route path="/reset-password" element={<ResetPassword />} />
+
+                {/* Lazy Protected Admin Management Section */}
+                <Route
+                  path="/admin"
+                  element={
+                    <AdminRoute>
+                      <AdminLayout />
+                    </AdminRoute>
+                  }
+                >
+                  <Route index element={<AdminDashboard />} />
+                  <Route path="users" element={<AdminUsers />} />
+                  <Route path="songs" element={<AdminSongs />} />
+                  <Route path="home-content" element={<AdminHomeContent />} />
+                  <Route path="moderation" element={<AdminModeration />} />
+                  <Route path="playlists" element={<AdminModeration />} />
+                  <Route path="settings" element={<AdminSettings />} />
+                  <Route path="security" element={<Admin2FA />} />
+                </Route>
 
                 {/* Main Application Routes (Protected by Login-First Gate) */}
                 <Route
