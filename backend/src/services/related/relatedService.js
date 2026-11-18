@@ -3,6 +3,7 @@ import { LIMITS, VARIETY } from './weights.js';
 import { composerOf, languageOf, normMovie, primaryArtist, singersOf } from './text.js';
 import { rankCandidates, whyLabel } from './scoring.js';
 import { diversify } from './diversify.js';
+import { createIdentitySet, sameVariant, titleCore, variantCore } from './identity.js';
 
 const SHELF_KEYS = ['trending', 'latest', 'gana', 'nineties', 'twoThousands', 'melodies', 'love', 'sad', 'folk', 'instrumental'];
 
@@ -71,16 +72,30 @@ export function createRelatedService({ manager, signals, cache = new LruCacheSer
       if (twin) shelves.set(seed.id, shelves.get(twin.id));
     }
 
-    // Merge, de-duplicate (by id, then by title+artist), drop the seed
+    // Merge and collapse duplicates: the same song under another id or singer order, and versions of a song (unplugged, remix ...),
+    // are one candidate; the best copy is kept. The seed and its versions are never offered.
     const byId = new Map();
-    const dupKey = new Set([`${(seed.title || '').toLowerCase()}|${primaryArtist(seed)}`]);
+    const groups = new Map(); // variant title -> accepted songs with that title
+    const seedSet = createIdentitySet([seed]);
     const sources = { recommendations: 0, sameFilm: 0, sameSinger: 0, sameComposer: 0, coListening: 0, shelves: 0 };
+    const completeness = (s) => [s.image, s.album, s.year, s.streamUrl].filter(Boolean).length;
+    const isOriginal = (s) => titleCore(s) === variantCore(s);
+    const better = (a, b) => // is a a better copy than b?
+      (Number(a.playCount) || 0) !== (Number(b.playCount) || 0) ? (Number(a.playCount) || 0) > (Number(b.playCount) || 0)
+        : isOriginal(a) !== isOriginal(b) ? isOriginal(a)
+        : completeness(a) > completeness(b);
     const take = (list, label) => {
       for (const s of list || []) {
         if (!s?.id || !s.title || s.id === seed.id || byId.has(s.id)) continue;
-        const key = `${s.title.toLowerCase()}|${primaryArtist(s)}`;
-        if (dupKey.has(key)) continue;
-        dupKey.add(key);
+        if (seedSet.hasVariant(s)) continue;
+        const bucket = groups.get(variantCore(s)) || [];
+        const twin = bucket.find((o) => sameVariant(o, s));
+        if (twin) {
+          if (better(s, twin)) { byId.delete(twin.id); byId.set(s.id, s); bucket[bucket.indexOf(twin)] = s; } // keep the best copy
+          continue;
+        }
+        bucket.push(s);
+        groups.set(variantCore(s), bucket);
         byId.set(s.id, s);
         sources[label]++;
       }
@@ -119,8 +134,10 @@ export function createRelatedService({ manager, signals, cache = new LruCacheSer
     }
 
     const excluded = new Set([seedId, ...exclude]);
+    // Excluded songs also keep out their look-alikes and versions (another id, another singer order, "Unplugged" ...)
+    const blocked = createIdentitySet([pool.seed, ...pool.candidates.filter((s) => excluded.has(s.id))]);
     const ctx = { ...pool, liked: user?.liked, recent: user?.recent, skipped: user?.skipped };
-    const ranked = rankCandidates(pool.seed, pool.candidates.filter((s) => !excluded.has(s.id)), ctx)
+    const ranked = rankCandidates(pool.seed, pool.candidates.filter((s) => !excluded.has(s.id) && !blocked.hasVariant(s)), ctx)
       .filter((r) => r.score >= 0); // penalised or wrong-language songs never enter a radio batch
 
     const picked = diversify(ranked, { limit: n, maxRun: VARIETY.maxRun, discoveryRatio: VARIETY.discoveryRatio });
