@@ -53,6 +53,13 @@ export const commentLimiter = perUser({
   message: 'You are commenting too fast. Please wait a minute and try again.',
 });
 
+// A failed video embed is reported once per song; 20 an hour per account is plenty and stops anyone flagging the catalogue
+export const videoReportLimiter = perUser({
+  windowMs: 60 * 60 * 1000,
+  max: 20,
+  message: 'Too many video reports, please try again later.',
+});
+
 export const reportLimiter = perUser({
   windowMs: 60 * 1000,
   max: 10,

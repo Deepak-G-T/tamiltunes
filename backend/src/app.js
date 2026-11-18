@@ -1,3 +1,4 @@
+import { songVideoRoutes, adminVideoRoutes } from './routes/songVideoRoutes.js';
 import express from 'express';
 import cors from 'cors';
 import helmet from 'helmet';
@@ -96,7 +97,6 @@ app.get('/api/health', healthHandler);
 
 // Public Auth Routes & Health
 app.use('/api/auth', authRoutes);
-
 // Protected resource routes gated by loginGate (enforces 401 when REQUIRE_LOGIN=true)
 app.use('/api/music', loginGate, musicRoutes);
 app.use('/api/playlists', loginGate, playlistRoutes);
@@ -108,6 +108,8 @@ app.use('/api/me', loginGate, meRoutes);
 app.use('/api/home', loginGate, homeRoutes);
 app.use('/api/profile', loginGate, profileRoutes);
 app.use('/api/users', loginGate, userRoutes);
+app.use('/api', loginGate, songVideoRoutes);
+app.use('/api/admin/videos', adminVideoRoutes);
 app.use('/api/admin', adminRoutes);
 
 // 404 Handler

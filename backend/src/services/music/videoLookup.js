@@ -1,3 +1,4 @@
+import { songVideos } from '../songVideos/service.js';
 import { LruCacheService } from '../cacheService.js';
 import { config as defaultConfig } from '../../config/env.js';
 import { CURATED_VIDEOS } from './curatedVideos.js';
@@ -82,7 +83,9 @@ export const createVideoLookup = ({
   cache = new LruCacheService(2000, DAY_SECONDS),
   now = () => Date.now(),
   curated = CURATED_VIDEOS,
-  maxQueue = 20
+  maxQueue = 20,
+  // Admin choices and flags from the database (services/songVideos): { videoId } wins, { hidden: true } means no video. Synchronous.
+  getOverride = () => null
 } = {}) => {
   const inflight = new Map();
   const queue = [];
@@ -213,6 +216,9 @@ export const createVideoLookup = ({
   /** Synchronous: curated map, cache and the loaded channel index. Never touches the network. */
   const peek = (song) => {
     if (!song || !song.title) return undefined;
+    const o = getOverride(song);
+    if (o?.hidden) return null;
+    if (o?.videoId) return o.videoId;
     const c = curatedMatch(song);
     if (c) return c.videoId;
     const hit = cache.get(`video_${songKey(song)}`);
@@ -252,6 +258,9 @@ export const createVideoLookup = ({
   /** Async lookup with cache; the only code path that may call the API. */
   const lookup = async (song) => {
     if (!song || !song.title) return null;
+    const o = getOverride(song);
+    if (o?.hidden) return null;
+    if (o?.videoId) return o.videoId;
     const c = curatedMatch(song);
     if (c) return c.videoId;
 
@@ -321,21 +330,57 @@ export const createVideoLookup = ({
    */
   const attach = (songs) =>
     (songs || []).map((s) => {
-      if (!s || s.videoId) return s;
+      if (!s) return s;
+      if (s.videoId) {
+        // A song that already carries a video keeps it, unless that video was flagged (a YouTube-only song has nothing else to play)
+        if (s.source !== 'youtube' && getOverride(s)?.hidden) { const { videoId: _dropped, ...rest } = s; return rest; }
+        return s;
+      }
       const id = peek(s);
       if (id) return { ...s, videoId: id };
       if (id === undefined) enqueue(s);
       return s;
     });
 
+  /**
+   * Admin "check embeddable": the public oEmbed endpoint (no key: 200 = embeddable, 401/403 = embedding off, 404 = removed or private),
+   * then, only when the Data API is configured and the daily budget allows (1 unit), videos.list for status and region limits.
+   * Backend only: the key never leaves the server.
+   */
+  const checkVideo = async (videoId) => {
+    if (!VIDEO_ID_RE.test(String(videoId || ''))) return { videoId, embeddable: false, reason: 'invalid-id' };
+    const out = { videoId, embeddable: null, reason: null, title: null, channel: null, source: 'oembed', regionRestriction: null };
+    try {
+      const watch = `https://www.youtube.com/watch?v=${videoId}`;
+      const r = await fetchImpl(`https://www.youtube.com/oembed?url=${encodeURIComponent(watch)}&format=json`, { signal: AbortSignal.timeout(5000) });
+      if (r.status === 200) { const j = await r.json(); Object.assign(out, { embeddable: true, title: j.title ?? null, channel: j.author_name ?? null }); }
+      else if (r.status === 401 || r.status === 403) Object.assign(out, { embeddable: false, reason: 'embedding-disabled' });
+      else if (r.status === 404) Object.assign(out, { embeddable: false, reason: 'not-found-or-private' });
+      else out.reason = `oembed-http-${r.status}`;
+    } catch { out.reason = 'network'; }
+    if (apiEnabled() && spend(VIDEOS_COST)) {
+      try {
+        const v = (await apiCall('videos', { part: 'status,snippet,contentDetails', id: videoId })).items?.[0];
+        if (!v) Object.assign(out, { embeddable: false, reason: 'not-found-or-private', source: 'data-api' });
+        else {
+          const publicOk = !v.status?.privacyStatus || v.status.privacyStatus === 'public';
+          Object.assign(out, { source: 'data-api', embeddable: v.status?.embeddable === true && publicOk, reason: v.status?.embeddable !== true ? 'embedding-disabled' : publicOk ? null : 'not-public', title: v.snippet?.title ?? out.title, channel: v.snippet?.channelTitle ?? out.channel, regionRestriction: v.contentDetails?.regionRestriction ?? null });
+        }
+      } catch { /* keep the oEmbed answer */ }
+    }
+    return out;
+  };
+
   /** Awaited variant for the single-song route. */
   const attachOne = async (song) => {
-    if (!song || song.videoId) return song;
+    if (!song) return song;
+    if (song.videoId) return attach([song])[0];
     const id = await lookup(song);
     return id ? { ...song, videoId: id } : song;
   };
 
-  return { peek, lookup, attach, attachOne, stats, _budget: budget, _cache: cache, apiEnabled };
+  return { peek, lookup, attach, attachOne, checkVideo, stats, _budget: budget, _cache: cache, apiEnabled };
 };
 
-export const videoLookup = createVideoLookup();
+// Admin-chosen and flagged videos (database) come first: see services/songVideos/service.js
+export const videoLookup = createVideoLookup({ getOverride: (song) => songVideos.override(song) });
