@@ -245,6 +245,7 @@ model PlayEvent {
   @@index([userId, playedAt(sort: Desc)])
   @@index([songId, playedAt(sort: Desc)])
   @@index([userId, songId, playedAt])
+  @@index([playedAt]) // home page: most played songs across everyone in the last days
   @@map("play_events")
 }
 
