@@ -6,6 +6,7 @@ import Equalizer from '../components/common/Equalizer';
 import { useAudio } from '../context/AudioContext';
 import { useAuth } from '../context/AuthContext';
 import api from '../services/api';
+import SongMoreButton from '../components/common/SongMoreButton';
 
 const formatDuration = (seconds) => {
   if (!seconds || isNaN(seconds)) return '3:30';
@@ -217,6 +218,7 @@ const Favorites = () => {
                   >
                     <Heart className="w-4 h-4 fill-rose-500 text-rose-500" />
                   </button>
+                  <SongMoreButton song={song} />
                   <span className="font-mono text-[11px] tabular-nums">
                     {formatDuration(song.duration)}
                   </span>

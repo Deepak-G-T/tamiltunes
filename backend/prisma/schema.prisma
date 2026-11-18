@@ -39,6 +39,7 @@ model User {
   reports          Report[]
   playEvents       PlayEvent[]
   speedDialOverrides SpeedDialOverride[]
+  queueState       QueueState?
   followers        Follow[]  @relation("Followed")
   following        Follow[]  @relation("Follower")
 
@@ -262,4 +263,23 @@ model SpeedDialOverride {
   @@unique([userId, songId])
   @@index([userId])
   @@map("speed_dial_overrides")
+}
+
+// The play queue of a signed-in user (one row each). Only song ids are stored; metadata is re-fetched on restore.
+model QueueState {
+  userId       String   @id @map("user_id")
+  items        Json     // [{ id, o }]: history (last 50), the current song, then upcoming; o = u (added by user) | r (radio) | c (list)
+  currentIndex Int      @default(-1) @map("current_index")
+  positionSec  Int      @default(0) @map("position_sec")
+  shuffle      Boolean  @default(false)
+  repeat       String   @default("off")
+  autoplay     Boolean  @default(true)
+  mode         String   @default("radio")
+  sourceLabel  String?  @map("source_label")
+  deviceId     String?  @map("device_id")
+  updatedAt    DateTime @default(now()) @updatedAt @map("updated_at")
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@map("queue_state")
 }

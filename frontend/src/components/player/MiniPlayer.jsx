@@ -1,5 +1,5 @@
 import React from 'react';
-import { Play, Pause, SkipForward, ChevronUp } from 'lucide-react';
+import { Play, Pause, SkipForward, ChevronUp, ListMusic } from 'lucide-react';
 import { useAudio } from '../../context/AudioContext';
 import VideoModeToggle from './VideoModeToggle';
 import Equalizer from '../common/Equalizer';
@@ -18,6 +18,7 @@ const MiniPlayer = () => {
     nextTrack,
     previousTrack,
     setIsFullScreen,
+    setIsQueueOpen,
     isBuffering
   } = useAudio();
 
@@ -107,6 +108,14 @@ const MiniPlayer = () => {
             ) : (
               <Play className="w-4 h-4 fill-black ml-0.5" />
             )}
+          </button>
+
+          <button
+            onClick={() => { haptic(8); setIsQueueOpen(true); }}
+            className="p-2 text-zinc-300 hover:text-white active:scale-90 transition-transform"
+            aria-label="Show queue"
+          >
+            <ListMusic className="w-4 h-4" />
           </button>
 
           <button

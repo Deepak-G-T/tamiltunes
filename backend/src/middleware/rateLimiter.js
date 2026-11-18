@@ -84,3 +84,24 @@ export const speedDialWriteLimiter = perUser({
   max: 60,
   message: 'Too many Speed Dial changes, please slow down.',
 });
+
+// Saving the queue: the app already waits about 2 s between saves; this is the server-side ceiling
+export const queueWriteLimiter = perUser({
+  windowMs: 60 * 1000,
+  max: 30,
+  message: 'Saving the queue too often, please slow down.',
+});
+
+// Turning ids into songs for guests (may ask the music provider): modest per-address ceiling
+export const resolveLimiter = perUser({
+  windowMs: 60 * 1000,
+  max: 12,
+  message: 'Too many requests, please slow down.',
+});
+
+// Saving a whole queue as a playlist
+export const playlistBulkLimiter = perUser({
+  windowMs: 60 * 1000,
+  max: 6,
+  message: 'Too many playlists created, please slow down.',
+});

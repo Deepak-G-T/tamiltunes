@@ -8,7 +8,7 @@ const FOCUSABLE = 'a[href],button:not([disabled]),textarea,input,select,[tabinde
  * Accessible modal: bottom sheet on phones, centered dialog on larger screens.
  * Traps focus, closes on Escape / backdrop, restores focus, respects safe areas.
  */
-const BottomSheet = ({ open, onClose, title, subtitle, children, footer, tall = false, testId }) => {
+const BottomSheet = ({ open, onClose, title, subtitle, children, footer, tall = false, testId, bare = false }) => {
   const ref = useRef(null);
   const dragY = useRef(null);
   const titleId = useId();
@@ -21,6 +21,7 @@ const BottomSheet = ({ open, onClose, title, subtitle, children, footer, tall = 
     first?.focus({ preventScroll: true });
 
     const onKey = (e) => {
+      if (e.target?.closest?.('[role=menu]')) return; // a menu inside the sheet handles its own keys
       if (e.key === 'Escape') {
         e.stopPropagation();
         onClose();
@@ -53,7 +54,8 @@ const BottomSheet = ({ open, onClose, title, subtitle, children, footer, tall = 
         role="dialog"
         data-testid={testId}
         aria-modal="true"
-        aria-labelledby={titleId}
+        aria-labelledby={bare ? undefined : titleId}
+        aria-label={bare ? title : undefined}
         className={`slide-up relative w-full sm:max-w-lg bg-surface-2 border border-white/10 rounded-t-2xl sm:rounded-2xl shadow-2xl flex flex-col ${
           tall ? 'h-[84dvh]' : 'max-h-[84dvh]'
         } sm:max-h-[85dvh]`}
@@ -69,6 +71,7 @@ const BottomSheet = ({ open, onClose, title, subtitle, children, footer, tall = 
         >
           <span className="block w-10 h-1 rounded-full bg-white/25" />
         </div>
+        {!bare && (
         <div className="flex items-center justify-between gap-3 px-4 pt-2 pb-2 flex-shrink-0">
           <div className="min-w-0">
             <h2 id={titleId} className="text-base font-bold text-white truncate">{title}</h2>
@@ -82,7 +85,12 @@ const BottomSheet = ({ open, onClose, title, subtitle, children, footer, tall = 
             <X className="w-5 h-5" />
           </button>
         </div>
-        <div className="flex-1 min-h-0 overflow-y-auto overscroll-contain px-4">{children}</div>
+        )}
+        {bare ? (
+          <div className="flex-1 min-h-0 flex flex-col">{children}</div>
+        ) : (
+          <div className="flex-1 min-h-0 overflow-y-auto overscroll-contain px-4">{children}</div>
+        )}
         {footer && <div className="flex-shrink-0 border-t border-white/10 px-4 pt-3 pb-[max(0.75rem,env(safe-area-inset-bottom))]">{footer}</div>}
         {!footer && <div className="h-[env(safe-area-inset-bottom)]" />}
       </div>

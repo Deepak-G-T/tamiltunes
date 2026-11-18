@@ -7,6 +7,7 @@ import { useAudio } from '../context/AudioContext';
 import useCoverColor from '../hooks/useCoverColor';
 import { useAuth } from '../context/AuthContext';
 import api from '../services/api';
+import SongMoreButton from '../components/common/SongMoreButton';
 
 const formatDuration = (seconds) => {
   if (!seconds || isNaN(seconds)) return '3:30';
@@ -196,6 +197,7 @@ const AlbumDetail = () => {
                 >
                   <PlusCircle className="w-4 h-4" />
                 </button>
+                <SongMoreButton song={song} onAddToPlaylist={onOpenAddToPlaylist} />
                 <span className="font-mono text-[11px] tabular-nums">
                   {formatDuration(song.duration)}
                 </span>

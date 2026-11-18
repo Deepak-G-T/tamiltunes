@@ -1,11 +1,12 @@
-// Runs BOTH UI audits and fails if either fails (so one failing suite cannot hide the other):
+// Runs the UI audits and fails if either fails (so one failing suite cannot hide the other):
 //   1. src/test/runPlaywrightAudit.mjs  (fix/youtube-feed: screenshots, mini-player clearance, real YouTube iframe test)
 //   2. scripts/ui-audit.mjs             (video toggle at 360x640 / 390x844; stubbed YouTube API)
 import { spawnSync } from 'node:child_process';
 
 const suites = [
   ['fix/youtube-feed audit', 'src/test/runPlaywrightAudit.mjs'],
-  ['video toggle audit', 'scripts/ui-audit.mjs']
+  ['video toggle audit', 'scripts/ui-audit.mjs'],
+  ['play queue audit', 'scripts/queue-audit.mjs']
 ];
 
 const failed = [];

@@ -11,13 +11,14 @@
  *   mode      'radio' (fills itself forever) | 'context' (follows a playlist / album order, then offers radio)
  *
  * @typedef {{ id: string, title?: string }} Song
- * @typedef {{ song: Song, origin: 'user' | 'radio' | 'context' }} Entry
+ * @typedef {{ uid: string, song: Song, origin: 'user' | 'radio' | 'context' }} Entry   (uid is unique per queue slot, so the same song can be queued twice)
  * @typedef {ReturnType<typeof createQueueState>} QueueState
  */
 
 export const REFILL_THRESHOLD = 3; // refill when fewer than this many songs remain
 export const REFILL_BATCH = 20; // songs requested per refill
-export const MAX_HISTORY = 200;
+export const MAX_HISTORY = 50; // songs kept in the History tab
+export const MAX_QUEUE = 500; // songs allowed in the upcoming list
 export const MAX_PLAYED = 500;
 export const MAX_EXCLUDE = 200; // the related-songs endpoint accepts at most this many excluded ids
 
@@ -38,6 +39,7 @@ export function createQueueState(overrides = {}) {
     repeat: 'off', // 'off' | 'all' | 'one'
     refill: { pending: false, failures: 0, retryAt: 0 },
     fallback: [], // songs to queue if the radio returns nothing (e.g. the other Speed Dial tiles)
+    stopAfter: false, // "Stop after this song": pause when the current song ends
     ended: false, // nothing left to play
     offerRadio: false, // a playlist / album finished: the UI may offer to continue with radio
     ...overrides,
@@ -45,7 +47,10 @@ export function createQueueState(overrides = {}) {
 }
 
 const sourceOrigin = (state) => (state.mode === 'context' ? 'context' : 'radio');
-const entry = (song, origin) => ({ song, origin });
+let uidSeq = 0;
+/** A fresh id for one queue slot. Unique per slot, not per song. */
+export const newUid = () => `qi_${Date.now().toString(36)}${(++uidSeq).toString(36)}${Math.random().toString(36).slice(2, 6)}`;
+const entry = (song, origin, uid) => ({ uid: uid || newUid(), song, origin });
 const withPlayed = (played, ...ids) => cap(unique([...played, ...ids.filter(Boolean)]), MAX_PLAYED);
 const pushHistory = (history, song) => (song ? cap([...history, song], MAX_HISTORY) : history);
 
@@ -220,9 +225,28 @@ export function jumpTo(state, index) {
 
 // ---------------------------------------------------------------- editing the queue
 
+export const isQueueFull = (state) => state.upcoming.length >= MAX_QUEUE;
+
+/** Index in the upcoming list of a song that is already queued (-1 when it is not). The playing song does not count. */
+export const findQueued = (state, songId) => state.upcoming.findIndex((e) => e.song.id === songId);
+
+/**
+ * Move a queued song (from anywhere in the upcoming list) into the user's queue block, as "Play next" ('next') or
+ * "Add to queue" ('end'). Used when the user adds a song that is already queued and chooses to move it.
+ */
+export function moveToQueue(state, index, where = 'end') {
+  if (index < 0 || index >= state.upcoming.length) return state;
+  const moved = state.upcoming[index];
+  const rest = state.upcoming.filter((_, i) => i !== index);
+  const userCount = index < state.userCount ? state.userCount - 1 : state.userCount;
+  const at = where === 'next' ? 0 : userCount;
+  const upcoming = [...rest.slice(0, at), entry(moved.song, 'user', moved.uid), ...rest.slice(at)];
+  return { ...state, upcoming, userCount: userCount + 1 };
+}
+
 /** "Add to queue": after the user's other queued songs, before the radio / playlist songs. */
 export function addToQueue(state, song) {
-  if (!song) return state;
+  if (!song || isQueueFull(state)) return state;
   const upcoming = [...state.upcoming];
   upcoming.splice(state.userCount, 0, entry(song, 'user'));
   return { ...state, upcoming, userCount: state.userCount + 1 };
@@ -230,7 +254,7 @@ export function addToQueue(state, song) {
 
 /** "Play next": at the very front of the queue. */
 export function playNext(state, song) {
-  if (!song) return state;
+  if (!song || isQueueFull(state)) return state;
   return { ...state, upcoming: [entry(song, 'user'), ...state.upcoming], userCount: state.userCount + 1 };
 }
 
@@ -259,8 +283,93 @@ export function reorderUpcoming(state, from, to) {
   else if (from >= userCount && to < userCount) userCount += 1; // dropped into it
 
   const origin = sourceOrigin(state);
-  return { ...state, userCount, upcoming: list.map((e, i) => entry(e.song, i < userCount ? 'user' : origin)) };
+  return { ...state, userCount, upcoming: list.map((e, i) => entry(e.song, i < userCount ? 'user' : origin, e.uid)) };
 }
+
+/**
+ * Remove several queued songs at once (by uid). Returns what was removed (with each song's old position) so the UI can offer Undo.
+ * @returns {{ state: QueueState, removed: { index: number, entry: Entry }[] }}
+ */
+export function removeByUids(state, uids) {
+  const drop = new Set(uids);
+  const removed = [];
+  const upcoming = [];
+  let userCount = state.userCount;
+  state.upcoming.forEach((e, index) => {
+    if (drop.has(e.uid)) {
+      removed.push({ index, entry: e });
+      if (index < state.userCount) userCount -= 1;
+    } else upcoming.push(e);
+  });
+  if (!removed.length) return { state, removed };
+  return { state: { ...state, upcoming, userCount }, removed };
+}
+
+/** Undo a removal: put the songs back where they were (the list must not have been reshuffled in between). */
+export function restoreRemoved(state, removed) {
+  if (!removed?.length) return state;
+  const upcoming = [...state.upcoming];
+  let userCount = state.userCount;
+  for (const { index, entry: e } of [...removed].sort((a, b) => a.index - b.index)) {
+    if (upcoming.length >= MAX_QUEUE || upcoming.some((x) => x.uid === e.uid)) continue;
+    const at = Math.min(index, upcoming.length);
+    upcoming.splice(at, 0, e);
+    if (e.origin === 'user' && at <= userCount) userCount += 1;
+    else if (e.origin !== 'user' && at < userCount) { // landed inside the user block, so it becomes a user song
+      upcoming[at] = { ...e, origin: 'user' };
+      userCount += 1;
+    }
+  }
+  return { ...state, upcoming, userCount };
+}
+
+/** Move several queued songs into the user's block, keeping their relative order: 'next' = front, 'end' = after the other added songs. */
+export function moveManyToQueue(state, uids, where = 'next') {
+  const set = new Set(uids);
+  const picked = state.upcoming.filter((e) => set.has(e.uid));
+  if (!picked.length) return state;
+  const rest = state.upcoming.filter((e) => !set.has(e.uid));
+  const restUser = state.upcoming.slice(0, state.userCount).filter((e) => !set.has(e.uid)).length;
+  const at = where === 'next' ? 0 : restUser;
+  const moved = picked.map((e) => entry(e.song, 'user', e.uid));
+  return { ...state, upcoming: [...rest.slice(0, at), ...moved, ...rest.slice(at)], userCount: restUser + moved.length };
+}
+
+/** "Refresh recommendations": drop the auto-added songs so the radio fetches a new set. Added songs stay. Not for playlists / albums. */
+export function clearRadio(state) {
+  if (state.mode !== 'radio') return state;
+  return { ...state, upcoming: userEntries(state), refill: { pending: false, failures: 0, retryAt: 0 }, ended: false };
+}
+
+/** Remove the playing song from the queue and play the next one. The removed song does not go to history. */
+export function removeCurrent(state, opts) {
+  const r = advance(state, { reason: 'skip', ...opts });
+  if (r.status !== 'playing') return r;
+  return { ...r, state: { ...r.state, history: r.state.history.slice(0, -1) } };
+}
+
+/**
+ * Tap a song in the History list: play it now. What was playing goes to history, the queue is left as it is, nothing is lost.
+ * `index` is into `state.history` (oldest first).
+ */
+export function playFromHistory(state, index) {
+  if (index < 0 || index >= state.history.length) return { state, song: null };
+  const song = state.history[index];
+  const rest = state.history.filter((_, i) => i !== index);
+  return {
+    state: {
+      ...state,
+      history: pushHistory(rest, state.current && state.current.id !== song.id ? state.current : null),
+      played: withPlayed(state.played, song.id),
+      current: song,
+      ended: false,
+      offerRadio: false,
+    },
+    song,
+  };
+}
+
+export const setStopAfter = (state, on) => ({ ...state, stopAfter: Boolean(on) });
 
 export function clearUserQueue(state) {
   return { ...state, upcoming: sourceEntries(state), userCount: 0 };
@@ -401,7 +510,9 @@ export function getSections(state) {
   return {
     nowPlaying: state.current,
     nextInQueue: userEntries(state).map((e) => e.song),
+    nextInQueueEntries: userEntries(state),
     nextFrom: {
+      entries: sourceEntries(state),
       kind: state.mode,
       label: state.mode === 'context' ? (state.context?.label ? `Next from ${state.context.label}` : 'Next in this list') : 'Next from radio',
       items: source,
@@ -427,4 +538,27 @@ export function toSnapshot(state) {
   };
 }
 
-export const fromSnapshot = (snap) => createQueueState({ ...snap, history: [] });
+/**
+ * Give every entry a unique uid. Snapshots saved before uids existed have none, and a hand-edited or corrupted snapshot
+ * may repeat one: both are repaired here, so the rest of the engine can rely on "uid is unique".
+ */
+export function normalizeEntries(upcoming, userCount = 0) {
+  const seen = new Set();
+  const list = (Array.isArray(upcoming) ? upcoming : [])
+    .filter((e) => e && e.song && e.song.id)
+    .slice(0, MAX_QUEUE)
+    .map((e) => {
+      const uid = typeof e.uid === 'string' && e.uid && !seen.has(e.uid) ? e.uid : newUid();
+      seen.add(uid);
+      return { uid, song: e.song, origin: ['user', 'radio', 'context'].includes(e.origin) ? e.origin : 'radio' };
+    });
+  return { upcoming: list, userCount: Math.max(0, Math.min(userCount, list.length)) };
+}
+
+export const fromSnapshot = (snap) => {
+  const { upcoming, userCount } = normalizeEntries(snap?.upcoming, snap?.userCount ?? 0);
+  return createQueueState({ ...snap, upcoming, userCount, history: [] });
+};
+
+/** Index of a queue slot by uid (-1 when it is not in the upcoming list). */
+export const indexOfUid = (state, uid) => state.upcoming.findIndex((e) => e.uid === uid);

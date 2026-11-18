@@ -7,6 +7,7 @@ import { groupByDay } from '../lib/groupByDay';
 import { useAudio } from '../context/AudioContext';
 import { useAuth } from '../context/AuthContext';
 import api from '../services/api';
+import SongMoreButton from '../components/common/SongMoreButton';
 
 const formatTimeAgo = (dateStr) => {
   if (!dateStr) return '';
@@ -189,8 +190,9 @@ const History = () => {
                   </div>
                 </div>
 
-                <div className="text-right text-[11px] text-zinc-500 font-medium ml-4">
-                  {formatTimeAgo(item.playedAt || item.createdAt)}
+                <div className="flex items-center gap-2 ml-4">
+                  <span className="text-right text-[11px] text-zinc-500 font-medium">{formatTimeAgo(item.playedAt || item.createdAt)}</span>
+                  <SongMoreButton song={song} />
                 </div>
               </div>
             );

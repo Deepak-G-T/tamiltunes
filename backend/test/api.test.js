@@ -1,6 +1,6 @@
 import { execSync } from 'child_process';
-import path from 'path';
 import { fileURLToPath } from 'url';
+import path from 'path';
 import app, { isOriginAllowed } from '../src/app.js';
 import { initDb } from '../src/prisma/client.js';
 import { musicService, isOfficialFilmRelease } from '../src/services/music/providerManager.js';
@@ -13,9 +13,9 @@ const runTests = async () => {
   if (process.env.TEST_DATABASE_URL) {
     console.log('--- TEST_DATABASE_URL detected: Running prisma migrate deploy and testing against real PostgreSQL ---');
     try {
-      // Resolve from this file, not the shell's cwd: `npm test --prefix backend` runs inside backend/
-      execSync('npx prisma migrate deploy', {
-        cwd: path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..'),
+      // absolute path: works from the repo root and from `npm test --prefix backend` alike
+      const schemaPath = path.join(path.dirname(fileURLToPath(import.meta.url)), '..', 'prisma', 'schema.prisma');
+      execSync(`npx prisma migrate deploy --schema="${schemaPath}"`, {
         env: { ...process.env, DATABASE_URL: process.env.TEST_DATABASE_URL },
         stdio: 'inherit'
       });

@@ -14,7 +14,8 @@ import {
   ListMusic,
   Heart,
   Disc,
-  MessageCircle
+  MessageCircle,
+  MoreHorizontal
 } from 'lucide-react';
 import { useAudio } from '../../context/AudioContext';
 import ProgressBar from './ProgressBar';
@@ -22,6 +23,8 @@ import VolumeSlider from './VolumeSlider';
 import VideoSlot from './VideoSlot';
 import VideoModeToggle from './VideoModeToggle';
 import CommentsPanel from '../comments/CommentsPanel';
+import QueueContent from './queue/QueueContent';
+import { useSongActions } from '../common/SongActionsSheet';
 import { useSwipe } from '../../lib/swipe';
 import { haptic } from '../../lib/haptics';
 import { getUpNext } from '../../lib/upNext';
@@ -48,13 +51,15 @@ const FullScreenPlayer = ({ isOpen, onClose: onCloseProp, onToggleFavorite, isFa
     toggleShuffle,
     repeatMode,
     toggleRepeat,
-    setIsQueueOpen,
     activeEngine,
     queue,
     queueIndex
   } = useAudio();
 
   const [commentsOpen, setCommentsOpen] = useState(false);
+  const [view, setView] = useState('player'); // 'player' | 'queue' (the Queue tab inside Now Playing)
+  const songActions = useSongActions();
+  useEffect(() => { if (!isOpen) setView('player'); }, [isOpen]);
   // Every way of closing the player also closes the comments sheet
   const onClose = () => { setCommentsOpen(false); onCloseProp(); };
 
@@ -150,17 +155,33 @@ const FullScreenPlayer = ({ isOpen, onClose: onCloseProp, onToggleFavorite, isFa
           </p>
         </div>
 
-        <button
-          onClick={() => {
-            setIsQueueOpen(true);
-            onClose();
-          }}
-          aria-label="Open queue"
-          className="p-2.5 rounded-full bg-zinc-900/80 hover:bg-zinc-800 text-zinc-300 hover:text-white transition-all active:scale-90"
-        >
-          <ListMusic className="w-6 h-6" />
-        </button>
+        <div className="flex items-center gap-2">
+          <button
+            onClick={() => songActions.open(currentSong, { onAddToPlaylist })}
+            aria-label="More actions for this song"
+            aria-haspopup="menu"
+            className="p-2.5 rounded-full bg-zinc-900/80 hover:bg-zinc-800 text-zinc-300 hover:text-white transition-all active:scale-90"
+          >
+            <MoreHorizontal className="w-6 h-6" />
+          </button>
+          <button
+            onClick={() => setView((v) => (v === 'queue' ? 'player' : 'queue'))}
+            aria-label={view === 'queue' ? 'Show now playing' : 'Open queue'}
+            aria-pressed={view === 'queue'}
+            className={`p-2.5 rounded-full transition-all active:scale-90 ${view === 'queue' ? 'bg-brand-500 text-black' : 'bg-zinc-900/80 hover:bg-zinc-800 text-zinc-300 hover:text-white'}`}
+          >
+            <ListMusic className="w-6 h-6" />
+          </button>
+        </div>
       </div>
+
+      {view === 'queue' && (
+        <div data-testid="fs-queue" className="fixed inset-x-0 bottom-0 top-[4.75rem] z-20 bg-black/80 backdrop-blur-md">
+          <div className="h-full max-w-2xl mx-auto">
+            <QueueContent embedded />
+          </div>
+        </div>
+      )}
 
       {/* Center Artwork & Metadata */}
       <div className="relative z-10 flex flex-col items-center justify-center my-auto max-w-sm sm:max-w-md mx-auto w-full py-4">

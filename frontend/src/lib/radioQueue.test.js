@@ -3,7 +3,7 @@ import {
   createQueueState, playFromSearch, playFromContext, switchToRadio, advance, previous, jumpTo, addToQueue, playNext,
   removeFromUpcoming, reorderUpcoming, clearUserQueue, setShuffle, setRepeat, nextRepeat, setAutoplay, needsRefill,
   startRefill, applyRefill, refillFailed, runRefill, getSections, peekNext, toSnapshot, fromSnapshot, shuffled,
-  applyFallback, toFlatQueue, removeFromHistory,
+  applyFallback, toFlatQueue, removeFromHistory, indexOfUid, findQueued, moveToQueue, isQueueFull, MAX_QUEUE, removeByUids, restoreRemoved, moveManyToQueue, clearRadio, removeCurrent, setStopAfter, playFromHistory,
   REFILL_THRESHOLD, MAX_EXCLUDE, REFILL_BACKOFF_MS,
 } from './radioQueue';
 
@@ -405,5 +405,222 @@ describe('fallback, flat view and history', () => {
     const s = advance(advance(radio('a', 'b', 'c')).state).state; // history a b, playing c
     expect(removeFromHistory(s, 0).history.map((x) => x.id)).toEqual(['b']);
     expect(removeFromHistory(s, 5)).toBe(s);
+  });
+});
+
+describe('queue item ids (queue v2)', () => {
+  it('gives every slot a unique id, so the same song can be queued twice', () => {
+    let s = radio('a', 'r1');
+    s = addToQueue(addToQueue(s, S('x')), S('x'));
+    const uids = s.upcoming.map((e) => e.uid);
+    expect(uids.every(Boolean)).toBe(true);
+    expect(new Set(uids).size).toBe(uids.length);
+    expect(ids(s.upcoming).filter((i) => i === 'x')).toHaveLength(2);
+  });
+
+  it('keeps a slot id when it is dragged to a new place', () => {
+    let s = radio('a', 'r1', 'r2', 'r3');
+    const uid = s.upcoming[2].uid;
+    s = reorderUpcoming(s, 2, 0);
+    expect(s.upcoming[0].uid).toBe(uid);
+  });
+
+  it('repairs old snapshots that have no ids, and repeated or invalid entries', () => {
+    const old = { current: S('c'), upcoming: [{ song: S('a'), origin: 'user' }, { song: S('b'), origin: 'radio' }], userCount: 1, mode: 'radio' };
+    const s = fromSnapshot(old);
+    expect(s.upcoming.every((e) => typeof e.uid === 'string' && e.uid)).toBe(true);
+    const dup = fromSnapshot({ current: S('c'), upcoming: [{ uid: 'same', song: S('a'), origin: 'user' }, { uid: 'same', song: S('b'), origin: 'radio' }, { song: null }, { uid: 'z', song: S('d'), origin: 'weird' }], userCount: 9 });
+    expect(new Set(dup.upcoming.map((e) => e.uid)).size).toBe(3);
+    expect(dup.upcoming[2].origin).toBe('radio');
+    expect(dup.userCount).toBe(3); // clamped to the list
+  });
+
+  it('keeps ids through a save and restore', () => {
+    const s = addToQueue(radio('a', 'r1'), S('x'));
+    const back = fromSnapshot(JSON.parse(JSON.stringify(toSnapshot(s))));
+    expect(back.upcoming.map((e) => e.uid)).toEqual(s.upcoming.map((e) => e.uid));
+  });
+
+  it('finds a slot by id and exposes entries to the panel', () => {
+    let s = addToQueue(radio('a', 'r1'), S('x'));
+    const u = s.upcoming[0].uid;
+    expect(indexOfUid(s, u)).toBe(0);
+    expect(indexOfUid(s, 'nope')).toBe(-1);
+    expect(getSections(s).nextInQueueEntries[0].uid).toBe(u);
+    expect(getSections(s).nextFrom.entries.length).toBe(1);
+  });
+
+  it('keeps only the last 50 songs of history', () => {
+    let s = playFromSearch(createQueueState(), S('s0'));
+    for (let i = 1; i <= 60; i++) s = playFromSearch(s, S(`s${i}`));
+    expect(s.history).toHaveLength(50);
+    expect(s.history[49].id).toBe('s59');
+  });
+});
+
+describe('duplicates and the 500 cap (queue v2)', () => {
+  it('finds a queued song, but not the one that is playing', () => {
+    const s = addToQueue(radio('a', 'r1', 'r2'), S('x'));
+    expect(findQueued(s, 'r2')).toBe(2);
+    expect(findQueued(s, 'x')).toBe(0);
+    expect(findQueued(s, 'a')).toBe(-1);
+    expect(findQueued(s, 'zzz')).toBe(-1);
+  });
+
+  it('"add again" really queues a second copy', () => {
+    let s = addToQueue(radio('a', 'r1'), S('x'));
+    s = addToQueue(s, S('x'));
+    expect(ids(s.upcoming)).toEqual(['x', 'x', 'r1']);
+    expect(s.userCount).toBe(2);
+  });
+
+  it('moving a radio song to Play next puts it first and marks it user-added', () => {
+    let s = radio('a', 'r1', 'r2', 'r3');
+    const uid = s.upcoming[2].uid;
+    s = moveToQueue(s, 2, 'next');
+    expect(ids(s.upcoming)).toEqual(['r3', 'r1', 'r2']);
+    expect(s.userCount).toBe(1);
+    expect(s.upcoming[0].origin).toBe('user');
+    expect(s.upcoming[0].uid).toBe(uid);
+  });
+
+  it('moving to the end of "Next in queue" lands after the other added songs, before the radio songs', () => {
+    let s = radio('a', 'r1', 'r2');
+    s = addToQueue(addToQueue(s, S('u1')), S('u2'));
+    s = moveToQueue(s, 3, 'end'); // r2
+    expect(ids(s.upcoming)).toEqual(['u1', 'u2', 'r2', 'r1']);
+    expect(s.userCount).toBe(3);
+    // moving a user song to the end keeps the count right
+    s = moveToQueue(s, 0, 'end');
+    expect(ids(s.upcoming)).toEqual(['u2', 'r2', 'u1', 'r1']);
+    expect(s.userCount).toBe(3);
+  });
+
+  it('ignores a bad index', () => {
+    const s = radio('a', 'r1');
+    expect(moveToQueue(s, 9, 'next')).toBe(s);
+  });
+
+  it('refuses to grow past 500 songs', () => {
+    let s = radio('a');
+    s = { ...s, upcoming: Array.from({ length: MAX_QUEUE }, (_, i) => ({ uid: `u${i}`, song: S(`q${i}`), origin: 'radio' })) };
+    expect(isQueueFull(s)).toBe(true);
+    expect(addToQueue(s, S('x'))).toBe(s);
+    expect(playNext(s, S('x'))).toBe(s);
+    expect(isQueueFull(removeFromUpcoming(s, 0))).toBe(false);
+  });
+});
+
+describe('removing, undo, moving many, refresh, remove current, stop after (queue v2)', () => {
+  const build = () => {
+    let s = radio('a', 'r1', 'r2', 'r3');
+    s = addToQueue(addToQueue(s, S('u1')), S('u2'));
+    return s; // upcoming: u1 u2 r1 r2 r3
+  };
+
+  it('removes several songs at once and keeps the user block count right', () => {
+    const s = build();
+    const pick = [s.upcoming[1].uid, s.upcoming[3].uid]; // u2, r2
+    const { state, removed } = removeByUids(s, pick);
+    expect(ids(state.upcoming)).toEqual(['u1', 'r1', 'r3']);
+    expect(state.userCount).toBe(1);
+    expect(removed.map((r) => r.index)).toEqual([1, 3]);
+  });
+
+  it('undo puts everything back in the same place', () => {
+    const s = build();
+    const pick = [s.upcoming[0].uid, s.upcoming[3].uid];
+    const { state, removed } = removeByUids(s, pick);
+    const back = restoreRemoved(state, removed);
+    expect(ids(back.upcoming)).toEqual(ids(s.upcoming));
+    expect(back.userCount).toBe(s.userCount);
+    expect(back.upcoming.map((e) => e.uid)).toEqual(s.upcoming.map((e) => e.uid));
+  });
+
+  it('undo does not duplicate songs when pressed twice, and does not bring back the queue past 500', () => {
+    const s = build();
+    const { state, removed } = removeByUids(s, [s.upcoming[0].uid]);
+    const once = restoreRemoved(state, removed);
+    expect(restoreRemoved(once, removed).upcoming).toHaveLength(once.upcoming.length);
+    const full = { ...state, upcoming: Array.from({ length: MAX_QUEUE }, (_, i) => ({ uid: `f${i}`, song: S(`f${i}`), origin: 'radio' })), userCount: 0 };
+    expect(restoreRemoved(full, removed).upcoming).toHaveLength(MAX_QUEUE);
+  });
+
+  it('removing nothing changes nothing', () => {
+    const s = build();
+    expect(removeByUids(s, ['nope']).state).toBe(s);
+    expect(restoreRemoved(s, [])).toBe(s);
+  });
+
+  it('moves several songs to play next, keeping their order', () => {
+    const s = build();
+    const m = moveManyToQueue(s, [s.upcoming[4].uid, s.upcoming[2].uid], 'next'); // r3 and r1
+    expect(ids(m.upcoming)).toEqual(['r1', 'r3', 'u1', 'u2', 'r2']);
+    expect(m.userCount).toBe(4);
+    expect(m.upcoming.slice(0, 4).every((e) => e.origin === 'user')).toBe(true);
+  });
+
+  it('moves several songs to the end of the added block, before the radio songs', () => {
+    const s = build();
+    const m = moveManyToQueue(s, [s.upcoming[0].uid, s.upcoming[4].uid], 'end'); // u1 and r3
+    expect(ids(m.upcoming)).toEqual(['u2', 'u1', 'r3', 'r1', 'r2']);
+    expect(m.userCount).toBe(3);
+  });
+
+  it('refresh recommendations drops only the auto-added songs and resets the refill backoff', () => {
+    let s = refillFailed(refillFailed(build()));
+    s = clearRadio(s);
+    expect(ids(s.upcoming)).toEqual(['u1', 'u2']);
+    expect(s.refill).toEqual({ pending: false, failures: 0, retryAt: 0 });
+    expect(needsRefill(s, { threshold: 3 })).toBe(true);
+    const list = playFromContext(createQueueState(), { songs: list3(), index: 0 });
+    expect(clearRadio(list)).toBe(list); // playlists are not radio
+  });
+
+  it('removing the playing song plays the next one and leaves it out of history', () => {
+    const s = build();
+    const r = removeCurrent(s);
+    expect(r.status).toBe('playing');
+    expect(r.state.current.id).toBe('u1');
+    expect(r.state.history.map((x) => x.id)).not.toContain('a');
+    expect(r.state.userCount).toBe(1);
+  });
+
+  it('removing the playing song with nothing queued asks for more (radio) instead of stopping', () => {
+    const s = radio('a');
+    expect(removeCurrent(s).status).toBe('waiting');
+  });
+
+  it('stop after this song is a flag that can be set and cleared', () => {
+    let s = setStopAfter(radio('a', 'r1'), true);
+    expect(s.stopAfter).toBe(true);
+    s = setStopAfter(s, false);
+    expect(s.stopAfter).toBe(false);
+    expect(createQueueState().stopAfter).toBe(false);
+  });
+});
+
+function list3() { return [S('p1'), S('p2'), S('p3')]; }
+
+describe('history replay (queue v2)', () => {
+  it('plays a history song now, keeps the queue, and puts the playing song into history', () => {
+    let s = radio('a', 'r1', 'r2');
+    s = advance(s).state; // r1 plays, a in history
+    s = advance(s).state; // r2 plays, a r1 in history
+    const r = playFromHistory(s, 0); // replay a
+    expect(r.song.id).toBe('a');
+    expect(r.state.current.id).toBe('a');
+    expect(r.state.history.map((x) => x.id)).toEqual(['r1', 'r2']);
+    expect(r.state.upcoming).toEqual(s.upcoming);
+  });
+  it('ignores a bad index', () => {
+    const s = radio('a', 'r1');
+    expect(playFromHistory(s, 5).song).toBeNull();
+  });
+  it('never keeps 51 songs in history', () => {
+    let s = playFromSearch(createQueueState(), S('s0'));
+    for (let i = 1; i <= 55; i++) s = playFromSearch(s, S(`s${i}`));
+    const r = playFromHistory(s, 10);
+    expect(r.state.history.length).toBeLessThanOrEqual(50);
   });
 });

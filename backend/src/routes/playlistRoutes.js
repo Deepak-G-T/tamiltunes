@@ -14,10 +14,14 @@ import {
 import { requireAuth, optionalAuth } from '../middleware/auth.js';
 import { validateBody } from '../middleware/validate.js';
 
+import { playlistBulkLimiter } from '../middleware/rateLimiter.js';
+import { fromQueueSchema, saveQueueAsPlaylist } from '../controllers/queueController.js';
+
 const router = Router();
 
 router.get('/', requireAuth, getPlaylists);
 router.post('/', requireAuth, validateBody(createPlaylistSchema), createPlaylist);
+router.post('/from-queue', requireAuth, playlistBulkLimiter, validateBody(fromQueueSchema), saveQueueAsPlaylist);
 router.get('/:id', optionalAuth, getPlaylistById);
 router.put('/:id', requireAuth, validateBody(updatePlaylistSchema), updatePlaylist);
 router.delete('/:id', requireAuth, deletePlaylist);

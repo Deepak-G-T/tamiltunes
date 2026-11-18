@@ -333,6 +333,16 @@ async function runGestures(browser, width, height) {
   await mini.click({ position: { x: 20, y: 10 } });
   await page.waitForSelector('[aria-label="Close now playing"]', { timeout: 3000 });
   await page.locator('[aria-label="Open queue"]').click();
+  await page.locator('[data-testid=fs-queue]').waitFor({ timeout: 3000 });
+  check(`[${tag}] Open queue shows a Queue tab inside Now Playing`, await page.locator('[data-testid=fs-queue] [role=tab]').count() === 2);
+  await page.locator('[aria-label="Show now playing"]').click();
+  await page.waitForTimeout(200);
+  check(`[${tag}] the queue tab can be closed again from inside Now Playing`, (await page.locator('[data-testid=fs-queue]').count()) === 0);
+  await page.locator('[aria-label="Close now playing"]').click();
+  await page.waitForTimeout(400);
+
+  // Queue as a bottom sheet on phones (opened from the mini player)
+  await page.locator('[aria-label="Show queue"]').click();
   const sheet = page.locator('[data-testid=queue-sheet]');
   await sheet.waitFor({ timeout: 3000 });
   await page.waitForTimeout(450); // slide-in animation
@@ -344,9 +354,7 @@ async function runGestures(browser, width, height) {
   await swipe(page, { x: handle.x, y: handle.y }, { x: handle.x, y: handle.y + 160 });
   await page.waitForTimeout(400);
   check(`[${tag}] swiping down on the queue handle closes it`, (await page.locator('[data-testid=queue-sheet]').count()) === 0);
-  await mini.click({ position: { x: 20, y: 10 } });
-  await page.waitForSelector('[aria-label="Close now playing"]', { timeout: 3000 });
-  await page.locator('[aria-label="Open queue"]').click();
+  await page.locator('[aria-label="Show queue"]').click();
   await page.locator('[data-testid=queue-sheet]').waitFor({ timeout: 3000 });
   await page.waitForTimeout(450);
   await page.touchscreen.tap(width / 2, 40); // the dimmed page above the sheet
