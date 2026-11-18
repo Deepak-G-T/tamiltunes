@@ -12,6 +12,14 @@ const Toast = ({ toast, onDismiss }) => {
       className="fixed top-4 left-1/2 -translate-x-1/2 w-[calc(100%-2rem)] max-w-sm flex items-start gap-2 rounded-xl bg-zinc-900/95 border border-amber-500/40 text-amber-200 text-sm px-4 py-3 shadow-2xl"
     >
       <span className="flex-1">{toast.message}</span>
+      {toast.action && (
+        <button
+          onClick={() => { toast.action.onClick(); onDismiss(); }}
+          className="px-2.5 py-1 rounded-full bg-brand-500 hover:bg-brand-400 text-black text-xs font-bold whitespace-nowrap"
+        >
+          {toast.action.label}
+        </button>
+      )}
       <button onClick={onDismiss} aria-label="Dismiss" className="text-zinc-400 hover:text-white">
         <X className="w-4 h-4" />
       </button>

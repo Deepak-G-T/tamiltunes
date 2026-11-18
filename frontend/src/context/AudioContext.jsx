@@ -1,17 +1,21 @@
-import React, { createContext, useContext, useState, useRef, useEffect, useCallback } from 'react';
+import React, { createContext, useContext, useState, useRef, useEffect, useCallback, useMemo } from 'react';
 import api from '../services/api';
 import YouTubePlayer from '../components/player/YouTubePlayer';
 import {
-  getNextTrackIndex,
-  getPreviousTrackAction,
-  reorderQueue,
-  calculateNewQueueIndexAfterRemoval
-} from '../utils/queueLogic';
+  createQueueState, playFromSearch, playFromContext, switchToRadio, advance, previous, jumpTo,
+  addToQueue as queueAdd, playNext as queuePlayNext, removeFromUpcoming, removeFromHistory, reorderUpcoming,
+  clearUserQueue, setShuffle as queueSetShuffle, setRepeat as queueSetRepeat, nextRepeat, setAutoplay as queueSetAutoplay,
+  needsRefill, runRefill, toFlatQueue, getSections
+} from '../lib/radioQueue';
+import { fetchRelated } from '../lib/radioApi';
 import Toast from '../components/common/Toast';
 import { getCoverColor, rgbVar } from '../lib/coverColor';
 import { engineFor, canToggleVideo, getVideoId, planSwitch, planEmbedError } from '../lib/playbackLogic';
 
 const AudioContext = createContext();
+const AUTOPLAY_KEY = 'tamiltunes_autoplay';
+const FADE_IN_SECONDS = 0.6; // soft start / end of each track (HTML5 engine only)
+const FADE_OUT_SECONDS = 1.2;
 
 export const AudioProvider = ({ children }) => {
   const audioRef = useRef(new Audio());
@@ -27,14 +31,29 @@ export const AudioProvider = ({ children }) => {
     return saved !== null ? parseFloat(saved) : 0.8;
   });
   const [isMuted, setIsMuted] = useState(false);
+  const volumeRef = useRef(volume);
+  const mutedRef = useRef(false);
   const [isBuffering, setIsBuffering] = useState(false);
   const [playbackError, setPlaybackError] = useState(null);
 
-  // Playback playlist / queue
-  const [queue, setQueue] = useState([]);
-  const [queueIndex, setQueueIndex] = useState(-1);
-  const [isShuffle, setIsShuffle] = useState(false);
-  const [repeatMode, setRepeatMode] = useState('off'); // 'off' | 'all' | 'one'
+  // Playback queue: the radio queue engine (lib/radioQueue.js) is the source of truth. `qsRef` always holds the latest
+  // state so several updates in one tick (and async refills) never act on a stale copy.
+  const [qs, setQs] = useState(() => {
+    let autoplay = true;
+    try { autoplay = localStorage.getItem(AUTOPLAY_KEY) !== 'off'; } catch { /* storage blocked */ }
+    return createQueueState({ autoplay });
+  });
+  const qsRef = useRef(qs);
+  const updateQs = useCallback((fn) => {
+    const next = fn(qsRef.current);
+    qsRef.current = next;
+    setQs(next);
+    return next;
+  }, []);
+  const { queue, queueIndex } = useMemo(() => toFlatQueue(qs), [qs]); // flat list for views that show the whole queue
+  const isShuffle = qs.shuffle;
+  const repeatMode = qs.repeat; // 'off' | 'all' | 'one'
+  const [refillTick, setRefillTick] = useState(0);
 
   // Race condition & adaptive streaming refs
   const playPromiseRef = useRef(null);
@@ -71,6 +90,11 @@ export const AudioProvider = ({ children }) => {
     isPlayingRef.current = isPlaying;
   }, [isPlaying]);
 
+  useEffect(() => {
+    volumeRef.current = volume;
+    mutedRef.current = isMuted;
+  }, [volume, isMuted]);
+
   // Page-wide colour wash follows the playing song's artwork (falls back to a stable seed colour)
   useEffect(() => {
     if (typeof document === 'undefined') return undefined;
@@ -88,7 +112,7 @@ export const AudioProvider = ({ children }) => {
     };
   }, [currentSong?.id, currentSong?.image]);
 
-  const showToast = useCallback((message) => setToast({ id: Date.now(), message }), []);
+  const showToast = useCallback((message, action = null) => setToast({ id: Date.now(), message, action }), []);
   useEffect(() => {
     if (!toast) return undefined;
     const t = setTimeout(() => setToast(null), 6000);
@@ -200,6 +224,7 @@ export const AudioProvider = ({ children }) => {
   const handleExpiredStream = async (song) => {
     if (!song || song._hasRetriedFreshFetch) {
       setPlaybackError('Stream unavailable or expired. Skipping to next track...');
+      showToast('That song could not be played. Skipping to the next one.');
       setTimeout(() => {
         nextTrack();
       }, 1500);
@@ -231,6 +256,7 @@ export const AudioProvider = ({ children }) => {
     }
 
     setPlaybackError('Stream expired. Skipping to next track...');
+    showToast('That song could not be played. Skipping to the next one.');
     setTimeout(() => {
       nextTrack();
     }, 1500);
@@ -244,6 +270,15 @@ export const AudioProvider = ({ children }) => {
 
     const onTimeUpdate = () => {
       if (!isYouTubeSong(currentSongRef.current)) {
+        // soft start and end of every track (ignored on iOS, where the volume is read-only)
+        const d = audio.duration;
+        const t = audio.currentTime;
+        if (!mutedRef.current && Number.isFinite(d) && d > FADE_IN_SECONDS + FADE_OUT_SECONDS) {
+          let f = 1;
+          if (t < FADE_IN_SECONDS) f = Math.min(f, 0.2 + 0.8 * (t / FADE_IN_SECONDS));
+          if (d - t < FADE_OUT_SECONDS) f = Math.min(f, Math.max(0, (d - t) / FADE_OUT_SECONDS));
+          audio.volume = Math.max(0, Math.min(1, volumeRef.current * f));
+        }
         setCurrentTime(audio.currentTime);
         checkRecordHistory(currentSongRef.current, audio.currentTime);
       }
@@ -335,17 +370,10 @@ export const AudioProvider = ({ children }) => {
   }, [isYouTubeSong, checkRecordHistory]);
 
   // Handle track end
-  const handleTrackEnd = () => {
-    if (repeatMode === 'one') {
-      seek(0);
-      resume();
-    } else {
-      nextTrack();
-    }
-  };
+  const handleTrackEnd = () => goNextRef.current('ended');
 
-  // Play a specific song and choose engine by source
-  const playSong = async (song, newQueue = null) => {
+  // Start a song on the right engine (audio element or YouTube). The queue is handled by the engine, not here.
+  const startPlayback = async (song) => {
     if (!song) return;
 
     // Increment request ID to invalidate in-flight play attempts
@@ -357,15 +385,6 @@ export const AudioProvider = ({ children }) => {
     setCurrentSong(song);
     currentSongRef.current = song;
     setCurrentTime(0);
-
-    if (newQueue && Array.isArray(newQueue) && newQueue.length > 0) {
-      setQueue(newQueue);
-      const index = newQueue.findIndex((item) => item.id === song.id);
-      setQueueIndex(index !== -1 ? index : 0);
-    } else if (!queue.some((item) => item.id === song.id)) {
-      setQueue((prev) => [...prev, song]);
-      setQueueIndex(queue.length);
-    }
 
     const isYT = isYouTubeSong(song);
 
@@ -624,91 +643,137 @@ export const AudioProvider = ({ children }) => {
     }
   };
 
-  const nextTrack = () => {
-    if (queue.length === 0) return;
+  // ---- queue controls (all state changes go through the engine) ----
 
-    const nextIndex = getNextTrackIndex(queueIndex, queue.length, {
-      isShuffle,
-      repeatMode
-    });
-
-    if (nextIndex === -1) {
-      pause();
-      return;
+  /** Play a song. With a list of 2+ songs it follows that list (playlist / album / shelf); otherwise it starts a radio. */
+  const playSong = async (song, newQueue = null, opts = {}) => {
+    if (!song) return;
+    if (Array.isArray(newQueue) && newQueue.length > 1) {
+      const index = Math.max(0, newQueue.findIndex((item) => item.id === song.id));
+      updateQs((q) => playFromContext(q, { songs: newQueue, index, type: opts.type || 'list', id: opts.id ?? null, label: opts.label || '' }));
+    } else {
+      updateQs((q) => playFromSearch(q, song, { fallback: opts.fallback || [] }));
     }
-
-    setQueueIndex(nextIndex);
-    playSong(queue[nextIndex]);
+    return startPlayback(song);
   };
 
-  const previousTrack = () => {
-    if (queue.length === 0) return;
+  /** Play a song and let the radio fill the queue after it. `fallback` songs are queued if the radio has nothing. */
+  const startRadio = (song, { fallback = [] } = {}) => playSong(song, null, { fallback });
 
-    const { action, index } = getPreviousTrackAction(queueIndex, queue.length, currentTime, {
-      restartThreshold: 3
-    });
-
-    if (action === 'restart') {
+  const goNext = async (reason = 'skip') => {
+    let r = advance(qsRef.current, { reason });
+    if (r.status === 'repeat-one') {
       seek(0);
       resume();
       return;
     }
-
-    if (index >= 0) {
-      setQueueIndex(index);
-      playSong(queue[index]);
+    if (r.status === 'waiting') {
+      // radio queue ran dry: fetch more, then try again
+      await runRefill({ get: () => qsRef.current, update: updateQs, fetchRelated });
+      r = advance(qsRef.current, { reason });
     }
-  };
-
-  const toggleShuffle = () => setIsShuffle((prev) => !prev);
-
-  const toggleRepeat = () => {
-    setRepeatMode((prev) => {
-      if (prev === 'off') return 'all';
-      if (prev === 'all') return 'one';
-      return 'off';
-    });
-  };
-
-  const addToQueue = (song) => {
-    if (!song) return;
-    setQueue((prev) => [...prev, song]);
-  };
-
-  const moveInQueue = (fromIndex, toIndex) => {
-    setQueue((prev) => {
-      const nextQ = reorderQueue(prev, fromIndex, toIndex);
-      return nextQ;
-    });
-    // Adjust queueIndex if the currently playing song moved
-    if (fromIndex === queueIndex) {
-      setQueueIndex(toIndex);
-    } else if (fromIndex < queueIndex && toIndex >= queueIndex) {
-      setQueueIndex((prev) => prev - 1);
-    } else if (fromIndex > queueIndex && toIndex <= queueIndex) {
-      setQueueIndex((prev) => prev + 1);
+    if (r.status === 'playing') {
+      updateQs(() => r.state);
+      return startPlayback(r.song);
     }
-  };
-
-  const removeFromQueue = (index) => {
-    const nextQ = queue.filter((_, idx) => idx !== index);
-    const newIdx = calculateNewQueueIndexAfterRemoval(index, queueIndex, nextQ.length);
-    setQueue(nextQ);
-    setQueueIndex(newIdx);
-
-    if (index === queueIndex) {
-      if (newIdx >= 0 && nextQ[newIdx]) {
-        playSong(nextQ[newIdx]);
-      } else {
-        pause();
+    if (r.status === 'ended') {
+      updateQs(() => r.state);
+      pause();
+      if (r.state.offerRadio) {
+        showToast('That list has finished.', { label: 'Keep playing similar songs', onClick: () => continueWithRadio() });
       }
+      return;
+    }
+    pause(); // still waiting: the radio could not be reached
+    showToast('No more songs to play right now. Check your connection and try again.');
+  };
+  const goNextRef = useRef(goNext);
+  goNextRef.current = goNext;
+
+  const nextTrack = () => goNext('skip');
+
+  const previousTrack = () => {
+    const r = previous(qsRef.current, { currentTime, restartThreshold: 3 });
+    if (r.status === 'restart') {
+      seek(0);
+      resume();
+      return;
+    }
+    if (r.status === 'playing') {
+      updateQs(() => r.state);
+      startPlayback(r.song);
     }
   };
 
-  const clearQueue = () => {
-    setQueue([]);
-    setQueueIndex(-1);
+  /** A playlist / album ended: carry on with radio seeded from the last song. */
+  const continueWithRadio = async () => {
+    updateQs(switchToRadio);
+    await goNextRef.current('skip');
   };
+
+  const toggleShuffle = () => updateQs((q) => queueSetShuffle(q, !q.shuffle));
+  const toggleRepeat = () => updateQs((q) => queueSetRepeat(q, nextRepeat(q.repeat)));
+  const setAutoplay = (on) => {
+    try { localStorage.setItem(AUTOPLAY_KEY, on ? 'on' : 'off'); } catch { /* storage blocked */ }
+    updateQs((q) => queueSetAutoplay(q, on));
+  };
+
+  const addToQueue = (song) => { if (song) updateQs((q) => queueAdd(q, song)); };
+  const playNext = (song) => { if (song) updateQs((q) => queuePlayNext(q, song)); };
+  const clearQueue = () => updateQs(clearUserQueue); // clears the songs the user added; the radio / list carries on
+
+  // Index-based helpers for views that list "upcoming" (what the queue panel uses)
+  const removeFromUpcomingAt = (i) => updateQs((q) => removeFromUpcoming(q, i));
+  const reorderUpcomingAt = (from, to) => updateQs((q) => reorderUpcoming(q, from, to));
+  const jumpToUpcoming = (i) => {
+    const r = jumpTo(qsRef.current, i);
+    if (!r.song) return;
+    updateQs(() => r.state);
+    startPlayback(r.song);
+  };
+
+  // Flat-index helpers kept for older callers (index into the whole `queue` list)
+  const moveInQueue = (from, to) => {
+    const h = qsRef.current.history.length;
+    if (from > h && to > h) updateQs((q) => reorderUpcoming(q, from - h - 1, to - h - 1));
+  };
+  const removeFromQueue = (index) => {
+    const h = qsRef.current.history.length;
+    if (index < h) updateQs((q) => removeFromHistory(q, index));
+    else if (index === h) goNext('skip');
+    else updateQs((q) => removeFromUpcoming(q, index - h - 1));
+  };
+
+  // ---- radio refill: keep the queue topped up so the music never stops ----
+  useEffect(() => {
+    if (needsRefill(qs)) runRefill({ get: () => qsRef.current, update: updateQs, fetchRelated });
+  }, [qs, refillTick, updateQs]);
+
+  // after a failed refill the engine waits (1 s ... 30 s); wake up when the wait is over
+  useEffect(() => {
+    const wait = qs.refill.retryAt - Date.now();
+    if (wait <= 0 || qs.mode !== 'radio' || !qs.autoplay || !qs.current) return undefined;
+    const t = setTimeout(() => setRefillTick((n) => n + 1), wait + 50);
+    return () => clearTimeout(t);
+  }, [qs.refill.retryAt, qs.mode, qs.autoplay, qs.current]);
+
+  // ---- preload the next track so the switch has no gap (only the next one, only for audio songs) ----
+  const preloadRef = useRef(null);
+  const nextUpId = qs.upcoming[0]?.song?.id;
+  useEffect(() => {
+    const next = qs.upcoming[0]?.song;
+    if (!next || !currentSong || engineFor(next, 'audio', unavailableVideosRef.current) === 'youtube') return undefined;
+    const t = setTimeout(() => {
+      try {
+        const url = buildCandidateUrls(next)[0];
+        if (!url) return;
+        const el = preloadRef.current ?? (preloadRef.current = new Audio());
+        el.preload = 'auto';
+        el.src = new URL(url, window.location.origin).href;
+      } catch { /* preloading is best effort */ }
+    }, 4000); // after the current song has settled
+    return () => clearTimeout(t);
+  }, [nextUpId, currentSong?.id]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // Media Session API integration for Lock-screen, Headphone, & Bluetooth controls
   useEffect(() => {
@@ -719,9 +784,9 @@ export const AudioProvider = ({ children }) => {
         title: currentSong.title,
         artist: currentSong.artist || currentSong.singers || 'TamilTunes Artist',
         album: currentSong.album || 'TamilTunes',
-        artwork: [
-          { src: currentSong.image, sizes: '512x512', type: 'image/jpeg' }
-        ]
+        artwork: currentSong.image
+          ? ['96x96', '256x256', '512x512'].map((sizes) => ({ src: currentSong.image, sizes, type: 'image/jpeg' }))
+          : []
       });
 
       navigator.mediaSession.setActionHandler('play', () => resume());
@@ -731,6 +796,8 @@ export const AudioProvider = ({ children }) => {
       navigator.mediaSession.setActionHandler('seekto', (details) => {
         if (details.seekTime !== undefined) seek(details.seekTime);
       });
+      navigator.mediaSession.setActionHandler('seekbackward', (d) => seek(Math.max(0, currentTime - (d?.seekOffset || 10))));
+      navigator.mediaSession.setActionHandler('seekforward', (d) => seek(Math.min(duration || Infinity, currentTime + (d?.seekOffset || 10))));
     } catch (e) {
       console.warn('MediaSession handler warning:', e);
     }
@@ -743,6 +810,8 @@ export const AudioProvider = ({ children }) => {
           navigator.mediaSession.setActionHandler('previoustrack', null);
           navigator.mediaSession.setActionHandler('nexttrack', null);
           navigator.mediaSession.setActionHandler('seekto', null);
+          navigator.mediaSession.setActionHandler('seekbackward', null);
+          navigator.mediaSession.setActionHandler('seekforward', null);
         } catch (e) {}
       }
     };
@@ -817,6 +886,9 @@ export const AudioProvider = ({ children }) => {
         playbackError,
         queue,
         queueIndex,
+        queueSections: getSections(qs),
+        autoplay: qs.autoplay,
+        offerRadio: qs.offerRadio,
         isShuffle,
         repeatMode,
         isFullScreen,
@@ -833,6 +905,13 @@ export const AudioProvider = ({ children }) => {
         toggleShuffle,
         toggleRepeat,
         addToQueue,
+        playNext,
+        startRadio,
+        continueWithRadio,
+        setAutoplay,
+        removeFromUpcomingAt,
+        reorderUpcomingAt,
+        jumpToUpcoming,
         moveInQueue,
         removeFromQueue,
         clearQueue,
