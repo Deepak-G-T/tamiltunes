@@ -120,3 +120,6 @@ Songs may carry an optional `videoId`. It comes from the curated map `backend/sr
   (`reset-password`, `verify-password`, `report:email-collisions`): `docs/AUTH.md`. Migrations `20261123000000_password_reset`, `20261123000100_email_lower_unique`
   (take the Neon backup BEFORE merging; the second one skips itself if two emails would collide). `npm run test:auth --prefix frontend` is the sign in / sign up browser audit.
 - UNTESTED: a real reset email from the provider; the migrations on Neon (they passed on a scratch Postgres 16).
+## No repeats in autoplay (fix/queue-duplicates)
+- Song identity (fingerprint, variant key) in `frontend/src/lib/songIdentity.js` and a copy in `backend/src/services/related/identity.js`: keep the two in sync (both have tests with the same examples).
+  Rules and limits in `docs/RADIO.md`. `npm run report:duplicate-songs --prefix backend` is report-only.

@@ -15,7 +15,7 @@ const BASE = `http://127.0.0.1:${PORT}`;
 const song = (id, title, extra = {}) => ({ id, title, artist: 'Test Artist', album: 'Test Album', duration: 200, image: '', streamUrl: `https://aac.saavncdn.com/${id}_320.mp4`, source: 'audio', ...extra });
 const Q = Array.from({ length: 6 }, (_, i) => song(`q${i + 1}`, `Queue Song ${i + 1}`));
 const RADIO_ARTISTS = ['Artist A', 'Artist A', 'Artist A', 'Artist A', 'Artist A', 'Artist B', 'Artist B', 'Artist C', 'Artist C', 'Artist C', 'Artist D', 'Artist D']; // five in a row by one artist: autoplay must spread them
-const R = Array.from({ length: 12 }, (_, i) => song(`r${i + 1}`, `Radio Song ${i + 1}`, { duration: 180, artist: RADIO_ARTISTS[i] }));
+const R = Array.from({ length: 12 }, (_, i) => song(`r${i + 1}`, `Radio Song ${i + 1}`, { duration: 180, artist: RADIO_ARTISTS[i], album: `Radio Film ${i + 1}` })); // a different film each: at most 2 songs per film are allowed per 10
 const relatedCalls = [];
 const FEED = { trending: Q, latest: [], gana: [], nineties: [], twoThousands: [], melodies: [], love: [], sad: [], folk: [], instrumental: [], popularAlbums: [], popularArtists: [], albums: [], artists: [] };
 

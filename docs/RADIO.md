@@ -63,3 +63,28 @@ Other knobs: `VARIETY.maxRun` (3), `VARIETY.discoveryRatio` (0.3), `VARIETY.simi
 - "Add to queue", "Play next", remove and drag-to-reorder keep the user-added songs ahead of the radio ones.
 - Shuffle reorders the remaining playlist songs (and restores the order when turned off); repeat is off / all / one.
 - The queue is not yet wired into the player UI: that is phase 3.
+
+
+## No repeats (fingerprint and variant rules)
+The same song comes back under other ids, covers and singer order, and versions of a song (unplugged, remix ...) must not fill a radio block.
+`frontend/src/lib/songIdentity.js` (copy: `backend/src/services/related/identity.js`, same tests) defines:
+- **songFingerprint**: the title without bracketed text, "- From ...", punctuation (NFKC, lower case; version words inside brackets are kept)
+  plus the singers sorted alphabetically. Two songs are the same song when the titles match and the film matches (or is missing) or the
+  singers overlap.
+- **variantKey**: the same without version words (unplugged, acoustic, remix, reprise, lofi, slowed, reverb, instrumental, karaoke, cover,
+  male / female version, 8D).
+
+Autoplay (engine, `applyRefill`): a song is added only if it is not, by id, fingerprint or variant, the playing song, any song in the queue
+(yours and the radio's), one of the last 50 played, or one skipped this session. Songs played earlier this session are also kept out by id (500).
+At most one song per variant in the radio block; at most 2 songs per film within any 10 songs; at most 3 in a row by one artist. The check
+runs against the live queue when the answer arrives, so songs you queued while the request was running are respected. Songs you add yourself
+always win: a duplicate asks "Already in queue - add again?" and is then added; a version is added without asking.
+Queues are cleaned when loaded and when the playing song changes (`cleanRadioDuplicates`): autoplay entries that repeat the playing song,
+an earlier entry or a version of either are removed; your own songs are never touched.
+
+Server (`/api/songs/:id/related`): the seed, its copies and its versions are never offered; duplicates among candidates collapse to one copy
+(most played, then the original over a version, then the most complete data); excluded ids also keep out their copies and versions; at most
+2 songs per film per 10; "same singer" cannot be the only reason for more than 30% of a batch. Fingerprints are computed in memory on the
+candidate pool (cached 5 minutes), so there is no extra database column and no extra query.
+
+`npm run report:duplicate-songs --prefix backend` lists duplicate groups in the songs table (report only, it changes nothing).
