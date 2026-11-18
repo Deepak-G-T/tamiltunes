@@ -166,7 +166,7 @@ const artistKeys = (song) => {
     song?.artist,
     ...(Array.isArray(song?.composer) ? song.composer : [song?.composer]),
   ].filter(Boolean).join(',');
-  return new Set(raw.split(/,|&|\/|;|\bfeat\.?\b|\bft\.?\b|\band\b|\bwith\b/i).map((x) => squash(base(x)).replace(/[^\p{L}\p{N}\p{M}]/gu, '')).filter((k) => k.length > 1 && k !== 'tamilartist' && k !== 'various' && k !== 'variousartists'));
+  return new Set(raw.split(/,|&|\/|;|\bfeat\.?\b|\bft\.?\b|\band\b|\bwith\b/i).map((x) => squash(base(x)).replace(/[^\p{L}\p{N}\p{M}]/gu, '')).filter((k) => k.length > 0 && k !== 'tamilartist' && k !== 'various' && k !== 'variousartists'));
 };
 const shareArtist = (a, b) => { const ka = artistKeys(a); const kb = artistKeys(b); for (const k of ka) if (kb.has(k)) return true; return false; };
 const hasArtist = (s) => artistKeys(s).size > 0;

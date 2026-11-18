@@ -15,7 +15,7 @@ assert.ok(sameSong(think('a'), think('b', { image: 'x.jpg', singers: 'Pragathi G
 const unplugged = think('u', { title: 'Pavazha Malli Unplugged (From "Think Indie")' });
 assert.ok(!sameSong(think('a'), unplugged) && sameVariant(think('a'), unplugged) && variantKey(think('a')) === variantKey(unplugged));
 for (const w of ['Unplugged', 'Acoustic', 'Remix', 'Reprise', 'Lofi', 'Slowed', 'Reverb', 'Instrumental', 'Karaoke', 'Cover', '8D', 'Male Version', 'Female Version']) assert.equal(variantCore({ title: `Pavazha Malli ${w}` }), 'pavazha malli', w);
-assert.ok(!sameSong(think('a'), think('x', { album: 'Another Film', singers: 'Someone Else', artist: 'Someone Else' })));
+assert.ok(!sameSong(think('a'), think('x', { album: 'Another Film', singers: 'Someone Else', artist: 'Someone Else', composer: 'Someone Else' })));
 console.log('✓ related: song identity rules (same song, other id / singer order; versions)');
 
 // ---- the related endpoint (service) collapses duplicates
