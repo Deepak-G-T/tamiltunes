@@ -345,6 +345,27 @@ export function removeCurrent(state, opts) {
   return { ...r, state: { ...r.state, history: r.state.history.slice(0, -1) } };
 }
 
+/**
+ * Tap a song in the History list: play it now. What was playing goes to history, the queue is left as it is, nothing is lost.
+ * `index` is into `state.history` (oldest first).
+ */
+export function playFromHistory(state, index) {
+  if (index < 0 || index >= state.history.length) return { state, song: null };
+  const song = state.history[index];
+  const rest = state.history.filter((_, i) => i !== index);
+  return {
+    state: {
+      ...state,
+      history: pushHistory(rest, state.current && state.current.id !== song.id ? state.current : null),
+      played: withPlayed(state.played, song.id),
+      current: song,
+      ended: false,
+      offerRadio: false,
+    },
+    song,
+  };
+}
+
 export const setStopAfter = (state, on) => ({ ...state, stopAfter: Boolean(on) });
 
 export function clearUserQueue(state) {

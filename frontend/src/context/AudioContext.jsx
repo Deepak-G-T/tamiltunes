@@ -6,8 +6,10 @@ import {
   createQueueState, playFromSearch, playFromContext, switchToRadio, advance, previous, jumpTo,
   addToQueue as queueAdd, playNext as queuePlayNext, removeFromUpcoming, removeFromHistory, reorderUpcoming,
   clearUserQueue, setShuffle as queueSetShuffle, setRepeat as queueSetRepeat, nextRepeat, setAutoplay as queueSetAutoplay,
-  needsRefill, runRefill, toFlatQueue, getSections, isQueueFull, findQueued, moveToQueue, indexOfUid, MAX_QUEUE
+  needsRefill, runRefill, toFlatQueue, getSections, isQueueFull, findQueued, moveToQueue, indexOfUid, MAX_QUEUE,
+  removeByUids, restoreRemoved, moveManyToQueue, clearRadio, removeCurrent, setStopAfter, playFromHistory
 } from '../lib/radioQueue';
+import { startSleep } from '../lib/sleepTimer';
 import { fetchRelated } from '../lib/radioApi';
 import { useAuth } from './AuthContext';
 import { toSaved, fromSaved, sameQueue, savedIds, readGuestQueue, writeGuestQueue, getDeviceId, SAVE_DEBOUNCE_MS } from '../lib/queuePersist';
@@ -693,6 +695,9 @@ export const AudioProvider = ({ children }) => {
     setIsPlaying(false);
   };
 
+  const pauseRef = useRef(pause);
+  pauseRef.current = pause;
+
   const resume = async () => {
     if (await startRestored()) return;
     if (isYouTubeSong(currentSong)) {
@@ -762,6 +767,15 @@ export const AudioProvider = ({ children }) => {
   const startRadio = (song, { fallback = [] } = {}) => playSong(song, null, { fallback });
 
   const goNext = async (reason = 'skip') => {
+    if (reason === 'ended' && qsRef.current.stopAfter) {
+      // "Stop after this song" (or the sleep timer's "end of song"): stay on this song, paused at the start
+      updateQs((q) => setStopAfter(q, false));
+      setSleepTimer((t) => (t?.id === 'song' ? null : t));
+      pause();
+      seek(0);
+      showToast('Stopped after this song.');
+      return;
+    }
     let r = advance(qsRef.current, { reason });
     if (r.status === 'repeat-one') {
       seek(0);
@@ -788,6 +802,32 @@ export const AudioProvider = ({ children }) => {
     pause(); // still waiting: the radio could not be reached
     showToast('No more songs to play right now. Check your connection and try again.');
   };
+  // Sleep timer: pause after 15 / 30 / 60 minutes, or when this song ends
+  const [sleepTimer, setSleepTimer] = useState(null); // { id, endsAt | null }
+  const startSleepTimer = (id) => {
+    const t = startSleep(id);
+    if (!t) return;
+    setSleepTimer(t);
+    updateQs((q) => setStopAfter(q, id === 'song'));
+    showToast(id === 'song' ? 'Music will stop after this song.' : `Sleep timer set for ${id} minutes.`);
+  };
+  const cancelSleepTimer = () => { setSleepTimer(null); updateQs((q) => setStopAfter(q, false)); showToast('Sleep timer off.'); };
+  const toggleStopAfter = () => {
+    const on = !qsRef.current.stopAfter;
+    updateQs((q) => setStopAfter(q, on));
+    if (!on) setSleepTimer((t) => (t?.id === 'song' ? null : t));
+    showToast(on ? 'Music will stop after this song.' : 'Will keep playing after this song.');
+  };
+  useEffect(() => {
+    if (!sleepTimer?.endsAt) return undefined;
+    const t = setTimeout(() => {
+      setSleepTimer(null);
+      pauseRef.current();
+      showToast('Sleep timer: music stopped.');
+    }, Math.max(0, sleepTimer.endsAt - Date.now()));
+    return () => clearTimeout(t);
+  }, [sleepTimer, showToast]);
+
   const goNextRef = useRef(goNext);
   goNextRef.current = goNext;
 
@@ -838,7 +878,37 @@ export const AudioProvider = ({ children }) => {
     if (choice === 'again') updateQs((s) => (p.where === 'next' ? queuePlayNext(s, p.song) : queueAdd(s, p.song)));
     else updateQs((s) => { const i = indexOfUid(s, p.uid); return i >= 0 ? moveToQueue(s, i, p.where) : s; });
   };
-  const clearQueue = () => updateQs(clearUserQueue); // clears the songs the user added; the radio / list carries on
+  const clearQueue = () => {
+    const before = qsRef.current;
+    if (!before.userCount) return;
+    updateQs(clearUserQueue);
+    showToast(`Cleared ${before.userCount} song${before.userCount === 1 ? '' : 's'} from your queue.`, { label: 'Undo', onClick: () => updateQs((q) => restoreRemoved(q, before.upcoming.slice(0, before.userCount).map((entry, index) => ({ index, entry })))) });
+  };
+
+  // ---- Queue v2 actions (by queue slot id, so the same song can be queued twice)
+  const undoToast = (message, removed) => showToast(message, { label: 'Undo', onClick: () => updateQs((q) => restoreRemoved(q, removed)) });
+  const removeUids = (uids) => {
+    const r = removeByUids(qsRef.current, uids);
+    if (!r.removed.length) return;
+    updateQs(() => r.state);
+    undoToast(r.removed.length === 1 ? `Removed "${r.removed[0].entry.song.title}".` : `Removed ${r.removed.length} songs.`, r.removed);
+  };
+  const moveUidsToQueue = (uids, where) => updateQs((q) => moveManyToQueue(q, uids, where));
+  const reorderByUid = (activeUid, overUid) => updateQs((q) => reorderUpcoming(q, indexOfUid(q, activeUid), indexOfUid(q, overUid)));
+  const jumpToUid = (uid) => { const i = indexOfUid(qsRef.current, uid); if (i >= 0) jumpToUpcoming(i); };
+  const removeCurrentSong = async () => {
+    const r = removeCurrent(qsRef.current);
+    if (r.status === 'playing') { updateQs(() => r.state); showToast('Removed from the queue.'); return startPlayback(r.song); }
+    return goNext('skip');
+  };
+  const refreshRecommendations = () => { updateQs(clearRadio); setRefillTick((n) => n + 1); };
+  const playFromHistoryAt = (i) => { const r = playFromHistory(qsRef.current, i); if (!r.song) return; updateQs(() => r.state); startPlayback(r.song); };
+  const saveQueueAsPlaylist = async (name) => {
+    const q = qsRef.current;
+    const songIds = [q.current?.id, ...q.upcoming.map((e) => e.song.id)].filter(Boolean);
+    const { data } = await api.post('/playlists/from-queue', { name, songIds });
+    return data;
+  }; // clears the songs the user added; the radio / list carries on
 
   // Index-based helpers for views that list "upcoming" (what the queue panel uses)
   const removeFromUpcomingAt = (i) => updateQs((q) => removeFromUpcoming(q, i));
@@ -1004,7 +1074,26 @@ export const AudioProvider = ({ children }) => {
         playbackError,
         queue,
         queueIndex,
-        queueSections: getSections(qs),
+        queueSections: {
+          ...getSections(qs),
+          history: [...qs.history].reverse(), // newest first
+          refill: { pending: qs.refill.pending, failed: qs.refill.failures > 0 },
+          mode: qs.mode,
+          stopAfter: qs.stopAfter,
+          full: isQueueFull(qs),
+        },
+        sleepTimer,
+        startSleepTimer,
+        cancelSleepTimer,
+        toggleStopAfter,
+        removeUids,
+        moveUidsToQueue,
+        reorderByUid,
+        jumpToUid,
+        removeCurrentSong,
+        refreshRecommendations,
+        playFromHistoryAt,
+        saveQueueAsPlaylist,
         autoplay: qs.autoplay,
         offerRadio: qs.offerRadio,
         isShuffle,

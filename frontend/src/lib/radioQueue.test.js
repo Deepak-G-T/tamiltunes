@@ -3,7 +3,7 @@ import {
   createQueueState, playFromSearch, playFromContext, switchToRadio, advance, previous, jumpTo, addToQueue, playNext,
   removeFromUpcoming, reorderUpcoming, clearUserQueue, setShuffle, setRepeat, nextRepeat, setAutoplay, needsRefill,
   startRefill, applyRefill, refillFailed, runRefill, getSections, peekNext, toSnapshot, fromSnapshot, shuffled,
-  applyFallback, toFlatQueue, removeFromHistory, indexOfUid, findQueued, moveToQueue, isQueueFull, MAX_QUEUE, removeByUids, restoreRemoved, moveManyToQueue, clearRadio, removeCurrent, setStopAfter,
+  applyFallback, toFlatQueue, removeFromHistory, indexOfUid, findQueued, moveToQueue, isQueueFull, MAX_QUEUE, removeByUids, restoreRemoved, moveManyToQueue, clearRadio, removeCurrent, setStopAfter, playFromHistory,
   REFILL_THRESHOLD, MAX_EXCLUDE, REFILL_BACKOFF_MS,
 } from './radioQueue';
 
@@ -601,3 +601,26 @@ describe('removing, undo, moving many, refresh, remove current, stop after (queu
 });
 
 function list3() { return [S('p1'), S('p2'), S('p3')]; }
+
+describe('history replay (queue v2)', () => {
+  it('plays a history song now, keeps the queue, and puts the playing song into history', () => {
+    let s = radio('a', 'r1', 'r2');
+    s = advance(s).state; // r1 plays, a in history
+    s = advance(s).state; // r2 plays, a r1 in history
+    const r = playFromHistory(s, 0); // replay a
+    expect(r.song.id).toBe('a');
+    expect(r.state.current.id).toBe('a');
+    expect(r.state.history.map((x) => x.id)).toEqual(['r1', 'r2']);
+    expect(r.state.upcoming).toEqual(s.upcoming);
+  });
+  it('ignores a bad index', () => {
+    const s = radio('a', 'r1');
+    expect(playFromHistory(s, 5).song).toBeNull();
+  });
+  it('never keeps 51 songs in history', () => {
+    let s = playFromSearch(createQueueState(), S('s0'));
+    for (let i = 1; i <= 55; i++) s = playFromSearch(s, S(`s${i}`));
+    const r = playFromHistory(s, 10);
+    expect(r.state.history.length).toBeLessThanOrEqual(50);
+  });
+});
