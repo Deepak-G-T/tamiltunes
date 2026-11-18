@@ -28,6 +28,7 @@ const ForgotPassword = lazy(() => import('./pages/ForgotPassword'));
 const ResetPassword = lazy(() => import('./pages/ResetPassword'));
 const Profile = lazy(() => import('./pages/Profile'));
 const UserProfile = lazy(() => import('./pages/UserProfile'));
+const Install = lazy(() => import('./pages/Install'));
 
 function App() {
   return (
@@ -53,6 +54,7 @@ function App() {
                 <Route path="reset-password" element={<ResetPassword />} />
                 <Route path="profile" element={<Profile />} />
                 <Route path="u/:username" element={<UserProfile />} />
+                <Route path="install" element={<Install />} />
                 <Route path="*" element={<Navigate to="/" replace />} />
               </Route>
             </Routes>

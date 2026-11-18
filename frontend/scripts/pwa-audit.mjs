@@ -112,6 +112,17 @@ async function run(browser) {
   check('and the dismissal is remembered after a reload', (await page.locator('[data-testid=pwa-install]').count()) === 0);
   await page.evaluate(() => window.dispatchEvent(new CustomEvent('tamiltunes:pwa-update')));
   check('a new version shows a Reload bar (never a silent reload)', await until(async () => (await page.locator('[data-testid=pwa-update]').count()) === 1));
+  // ---- the Install page
+  await page.goto(`${BASE}/install`);
+  await page.waitForSelector('[data-testid=install-page]');
+  const apk = await page.locator('[data-testid=apk-link]').getAttribute('href');
+  check('the Install page links the Android APK', /TamilTunes\.apk$/.test(apk || ''), apk);
+  check('the Install page explains installing from the browser for Android, iPhone and a computer', JSON.stringify(await page.locator('h3').allTextContents()) === JSON.stringify(['Android (Chrome)', 'iPhone and iPad (Safari)', 'Computer (Chrome or Edge)']));
+  check('the download button is at least 44px high', (await page.locator('[data-testid=apk-link]').boundingBox()).height >= 44);
+  await page.evaluate(() => window.dispatchEvent(Object.assign(new Event('beforeinstallprompt'), { prompt() { window.__prompted = true; }, userChoice: Promise.resolve({ outcome: 'accepted' }) })));
+  check('"Install TamilTunes now" appears when the browser offers installing', await until(async () => (await page.locator('[data-testid=install-now]').count()) === 1));
+  await page.locator('[data-testid=install-now]').click();
+  check('and it opens the browser install dialog', await until(() => page.evaluate(() => window.__prompted === true)));
   check('no page errors', errors.length === 0, errors.join(' | '));
   await ctx.close();
 }

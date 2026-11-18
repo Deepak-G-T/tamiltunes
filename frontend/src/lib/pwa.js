@@ -21,6 +21,28 @@ export function rememberDismissed(storage, now = Date.now()) {
   try { storage?.setItem(DISMISS_KEY, String(now)); } catch { /* storage blocked: the banner may come back next visit */ }
 }
 
+// The browser's install offer. It can arrive before any component is on screen, so it is captured at startup and kept here.
+let installEvent = null;
+export const getInstallEvent = () => installEvent;
+export function captureInstallPrompt() {
+  if (typeof window === 'undefined' || isNativeApp()) return;
+  window.addEventListener('beforeinstallprompt', (e) => {
+    e.preventDefault(); // we show our own button
+    installEvent = e;
+    window.dispatchEvent(new CustomEvent('tamiltunes:install-available'));
+  });
+  window.addEventListener('appinstalled', () => { installEvent = null; window.dispatchEvent(new CustomEvent('tamiltunes:installed')); });
+}
+/** Show the browser's install dialog. Resolves to 'accepted', 'dismissed' or null (nothing to install). */
+export async function promptInstall() {
+  const e = installEvent;
+  if (!e) return null;
+  installEvent = null;
+  e.prompt();
+  const choice = await e.userChoice?.catch?.(() => null);
+  return choice?.outcome ?? null;
+}
+
 let updateSW = null;
 /** Register the worker. A new version raises `tamiltunes:pwa-update`; `applyUpdate()` then reloads on the new one. */
 export async function registerServiceWorker() {
