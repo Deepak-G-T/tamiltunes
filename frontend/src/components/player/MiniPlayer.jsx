@@ -50,7 +50,7 @@ const MiniPlayer = () => {
   };
 
   return (
-    <div className="md:hidden fixed bottom-16 left-0 right-0 z-40 px-2 pb-1 pointer-events-auto slide-up">
+    <div className="md:hidden fixed bottom-[var(--nav-h)] left-0 right-0 z-40 px-2 pb-1 pointer-events-auto slide-up">
       <div
         className="bg-surface-4 rounded-lg p-2 shadow-[0_8px_24px_rgba(0,0,0,0.5)] flex items-center justify-between cursor-pointer active:scale-[0.98] transition-transform select-none touch-manipulation"
         onClick={handleOpenFull}
@@ -98,7 +98,7 @@ const MiniPlayer = () => {
               haptic(10);
               togglePlay();
             }}
-            className="w-9 h-9 rounded-full bg-white hover:bg-zinc-100 text-black flex items-center justify-center shadow-md active:scale-90 transition-transform"
+            className="w-11 h-11 rounded-full bg-white hover:bg-zinc-100 text-black flex items-center justify-center shadow-md active:scale-90 transition-transform"
             aria-label={isPlaying ? 'Pause' : 'Play'}
           >
             {isBuffering ? (
@@ -112,7 +112,7 @@ const MiniPlayer = () => {
 
           <button
             onClick={() => { haptic(8); setIsQueueOpen(true); }}
-            className="p-2 text-zinc-300 hover:text-white active:scale-90 transition-transform"
+            className="w-11 h-11 inline-flex items-center justify-center text-zinc-300 hover:text-white active:scale-90 transition-transform"
             aria-label="Show queue"
           >
             <ListMusic className="w-4 h-4" />
@@ -120,7 +120,7 @@ const MiniPlayer = () => {
 
           <button
             onClick={nextTrack}
-            className="p-2 text-zinc-300 hover:text-white active:scale-90 transition-transform"
+            className="w-11 h-11 inline-flex items-center justify-center text-zinc-300 hover:text-white active:scale-90 transition-transform"
             aria-label="Next song"
           >
             <SkipForward className="w-4 h-4" />
@@ -128,7 +128,7 @@ const MiniPlayer = () => {
 
           <button
             onClick={handleOpenFull}
-            className="p-1.5 text-brand-400 hover:text-brand-300 active:scale-90 transition-transform"
+            className="hidden min-[400px]:inline-flex w-11 h-11 items-center justify-center text-brand-400 hover:text-brand-300 active:scale-90 transition-transform" /* the whole bar already opens the player: this arrow only shows where there is room for a 44px target */
             title="Expand player"
             aria-label="Expand player"
           >

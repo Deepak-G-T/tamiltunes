@@ -27,7 +27,7 @@ const MainLayout = () => {
   }, []);
 
   return (
-    <div className="flex flex-col h-screen w-screen bg-black text-white overflow-hidden">
+    <div className="flex flex-col h-full w-full bg-black text-white overflow-hidden">
       <div className="flex flex-1 min-h-0 md:p-2 md:gap-2">
       {/* Desktop Sidebar */}
       <div className="hidden md:flex flex-shrink-0 h-full w-[280px] lg:w-[320px]">

@@ -601,6 +601,13 @@ async function phone(browser, width, height) {
   check(`${tag} tabs, Now playing and rows are shown`, (await page.getByRole('tab').count()) === 2 && (await nowPlaying(page)) === 'Queue Song 1' && (await titles(page)).length >= 3);
   check(`${tag} the header actions are reachable (Clear queue, Save as playlist, Select)`, await page.getByRole('button', { name: 'Clear queue' }).isVisible() && await page.getByRole('button', { name: 'Save as playlist' }).isVisible() && await page.getByRole('button', { name: 'Select', exact: true }).isVisible());
   check(`${tag} no horizontal scroll`, await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth + 1));
+  check(`${tag} the mini player controls and the bottom bar are at least 44px, the page fills the visible height`, await page.evaluate(() => {
+    const box = (sel) => { const el = document.querySelector(sel); return el ? el.getBoundingClientRect() : null; };
+    const ok = (b) => b && b.width >= 44 && b.height >= 44;
+    const nav = document.querySelector('nav.fixed');
+    const tabs = [...nav.querySelectorAll('a')].map((a) => a.getBoundingClientRect());
+    return ok(box('[aria-label="Show queue"]')) && ok(box('[aria-label="Next song"]')) && (ok(box('button[aria-label="Pause"]')) || ok(box('button[aria-label="Play"]'))) && tabs.every((t) => t.width >= 44 && t.height >= 44) && Math.abs(document.getElementById('root').getBoundingClientRect().height - window.innerHeight) <= 1 && getComputedStyle(document.body).overscrollBehaviorY === 'none';
+  }));
   check(`${tag} rows have a visible drag handle and at least 44 px touch targets for the main actions`, await (async () => {
     const h = await page.locator('[data-testid=queue-row]').first().locator('button[aria-label^="Reorder"]').boundingBox();
     const row = await page.locator('[data-testid=queue-row]').first().boundingBox();

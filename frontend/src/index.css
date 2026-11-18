@@ -47,6 +47,23 @@
     --border-dark: #282828;
   }
 
+  :root {
+    --nav-h: calc(4rem + env(safe-area-inset-bottom, 0px)); /* the phone bottom bar: 64px plus the gesture-bar inset */
+  }
+
+  html, body {
+    height: 100%;
+    overscroll-behavior-y: none; /* no browser pull-to-refresh or glow: the app has its own (home page) and the player must never reload */
+  }
+
+  /* The app fills the real visible height (dvh: not under the URL bar) and keeps clear of notches and system bars */
+  #root {
+    height: 100vh;
+    height: 100dvh;
+    box-sizing: border-box;
+    padding: env(safe-area-inset-top, 0px) env(safe-area-inset-right, 0px) 0 env(safe-area-inset-left, 0px);
+  }
+
   body {
     background-color: #000000;
     color: #FFFFFF;
