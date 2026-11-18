@@ -46,13 +46,14 @@ const startServer = () => new Promise((resolve, reject) => {
 
 async function setup(page) {
   await page.route('**/api/music/home', (r) => r.fulfill({ json: { success: true, data: FEED } }));
+  await page.route('**/api/home**', (r) => r.fulfill({ json: { success: true, seed: 'test', hero: null, sections: [{ id: 'trending', title: 'Trending now', kind: 'songs', items: Q }] } }));
   await page.route('**/api/songs/*/related**', (r) => r.fulfill({ json: { success: true, items: R } }));
   await page.route('**/api/music/songs/resolve', (r) => {
     const ids = JSON.parse(r.request().postData() || '{}').ids || [];
     const songs = Object.fromEntries(ids.filter((i) => !i.startsWith('gone')).map((id) => [id, song(id, `Seed ${id}`, { duration: 100 })]));
     return r.fulfill({ json: { success: true, songs } });
   });
-  await page.route('**/api/**', (r) => (/music\/home|related|songs\/resolve/.test(r.request().url()) ? r.fallback() : r.fulfill({ json: { success: true } })));
+  await page.route('**/api/**', (r) => (/music\/home|\/api\/home|related|songs\/resolve/.test(r.request().url()) ? r.fallback() : r.fulfill({ json: { success: true } })));
   await page.route('https://www.youtube.com/iframe_api', (r) => r.fulfill({ contentType: 'application/javascript', body: '' }));
   await page.route('https://aac.saavncdn.com/**', (r) => r.fulfill({ status: 200, contentType: 'audio/wav', body: wav, headers: { 'Accept-Ranges': 'bytes' } }));
   await page.route('https://images.unsplash.com/**', (r) => r.abort());

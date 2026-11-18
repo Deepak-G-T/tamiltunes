@@ -10,6 +10,8 @@ import FeaturedHero from '../components/cards/FeaturedHero';
 import { useAuth } from '../context/AuthContext';
 import { useSpeedDial } from '../hooks/useSpeedDial';
 import { useStartRadio } from '../hooks/useStartRadio';
+import { useHomeFeed } from '../hooks/useHomeFeed';
+import { ErrorState } from '../components/common/StateViews';
 import api from '../services/api';
 
 const CATEGORIES = [
@@ -51,7 +53,6 @@ const Home = () => {
     folk: []
   });
   const [favoritesMap, setFavoritesMap] = useState({});
-  const [recent, setRecent] = useState([]);
 
   useEffect(() => {
     let isMounted = true;
@@ -104,30 +105,9 @@ const Home = () => {
   }, [homeData]);
   const speedDial = useSpeedDial({ trending: fillPool });
 
-  // Continue listening: your latest distinct songs
-  useEffect(() => {
-    if (!isAuthenticated) {
-      setRecent([]);
-      return undefined;
-    }
-    let on = true;
-    api.get('/history', { params: { limit: 30 } })
-      .then(({ data }) => {
-        if (!on) return;
-        const seen = new Set();
-        const songs = [];
-        for (const row of data.items || []) {
-          const song = row.song || row;
-          if (song?.id && !seen.has(song.id)) {
-            seen.add(song.id);
-            songs.push(song);
-          }
-        }
-        setRecent(songs.slice(0, 12));
-      })
-      .catch(() => {});
-    return () => { on = false; };
-  }, [isAuthenticated]);
+  // Everything below Speed Dial comes from one request, so no song is shown twice. It waits for Speed Dial so those songs can be left out.
+  const speedReady = !loading && speedDial.status !== 'loading';
+  const feed = useHomeFeed({ tab: activeTab, ready: speedReady, excludeIds: activeTab === 'all' ? speedDial.items.map((i) => i.id) : [] }); // Speed Dial is only shown on "All"
 
   const toggleFavorite = async (song) => {
     if (!isAuthenticated) {
@@ -167,11 +147,38 @@ const Home = () => {
     />
   );
 
-  const show = (...tabs) => activeTab === 'all' || tabs.includes(activeTab);
-  const featured = (homeData.trending || [])[0];
-  // Radio mixes from your three most-played songs
+  // Radio mixes start a radio from your three most-played songs (a different row from "Made for you")
   const mixSeeds = speedDial.items.filter((i) => i.source === 'played' && i.hot).slice(0, 3);
-  const ganaList = homeData.gana?.length > 0 ? homeData.gana : homeData.folk;
+  const feedLoading = feed.status === 'loading';
+
+  const renderSection = (section) => {
+    if (section.kind === 'artists') {
+      return (
+        <Shelf key={section.id} title={section.title}>
+          {section.items.map((artist) => <ArtistCard key={artist.id || artist.name} artist={artist} />)}
+        </Shelf>
+      );
+    }
+    if (section.kind === 'albums') {
+      return (
+        <Shelf key={section.id} title={section.title}>
+          {section.items.slice(0, 12).map((album) => <AlbumCard key={album.id} album={album} />)}
+        </Shelf>
+      );
+    }
+    return (
+      <React.Fragment key={section.id}>
+        {section.id === 'trending' && mixSeeds.length > 0 && (
+          <Shelf title="Radio mixes">
+            {mixSeeds.map((song) => <RadioMixCard key={song.id} song={song} onStart={startRadio} />)}
+          </Shelf>
+        )}
+        <Shelf title={section.title} onShowAll={section.id === 'trending' ? () => navigate('/search?q=Tamil') : undefined}>
+          {section.items.map((song) => songCard(song, section.items))}
+        </Shelf>
+      </React.Fragment>
+    );
+  };
 
   return (
     <div className="space-y-8 md:space-y-10 animate-in fade-in duration-300">
@@ -206,73 +213,15 @@ const Home = () => {
       {/* Speed dial: your most-played songs, one tap away (replaces the old Quick picks grid) */}
       {activeTab === 'all' && <SpeedDial {...speedDial} loadingHome={loading} />}
 
-      {/* Featured today: big artwork card with the first trending song */}
-      {activeTab === 'all' && !loading && featured && <FeaturedHero song={featured} playlist={homeData.trending} />}
+      {/* Featured today: one trending song, never repeated in a shelf below */}
+      {activeTab === 'all' && feed.hero && <FeaturedHero song={feed.hero} playlist={[feed.hero]} />}
 
-      {/* Continue listening */}
-      {activeTab === 'all' && isAuthenticated && recent.length > 0 && (
-        <Shelf title="Recently played">
-          {recent.map((song) => songCard(song, recent))}
-        </Shelf>
-      )}
-
-      {/* Made for you: radio mixes from your most-played songs */}
-      {activeTab === 'all' && mixSeeds.length > 0 && (
-        <Shelf title="Made for you">
-          {mixSeeds.map((song) => <RadioMixCard key={song.id} song={song} onStart={startRadio} />)}
-        </Shelf>
-      )}
-
-      {show('trending') && (
-        <Shelf title="Trending Tamil songs" loading={loading} onShowAll={() => navigate('/search?q=Tamil')}>
-          {homeData.trending?.slice(0, 12).map((song) => songCard(song, homeData.trending))}
-        </Shelf>
-      )}
-
-      {activeTab === 'all' && (
-        <Shelf title="Popular albums" loading={loading}>
-          {(homeData.albums || homeData.popularAlbums)?.slice(0, 12).map((album) => (
-            <AlbumCard key={album.id} album={album} />
-          ))}
-        </Shelf>
-      )}
-
-      {activeTab === 'all' && (
-        <Shelf title="Iconic composers & singers" loading={loading}>
-          {(homeData.artists || homeData.popularArtists)?.map((artist) => (
-            <ArtistCard key={artist.id || artist.name} artist={artist} />
-          ))}
-        </Shelf>
-      )}
-
-      {show('90s') && (
-        <Shelf title="90s golden era hits" loading={loading}>
-          {homeData.nineties?.slice(0, 12).map((song) => songCard(song, homeData.nineties))}
-        </Shelf>
-      )}
-
-      {show('2000s') && (
-        <Shelf title="2000s nostalgic hits" loading={loading}>
-          {homeData.twoThousands?.slice(0, 12).map((song) => songCard(song, homeData.twoThousands))}
-        </Shelf>
-      )}
-
-      {show('melodies', 'love') && (
-        <Shelf title="Heartfelt melodies & love songs" loading={loading}>
-          {homeData.melodies?.slice(0, 12).map((song) => songCard(song, homeData.melodies))}
-        </Shelf>
-      )}
-
-      {show('gana') && (
-        <Shelf title="Authentic film gaana hits" loading={loading}>
-          {ganaList?.slice(0, 12).map((song) => songCard(song, homeData.gana || homeData.folk))}
-        </Shelf>
-      )}
-
-      {show('folk') && (
-        <Shelf title="Folk & kuthu beats" loading={loading}>
-          {homeData.folk?.slice(0, 12).map((song) => songCard(song, homeData.folk))}
-        </Shelf>
+      {/* All other shelves, assembled together (no song twice). Fixed-height placeholders while loading: nothing jumps. */}
+      {feedLoading && [0, 1, 2].map((i) => <Shelf key={`sk-${i}`} title="" loading />)}
+      {feed.status === 'error' && <ErrorState compact message="Could not load the home page shelves." onRetry={feed.retry} />}
+      {!feedLoading && feed.sections.map(renderSection)}
+      {feed.status === 'ready' && feed.sections.length === 0 && (
+        <p className="py-10 text-center text-sm text-zinc-400">Nothing new to show right now. Try searching for a song or artist.</p>
       )}
     </div>
   );

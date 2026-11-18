@@ -98,7 +98,8 @@ const box = async (loc) => (await loc.boundingBox());
 
 async function setupRoutes(page) {
   await page.route('**/api/music/home', (r) => r.fulfill({ json: { success: true, data: FEED } }));
-  await page.route('**/api/**', (r) => (r.request().url().includes('/music/home') ? r.fallback() : r.fulfill({ json: { success: true } })));
+  await page.route('**/api/home**', (r) => r.fulfill({ json: { success: true, seed: 'test', hero: null, sections: [{ id: 'trending', title: 'Trending now', kind: 'songs', items: FEED.trending }] } }));
+  await page.route('**/api/**', (r) => (/\/music\/home|\/api\/home/.test(r.request().url()) ? r.fallback() : r.fulfill({ json: { success: true } })));
   await page.route('https://www.youtube.com/iframe_api', (r) => r.fulfill({ contentType: 'application/javascript', body: YT_STUB }));
   await page.route('https://aac.saavncdn.com/**', (r) => {
     const range = r.request().headers()['range'];
