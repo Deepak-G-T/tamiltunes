@@ -49,7 +49,6 @@ const FeaturedHero = ({ song, playlist }) => {
         <p className="inline-flex items-center gap-2 text-[11px] md:text-xs font-bold uppercase tracking-wider text-accent-300">
           <span aria-hidden="true">✦</span>
           <span>Featured today</span>
-          <span lang="ta" className="normal-case tracking-normal font-semibold">· இன்றைய சிறப்புப் பாடல்</span>
         </p>
         <h2 className="mt-1 text-2xl sm:text-3xl md:text-5xl font-black text-white tracking-tight leading-tight line-clamp-2">
           {song.title}
