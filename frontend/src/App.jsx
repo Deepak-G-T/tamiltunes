@@ -30,6 +30,7 @@ const ResetPassword = lazy(() => import('./pages/ResetPassword'));
 const Profile = lazy(() => import('./pages/Profile'));
 const UserProfile = lazy(() => import('./pages/UserProfile'));
 const Install = lazy(() => import('./pages/Install'));
+const Privacy = lazy(() => import('./pages/Privacy'));
 
 // Lazy-loaded Admin Section (non-admins never download this code)
 const AdminRoute = lazy(() => import('./components/auth/AdminRoute'));
@@ -57,6 +58,7 @@ function App() {
                 <Route path="/forgot-password" element={<ForgotPassword />} />
                 <Route path="/reset-password" element={<ResetPassword />} />
                 <Route path="/install" element={<Install />} />
+                <Route path="/privacy" element={<Privacy />} />
 
                 {/* Lazy Protected Admin Management Section */}
                 <Route

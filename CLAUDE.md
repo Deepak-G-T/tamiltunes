@@ -143,3 +143,10 @@ Songs may carry an optional `videoId`. It comes from the curated map `backend/sr
 - Icons are generated from the login-page logo: `node scripts/make-icons.mjs` (needs CHROMIUM_PATH if Playwright's browser is missing). `npm run test:pwa --prefix frontend` needs port 5000 free.
 - Phase 2 (Capacitor, `frontend/android/`): details, the Render CORS setting (`CORS_ORIGIN` must list `https://localhost,capacitor://localhost`), build commands and the phone checklist are in `docs/ANDROID_APP.md`. The Gradle build can only run in CI or on a computer with the Android SDK; `npm run test:native --prefix frontend` checks our own native code paths in a browser. UNTESTED: everything on a real phone.
 - Never commit a keystore, `keystore.properties` or `local.properties` (they are git-ignored); the login token lives in `lib/tokenStore.js` (private storage in the app), never read `localStorage` for it directly.
+
+## Video songs (feature/video-songs-v2, on top of feature/android-app)
+- YouTube embed only: never download, cache, re-host or hide the player; the API key and lookups stay in `backend/src/services/music/videoLookup.js`. Rules, API,
+  settings, the migration steps and the phone checklist: `docs/VIDEO_SONGS.md`. No batch auto-match job yet (later phase).
+- Migration `20261126000000_song_videos` (additive; songs.video_id / video_available / video_flagged_at + video_reports). Neon dev branch first, backup branch BEFORE merging.
+- A video is hidden for everyone only after 2 signed-in people report it (served video only); one failed embed hides it for that person (7 days, browser only).
+- UNTESTED: everything on a real phone (rotation/full screen, screen lock, Back from full screen, Bluetooth/headset, Wi-Fi only on mobile data).

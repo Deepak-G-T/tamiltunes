@@ -26,6 +26,7 @@ const VideoSettings = () => {
         hint="In Now Playing, play the video version when a song has one. The mini player always plays audio." />
       <Switch label="Wi-Fi only video" testId="pref-wifi-only" checked={videoPrefs.wifiOnly} onChange={(v) => setVideoPrefs({ wifiOnly: v })}
         hint="No video on mobile data (Android can tell; most computers cannot, so video is allowed there). YouTube picks the quality itself." />
+      <p className="py-3 text-xs text-zinc-500">Videos play through YouTube&apos;s player, which may set cookies once a video plays. <a href="/privacy" className="underline hover:text-white">Privacy</a></p>
     </div>
   );
 };
