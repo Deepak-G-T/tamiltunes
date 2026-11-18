@@ -7,7 +7,7 @@ import { db, usingPostgres, getPrismaClient } from '../../prisma/client.js';
 import { USER_WINDOWS } from './weights.js';
 
 // ---- play events (memory only; production uses the play_events table) ----
-const memoryEvents = [];
+export const memoryEvents = [];
 
 export function createMemorySignals() {
   return {

@@ -1,5 +1,7 @@
 import React, { createContext, useContext, useState, useEffect } from 'react';
 import api from '../services/api';
+import { migrateGuestPlays } from '../lib/guestPlays';
+import { speedDialApi } from '../lib/speedDialApi';
 
 const AuthContext = createContext();
 
@@ -44,6 +46,7 @@ export const AuthProvider = ({ children }) => {
         localStorage.setItem('tamiltunes_user', JSON.stringify(data.user));
         setToken(data.token);
         setUser(data.user);
+        migrateGuestPlays(window.localStorage, speedDialApi.importPlays); // songs played while signed out join the account
         return { success: true, user: data.user };
       }
       return { success: false, error: data.message || 'Login failed' };
@@ -63,6 +66,7 @@ export const AuthProvider = ({ children }) => {
         localStorage.setItem('tamiltunes_user', JSON.stringify(data.user));
         setToken(data.token);
         setUser(data.user);
+        migrateGuestPlays(window.localStorage, speedDialApi.importPlays);
         return { success: true, user: data.user };
       }
       return { success: false, error: data.message || 'Signup failed' };

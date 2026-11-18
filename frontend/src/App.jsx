@@ -3,6 +3,7 @@ import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
 import { AuthProvider } from './context/AuthContext';
 import { AudioProvider } from './context/AudioContext';
 import MainLayout from './components/layout/MainLayout';
+import PlayTracker from './components/player/PlayTracker';
 import { Loader2 } from 'lucide-react';
 
 const PageLoader = () => (
@@ -30,6 +31,7 @@ function App() {
     <BrowserRouter>
       <AuthProvider>
         <AudioProvider>
+          <PlayTracker />
           <Suspense fallback={<PageLoader />}>
             <Routes>
               <Route path="/" element={<MainLayout />}>
