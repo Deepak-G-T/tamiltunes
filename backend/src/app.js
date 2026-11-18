@@ -23,6 +23,7 @@ import userRoutes from './routes/userRoutes.js';
 import relatedRoutes from './routes/relatedRoutes.js';
 import meRoutes from './routes/meRoutes.js';
 import homeRoutes from './routes/homeRoutes.js';
+import adminRoutes from './routes/adminRoutes.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -107,6 +108,7 @@ app.use('/api/me', loginGate, meRoutes);
 app.use('/api/home', loginGate, homeRoutes);
 app.use('/api/profile', loginGate, profileRoutes);
 app.use('/api/users', loginGate, userRoutes);
+app.use('/api/admin', adminRoutes);
 
 // 404 Handler
 app.use((req, res) => {
