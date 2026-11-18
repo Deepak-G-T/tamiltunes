@@ -3,7 +3,7 @@ import {
   createQueueState, playFromSearch, playFromContext, addToQueue, applyRefill, advance, MAX_QUEUE,
 } from './radioQueue';
 import {
-  toSaved, fromSaved, sameQueue, savedIds, readGuestQueue, writeGuestQueue, getDeviceId, withRetry, isTransient, GUEST_QUEUE_KEY,
+  toSaved, fromSaved, sameQueue, shouldAskToContinue, savedIds, readGuestQueue, writeGuestQueue, getDeviceId, withRetry, isTransient, GUEST_QUEUE_KEY,
 } from './queuePersist';
 
 const S = (id) => ({ id, title: `Song ${id}`, artist: 'A', image: null, duration: 100 });
@@ -185,5 +185,25 @@ describe('quiet retries', () => {
     let calls = 0;
     await expect(withRetry(async () => { calls++; throw err(undefined); }, { retries: 2, sleep: async () => {} })).rejects.toThrow();
     expect(calls).toBe(3);
+  });
+});
+
+describe('continue on this device?', () => {
+  const meta = (extra = {}) => ({ updatedAt: '2026-11-18T10:00:10.000Z', deviceId: 'phone', ...extra });
+  it('asks when another device saved after this one last synced', () => {
+    expect(shouldAskToContinue({ meta: meta(), myDeviceId: 'laptop', lastSyncAt: '2026-11-18T10:00:00.000Z' })).toBe(true);
+  });
+  it('does not ask for this device\'s own save, an old save, or nothing saved', () => {
+    expect(shouldAskToContinue({ meta: meta({ deviceId: 'laptop' }), myDeviceId: 'laptop', lastSyncAt: null })).toBe(false);
+    expect(shouldAskToContinue({ meta: meta(), myDeviceId: 'laptop', lastSyncAt: '2026-11-18T10:00:10.000Z' })).toBe(false);
+    expect(shouldAskToContinue({ meta: meta(), myDeviceId: 'laptop', lastSyncAt: '2026-11-18T11:00:00.000Z' })).toBe(false);
+    expect(shouldAskToContinue({ meta: null, myDeviceId: 'laptop', lastSyncAt: null })).toBe(false);
+  });
+  it('asks when this device has never synced but another one saved', () => {
+    expect(shouldAskToContinue({ meta: meta(), myDeviceId: 'laptop', lastSyncAt: null })).toBe(true);
+  });
+  it('ignores a broken timestamp', () => {
+    expect(shouldAskToContinue({ meta: meta({ updatedAt: 'garbage' }), myDeviceId: 'laptop', lastSyncAt: null })).toBe(false);
+    expect(shouldAskToContinue({ meta: meta(), myDeviceId: 'laptop', lastSyncAt: 'garbage' })).toBe(true);
   });
 });

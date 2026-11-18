@@ -7,11 +7,12 @@ import {
   playEventSchema, pinSchema, orderSchema, importSchema,
 } from '../controllers/speedDialController.js';
 
-import { getQueue, putQueue, deleteQueue, queueSchema } from '../controllers/queueController.js';
+import { getQueue, getQueueMeta, putQueue, deleteQueue, queueSchema } from '../controllers/queueController.js';
 
 const router = Router();
 router.use(requireAuth);
 
+router.get('/queue/meta', getQueueMeta);
 router.get('/queue', getQueue);
 router.put('/queue', queueWriteLimiter, validateBody(queueSchema), putQueue);
 router.delete('/queue', queueWriteLimiter, deleteQueue);

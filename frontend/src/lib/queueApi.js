@@ -11,6 +11,8 @@ export const loadServerQueue = () =>
     return { queue: data?.queue ?? null, songs: data?.songs ?? {} };
   });
 
+export const loadServerQueueMeta = () => withRetry(async () => (await api.get('/me/queue/meta')).data?.meta ?? null);
+
 export const saveServerQueue = (saved) => withRetry(async () => (await api.put('/me/queue', saved)).data);
 
 /** Ids -> songs (guests, and the fallback when a signed-in user has only a browser copy). At most 100 ids per request. */

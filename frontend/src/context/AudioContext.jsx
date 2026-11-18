@@ -12,8 +12,9 @@ import {
 import { startSleep } from '../lib/sleepTimer';
 import { fetchRelated } from '../lib/radioApi';
 import { useAuth } from './AuthContext';
-import { toSaved, fromSaved, sameQueue, savedIds, readGuestQueue, writeGuestQueue, getDeviceId, SAVE_DEBOUNCE_MS } from '../lib/queuePersist';
-import { loadServerQueue, saveServerQueue, saveServerQueueOnExit, resolveSongIds } from '../lib/queueApi';
+import { toSaved, fromSaved, sameQueue, savedIds, readGuestQueue, writeGuestQueue, getDeviceId, shouldAskToContinue, SAVE_DEBOUNCE_MS, SYNC_CHECK_MIN_MS } from '../lib/queuePersist';
+import { loadServerQueue, loadServerQueueMeta, saveServerQueue, saveServerQueueOnExit, resolveSongIds } from '../lib/queueApi';
+import ContinueHerePrompt from '../components/player/ContinueHerePrompt';
 import Toast from '../components/common/Toast';
 import { getCoverColor, rgbVar } from '../lib/coverColor';
 import { engineFor, canToggleVideo, getVideoId, planSwitch, planEmbedError } from '../lib/playbackLogic';
@@ -135,6 +136,9 @@ export const AudioProvider = ({ children }) => {
   const queueReadyRef = useRef(false); // nothing is saved until the restore attempt is over, so a saved queue is never overwritten by an empty one
   const lastSavedRef = useRef(null);
   const restoreKeyRef = useRef(null);
+  const lastSyncRef = useRef(null); // updatedAt of the server copy this device last saved or loaded
+  const lastSyncCheckRef = useRef(0);
+  const [syncPrompt, setSyncPrompt] = useState(null);
   useEffect(() => { currentTimeRef.current = currentTime; }, [currentTime]);
   useEffect(() => { isAuthRef.current = isAuthenticated; }, [isAuthenticated]);
 
@@ -148,7 +152,7 @@ export const AudioProvider = ({ children }) => {
     lastSavedRef.current = saved;
     if (isAuthRef.current) {
       if (onExit) saveServerQueueOnExit(saved);
-      else saveServerQueue(saved).catch((e) => { lastSavedRef.current = null; console.warn('Could not save the queue:', e.message); }); // quiet: the next change tries again
+      else saveServerQueue(saved).then((d) => { if (d?.updatedAt) lastSyncRef.current = d.updatedAt; }).catch((e) => { lastSavedRef.current = null; console.warn('Could not save the queue:', e.message); }); // quiet: the next change tries again
     } else {
       writeGuestQueue(window.localStorage, saved);
     }
@@ -168,6 +172,57 @@ export const AudioProvider = ({ children }) => {
     return () => { document.removeEventListener('visibilitychange', onHide); window.removeEventListener('pagehide', onPageHide); };
   }, [flushQueueSave]);
 
+  // Show a restored queue: paused at the saved position, never auto-playing
+  const applyRestored = useCallback((restored) => {
+    const song = restored.currentSong;
+    playRequestIdRef.current += 1; // cancel any in-flight play attempt
+    audioRef.current?.pause();
+    ytPlayerRef.current?.pause?.();
+    updateQs(() => restored.state);
+    setCurrentSong(song);
+    currentSongRef.current = song;
+    setCurrentTime(restored.positionSec);
+    setDuration(song.duration || 0);
+    setIsPlaying(false);
+    restoredRef.current = { id: song.id, positionSec: restored.positionSec };
+    lastSavedRef.current = toSaved(restored.state, { positionSec: restored.positionSec, deviceId: deviceIdRef.current });
+  }, [updateQs]);
+
+  // Another device changed the queue? Looked at when the tab comes back into view (and at most every 30 s): no polling.
+  const checkOtherDevice = useCallback(async () => {
+    if (!isAuthRef.current || !queueReadyRef.current) return;
+    const now = Date.now();
+    if (now - lastSyncCheckRef.current < SYNC_CHECK_MIN_MS) return;
+    lastSyncCheckRef.current = now;
+    try {
+      const meta = await loadServerQueueMeta();
+      if (shouldAskToContinue({ meta, myDeviceId: deviceIdRef.current, lastSyncAt: lastSyncRef.current })) setSyncPrompt(meta);
+    } catch { /* offline or asleep: ask again next time */ }
+  }, []);
+  useEffect(() => {
+    const onVisible = () => { if (document.visibilityState === 'visible') checkOtherDevice(); };
+    document.addEventListener('visibilitychange', onVisible);
+    window.addEventListener('focus', checkOtherDevice);
+    return () => { document.removeEventListener('visibilitychange', onVisible); window.removeEventListener('focus', checkOtherDevice); };
+  }, [checkOtherDevice]);
+
+  const resolveSyncPrompt = async (choice) => {
+    const meta = syncPrompt;
+    setSyncPrompt(null);
+    if (!meta) return;
+    if (choice !== 'continue') { lastSyncRef.current = meta.updatedAt; return; } // keep this device's queue: our next save replaces theirs
+    try {
+      const { queue, songs } = await loadServerQueue();
+      const restored = queue && fromSaved(queue, songs, { autoplay: qsRef.current.autoplay });
+      if (!restored) { showToast('That queue is no longer available.'); return; }
+      lastSyncRef.current = queue.updatedAt;
+      applyRestored(restored);
+      showToast('Queue loaded from your other device. Press play to continue.');
+    } catch {
+      showToast('Could not load the queue from your other device. Please try again.');
+    }
+  };
+
   useEffect(() => {
     if (authLoading) return;
     const key = authUser?.id || 'guest';
@@ -178,7 +233,7 @@ export const AudioProvider = ({ children }) => {
         let saved = null;
         let songs = {};
         if (isAuthenticated) {
-          try { ({ queue: saved, songs } = await loadServerQueue()); } catch { /* the server is slow or asleep: fall back to this browser's copy, no error shown */ }
+          try { ({ queue: saved, songs } = await loadServerQueue()); lastSyncRef.current = saved?.updatedAt ?? null; } catch { /* the server is slow or asleep: fall back to this browser's copy, no error shown */ }
         }
         if (!saved) {
           const local = readGuestQueue(window.localStorage);
@@ -189,15 +244,7 @@ export const AudioProvider = ({ children }) => {
         if (!saved || qsRef.current.current || currentSongRef.current) return; // nothing saved, or the user already started something
         const restored = fromSaved(saved, songs, { autoplay: qsRef.current.autoplay });
         if (!restored) return;
-        const song = restored.currentSong;
-        updateQs(() => restored.state);
-        setCurrentSong(song);
-        currentSongRef.current = song;
-        setCurrentTime(restored.positionSec);
-        setDuration(song.duration || 0);
-        setIsPlaying(false); // restored paused: never auto-plays
-        restoredRef.current = { id: song.id, positionSec: restored.positionSec };
-        lastSavedRef.current = toSaved(restored.state, { positionSec: restored.positionSec, deviceId: deviceIdRef.current });
+        applyRestored(restored);
         if (restored.dropped > 0) showToast(`${restored.dropped} song${restored.dropped === 1 ? '' : 's'} from your saved queue ${restored.dropped === 1 ? 'is' : 'are'} no longer available.`);
       } catch (e) {
         console.warn('Could not restore the queue:', e.message);
@@ -862,12 +909,13 @@ export const AudioProvider = ({ children }) => {
   // Add a song to the user's queue block. A song that is already queued asks first: add it again, or move it.
   const [dupPrompt, setDupPrompt] = useState(null); // { song, where: 'next' | 'end', uid }
   const requestQueueAdd = (song, where) => {
-    if (!song) return;
+    if (!song) return 'none';
     const q = qsRef.current;
-    if (isQueueFull(q)) { showToast(`The queue is full (${MAX_QUEUE} songs). Remove some to add more.`); return; }
+    if (isQueueFull(q)) { showToast(`The queue is full (${MAX_QUEUE} songs). Remove some to add more.`); return 'full'; }
     const at = findQueued(q, song.id);
-    if (at >= 0) { setDupPrompt({ song, where, uid: q.upcoming[at].uid }); return; }
+    if (at >= 0) { setDupPrompt({ song, where, uid: q.upcoming[at].uid }); return 'prompt'; }
     updateQs((s) => (where === 'next' ? queuePlayNext(s, song) : queueAdd(s, song)));
+    return 'added';
   };
   const addToQueue = (song) => requestQueueAdd(song, 'end');
   const playNext = (song) => requestQueueAdd(song, 'next');
@@ -1025,7 +1073,7 @@ export const AudioProvider = ({ children }) => {
     }
   }, [currentTime, duration]);
 
-  // Global accessible keyboard shortcuts (Space, M, Arrows)
+  // Global accessible keyboard shortcuts (Space, M, N next, P previous, Q queue, Arrows)
   // Strictly disabled while typing in Search, Login, or any input/textarea
   useEffect(() => {
     const handleKeyDown = (e) => {
@@ -1040,6 +1088,15 @@ export const AudioProvider = ({ children }) => {
       } else if (e.code === 'KeyM') {
         e.preventDefault();
         toggleMute();
+      } else if (e.code === 'KeyN' && !e.ctrlKey && !e.metaKey && !e.altKey) {
+        e.preventDefault();
+        nextTrack();
+      } else if (e.code === 'KeyP' && !e.ctrlKey && !e.metaKey && !e.altKey) {
+        e.preventDefault();
+        previousTrack();
+      } else if (e.code === 'KeyQ' && !e.ctrlKey && !e.metaKey && !e.altKey) {
+        e.preventDefault();
+        setIsQueueOpen((open) => !open);
       } else if (e.code === 'ArrowRight' && e.shiftKey) {
         e.preventDefault();
         nextTrack();
@@ -1175,6 +1232,7 @@ export const AudioProvider = ({ children }) => {
       {children}
       <Toast toast={toast} onDismiss={() => setToast(null)} />
       <DuplicateQueuePrompt prompt={dupPrompt} onChoose={resolveDuplicate} />
+      <ContinueHerePrompt open={Boolean(syncPrompt)} onChoose={resolveSyncPrompt} />
     </AudioContext.Provider>
   );
 };

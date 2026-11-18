@@ -141,3 +141,20 @@ export async function withRetry(fn, { retries = 3, baseMs = 1000, sleep = (ms) =
   }
   throw lastError;
 }
+
+// ---------------------------------------------------------------- another device
+
+export const SYNC_CHECK_MIN_MS = 30000; // look at most this often (app open, tab focus): no polling
+
+/**
+ * Did another device change the saved queue since this device last saved or loaded it?
+ * @param {{ meta: { updatedAt: string, deviceId: string | null } | null, myDeviceId: string, lastSyncAt: string | null }} args
+ */
+export function shouldAskToContinue({ meta, myDeviceId, lastSyncAt }) {
+  if (!meta || !meta.updatedAt) return false;
+  if (meta.deviceId && meta.deviceId === myDeviceId) return false; // our own save
+  const theirs = Date.parse(meta.updatedAt);
+  if (!Number.isFinite(theirs)) return false;
+  const seen = lastSyncAt ? Date.parse(lastSyncAt) : 0;
+  return theirs > (Number.isFinite(seen) ? seen : 0) + 1000;
+}

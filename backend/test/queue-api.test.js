@@ -54,6 +54,15 @@ try {
   assert.equal(got.json.songs[s2].title, `Song ${s2}`);
   assert.equal(got.json.songs[s2].artist, 'Tester');
 
+  // meta: what the "continue on this device?" check reads (no song lookups)
+  assert.equal((await call('GET', '/me/queue/meta')).status, 401);
+  const meta = (await call('GET', '/me/queue/meta', { token: A })).json.meta;
+  assert.equal(meta.deviceId, 'dev-1');
+  assert.equal(meta.count, 3);
+  assert.equal(meta.currentId, s2);
+  assert.ok(meta.updatedAt);
+  assert.equal((await call('GET', '/me/queue/meta', { token: B })).json.meta, null);
+
   // last write wins
   await call('PUT', '/me/queue', { token: A, body: payload([{ id: s3, o: 'c' }]) });
   assert.deepEqual((await call('GET', '/me/queue', { token: A })).json.queue.items, [{ id: s3, o: 'c' }]);

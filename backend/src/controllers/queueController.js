@@ -57,6 +57,16 @@ export const getQueue = async (req, res, next) => {
   } catch (err) { next(err); }
 };
 
+/** GET /api/me/queue/meta: just enough to tell whether another device changed the queue (cheap: no song lookups). */
+export const getQueueMeta = async (req, res, next) => {
+  try {
+    const row = await getQueueStore().get(req.user.id);
+    if (!row) return res.json({ success: true, meta: null });
+    const st = presentState(row);
+    res.json({ success: true, meta: { updatedAt: st.updatedAt, deviceId: st.deviceId, count: st.items.length, currentId: st.items[st.currentIndex]?.id ?? null } });
+  } catch (err) { next(err); }
+};
+
 /** PUT /api/me/queue: replace the saved queue (last write wins). */
 export const putQueue = async (req, res, next) => {
   try {
