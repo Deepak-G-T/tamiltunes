@@ -8,6 +8,7 @@ import path from 'node:path';
 
 const require = createRequire(import.meta.url);
 const { chromium } = require('playwright');
+const viteBin = path.join(path.dirname(require.resolve('vite/package.json')), 'bin', 'vite.js'); // run vite directly, not through npx: works on Windows too
 
 const PORT = 4173;
 const OUT = process.env.UI_AUDIT_OUT || path.resolve('ui-audit-out');
@@ -79,7 +80,7 @@ const check = (name, cond, detail = '') => {
 
 const startServer = () =>
   new Promise((resolve, reject) => {
-    const p = spawn('npx', ['vite', 'preview', '--port', String(PORT), '--strictPort', '--host', '127.0.0.1'], { stdio: ['ignore', 'pipe', 'pipe'], detached: true });
+    const p = spawn(process.execPath, [viteBin, 'preview', '--port', String(PORT), '--strictPort', '--host', '127.0.0.1'], { stdio: ['ignore', 'pipe', 'pipe'], detached: process.platform !== 'win32' });
     let done = false;
     p.stdout.on('data', (d) => { if (!done && /127\.0\.0\.1:4173|Local/.test(d.toString())) { done = true; resolve(p); } });
     p.stderr.on('data', (d) => { if (!done) console.error(String(d)); });
@@ -399,7 +400,7 @@ try {
   results.push({ name: 'audit run', ok: false, detail: String(err) });
 } finally {
   await browser?.close();
-  if (server) { try { process.kill(-server.pid); } catch { /* already gone */ } } // kill npx AND its vite child
+  if (server) { try { if (process.platform === 'win32') server.kill(); else process.kill(-server.pid); } catch { /* already gone */ } }
 }
 const failed = results.filter((r) => !r.ok);
 console.log(`\n${results.length - failed.length}/${results.length} checks passed. Screenshots: ${OUT}`);
