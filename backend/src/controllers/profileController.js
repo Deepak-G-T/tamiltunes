@@ -1,10 +1,10 @@
-import bcrypt from 'bcryptjs';
 import { getStore } from '../community/store/index.js';
 import { validateUsername } from '../community/username.js';
 import { validateAvatarDataUrl } from '../community/avatar.js';
 import { checkContent, FILTER_MESSAGES } from '../community/contentFilter.js';
 import { presentOwnProfile } from '../community/presenters.js';
 import { db } from '../prisma/client.js';
+import { verifyPassword } from '../services/auth/credentials.js';
 
 const fail = (res, status, message, extra = {}) => res.status(status).json({ success: false, message, ...extra });
 
@@ -81,7 +81,7 @@ export const deleteMyAccount = async (req, res, next) => {
   try {
     // Re-check the password: a stolen token alone must not be able to destroy an account.
     const row = await db.user.findUnique({ where: { id: req.user.id } });
-    if (!row || !(await bcrypt.compare(req.body.password, row.password))) {
+    if (!row || !(await verifyPassword(req.body.password, row.password))) {
       return fail(res, 403, 'Incorrect password');
     }
     await getStore().deleteUser(req.user.id);

@@ -1,4 +1,5 @@
 import rateLimit from 'express-rate-limit';
+import { normalizeEmail } from '../services/auth/credentials.js';
 
 export const apiLimiter = rateLimit({
   windowMs: 15 * 60 * 1000, // 15 minutes
@@ -112,3 +113,34 @@ export const homeLimiter = perUser({
   max: 40,
   message: 'Too many requests, please slow down.',
 });
+
+// ---- sign in / sign up / password reset: limits per address AND per email (mount after the body is validated, so the email is normalised)
+const perEmail = ({ windowMs, max, skipSuccessfulRequests = false }) =>
+  rateLimit({
+    windowMs,
+    max,
+    skipSuccessfulRequests,
+    standardHeaders: true,
+    legacyHeaders: false,
+    keyGenerator: (req) => (req.body?.email ? `e:${normalizeEmail(req.body.email)}` : `ip:${req.ip}`),
+    message: { success: false, message: 'Too many attempts. Please try again later.' }, // the same for every email: says nothing about the account
+  });
+
+const perAddress = ({ windowMs, max, skipSuccessfulRequests = false }) =>
+  rateLimit({
+    windowMs,
+    max,
+    skipSuccessfulRequests,
+    standardHeaders: true,
+    legacyHeaders: false,
+    keyGenerator: (req) => `ip:${req.ip}`,
+    message: { success: false, message: 'Too many attempts. Please try again later.' },
+  });
+
+export const loginEmailLimiter = perEmail({ windowMs: 15 * 60 * 1000, max: 10, skipSuccessfulRequests: true }); // 10 wrong tries per email per 15 min
+export const loginIpLimiter = perAddress({ windowMs: 15 * 60 * 1000, max: 30, skipSuccessfulRequests: true });
+export const registerEmailLimiter = perEmail({ windowMs: 60 * 60 * 1000, max: 3 });
+export const registerIpLimiter = perAddress({ windowMs: 60 * 60 * 1000, max: 10 });
+export const forgotEmailLimiter = perEmail({ windowMs: 60 * 60 * 1000, max: 3 });
+export const forgotIpLimiter = perAddress({ windowMs: 15 * 60 * 1000, max: 5 });
+export const resetIpLimiter = perAddress({ windowMs: 15 * 60 * 1000, max: 10 });

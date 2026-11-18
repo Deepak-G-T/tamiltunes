@@ -3,7 +3,7 @@
  * Safe to re-run (upserts). Refuses to run in production. Never use real passwords here.
  *   DATABASE_URL=... npm run seed:community --prefix backend
  */
-import bcrypt from 'bcryptjs';
+import { hashPassword } from '../services/auth/credentials.js';
 import { PrismaClient } from '@prisma/client';
 
 if (process.env.NODE_ENV === 'production') {
@@ -20,7 +20,7 @@ const USERS = [
 ];
 
 const main = async () => {
-  const hash = await bcrypt.hash(PASSWORD, 10);
+  const hash = await hashPassword(PASSWORD);
   const users = {};
   for (const u of USERS) {
     users[u.username] = await prisma.user.upsert({
