@@ -9,7 +9,7 @@ of licence. Keep it that way unless the catalogue becomes licensed.
   `favicon.svg` is the same logo. Screenshots for the install dialog: `node scripts/make-screenshots.mjs` (placeholder covers; replace with real ones any time).
 - **Manifest + service worker** are built by `vite-plugin-pwa` (`injectManifest`, worker in `src/sw.js`, rules in `src/lib/swRules.js`).
   Cached: the app shell (precache), pictures (stale-while-revalidate), and ONLY the public music endpoints `/api/music/home|search|albums/:id|artists/:id`.
-  NEVER cached: audio/video streams (any Range request, `/stream`, saavncdn / googlevideo / youtube hosts), sign-in and every personal endpoint
+  NEVER cached, and not even intercepted (no route at all, so the browser handles them natively and Range requests keep working): audio/video streams (any Range request, `/stream`, saavncdn / googlevideo / youtube hosts), sign-in and every personal endpoint
   (auth, me, admin, home, history, favorites, playlists, comments, profile, queue). Offline page loads show `/offline.html`.
   A new version waits for the "Reload" bar (a silent reload would stop the music).
 - **Install**: the browser's install offer is captured at startup (`lib/pwa.js`), shown as a dismissible bar (remembered 30 days) and on the page `/install`
