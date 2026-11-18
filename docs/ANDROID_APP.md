@@ -58,7 +58,7 @@ npm ci
 npm run android:debug      # builds the web app, copies it in (cap sync) and runs gradle assembleDebug
 # the APK: frontend/android/app/build/outputs/apk/debug/app-debug.apk   (or: npm run android:open  to use Android Studio)
 ```
-Icons and splash: `npm run android:icons` (regenerates from the logo). Version: set `TAMILTUNES_VERSION_NAME` / `TAMILTUNES_VERSION_CODE` or pass `-PtamiltunesVersionName` / `-PtamiltunesVersionCode` to gradle.
+Icons, splash and install-dialog screenshots: `npm run images` (regenerates everything from the logo; needs Chromium for Playwright). Version: set `TAMILTUNES_VERSION_NAME` / `TAMILTUNES_VERSION_CODE` or pass `-PtamiltunesVersionName` / `-PtamiltunesVersionCode` to gradle.
 **Browser checks**: `npm run test:native --prefix frontend` builds the app with recording mocks of the plugins (`--mode nativetest`) and checks, in Chromium, our own code paths (token storage, server address, Back order, notification calls,
 offline banner, share, links). It cannot test the real plugins or Android.
 **Not verifiable here (no Android SDK reachable from this environment):** the Gradle build, the manifest merge, the APK itself. They are UNTESTED until the workflow or your computer builds them.

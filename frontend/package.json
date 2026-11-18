@@ -19,7 +19,9 @@
     "android:open": "cap open android",
     "android:debug": "node scripts/android-build.mjs assembleDebug",
     "android:icons": "node scripts/make-icons.mjs && capacitor-assets generate --android --assetPath assets",
-    "test:native": "vite build --mode nativetest && node scripts/native-audit.mjs"
+    "test:native": "vite build --mode nativetest && node scripts/native-audit.mjs",
+    "pwa:screenshots": "vite build && node scripts/make-screenshots.mjs",
+    "images": "node scripts/make-icons.mjs && capacitor-assets generate --android --assetPath assets && npm run pwa:screenshots"
   },
   "dependencies": {
     "@capacitor/android": "^8.6.2",
