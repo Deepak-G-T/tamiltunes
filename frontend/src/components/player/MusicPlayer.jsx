@@ -55,9 +55,9 @@ const MusicPlayer = ({ onAddToPlaylist }) => {
 
   const { isAuthenticated } = useAuth();
   const hasSong = Boolean(currentSong);
-  useEffect(() => { // once a song is on, fetch the panel code in the background so opening it is instant (not before: it would slow the first page load)
+  useEffect(() => { // as soon as a song is on (never before: it would slow the first page load), fetch the panel code so opening it is instant
     if (!hasSong) return undefined;
-    const t = setTimeout(() => { loadQueueDrawer(); loadFullScreenPlayer(); }, 1500);
+    const t = setTimeout(() => { loadQueueDrawer(); loadFullScreenPlayer(); }, 0);
     return () => clearTimeout(t);
   }, [hasSong]);
   const [isFavorite, setIsFavorite] = useState(false);
