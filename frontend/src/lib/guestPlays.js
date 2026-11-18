@@ -53,6 +53,16 @@ export function topGuestSongs(storage, n = 9, now = Date.now()) {
     .slice(0, n);
 }
 
+/** The artists a logged-out listener plays most (first name of each song's artist field), for the Daily Mix shelves. */
+export function topGuestArtists(storage, n = 6, now = Date.now()) {
+  const score = new Map();
+  for (const g of topGuestSongs(storage, MAX_GUEST_SONGS, now)) {
+    const names = String(g.song.artist || '').split(/[,&]/).map((x) => x.trim()).filter((x) => x && x !== 'Tamil Artist');
+    for (const name of names.slice(0, 2)) score.set(name, (score.get(name) || 0) + g.score);
+  }
+  return [...score.entries()].sort((a, b) => b[1] - a[1]).slice(0, n).map(([name]) => name);
+}
+
 /** Payload for POST /api/me/speed-dial/import. */
 export function exportGuestPlays(storage) {
   return Object.values(loadGuestPlays(storage))

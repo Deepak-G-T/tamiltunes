@@ -131,3 +131,8 @@ Songs may carry an optional `videoId`. It comes from the curated map `backend/sr
 - `songIdentity.js` and `backend/src/services/related/identity.js` are copies: change both. No Tamil script in source files (the English-only test): the transliteration table uses `\u` escapes.
 - Queue rows are 72px high (two-line title, one-line artists with the full list in the tooltip and at the top of the "..." menu); `useFlip` uses `ROW_HEIGHT`.
 - UNTESTED: the fuzzy rules against the live JioSaavn catalogue (tuned on the three reported pairs and fixtures; review the cluster report before trusting `--apply`), real-phone feel of the new rows.
+
+## Home fresh mixes (feature/home-fresh-mixes, on top of fix/queue-duplicates-v2)
+- New mix on every app open and on pull to refresh / the refresh button (`visit` token), last-shown songs sink (`avoid`), Daily Mix 1-3 from plays and likes
+  (guests: `artists` from the browser). No migration. Notes: `docs/HOME_FEED.md` (last section). Browser audit: `npm run test:home --prefix frontend` (24 checks).
+- UNTESTED: live JioSaavn pools for the mixes, real-phone pull to refresh.
