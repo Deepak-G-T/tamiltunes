@@ -1,5 +1,6 @@
 import assert from 'node:assert/strict';
 import app from '../src/app.js';
+import { config } from '../src/config/env.js';
 import { initDb } from '../src/prisma/client.js';
 import { musicService } from '../src/services/music/providerManager.js';
 import { musicCache } from '../src/services/cacheService.js';
@@ -345,7 +346,9 @@ musicService.setProvider('mock');
 musicCache.clear();
 const server = app.listen(5004);
 const BASE = 'http://localhost:5004/api/music';
+const origRequireLogin = config.requireLogin;
 try {
+  config.requireLogin = false;
   const home = await fetch(`${BASE}/home`).then((r) => r.json());
   const badass = home.data.trending.find((s) => /badass/i.test(s.title));
   assert.ok(badass, 'mock home has Badass');
@@ -373,5 +376,6 @@ try {
   assert.equal(raw.trending.find((s) => /badass/i.test(s.title)).videoId, badass.source === 'youtube' ? badass.videoId : undefined);
   console.log('✓ home / search / song responses carry videoId; fresh=1 still works for guests');
 } finally {
+  config.requireLogin = origRequireLogin;
   server.close();
 }

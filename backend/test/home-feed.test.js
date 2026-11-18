@@ -2,6 +2,7 @@ import assert from 'node:assert/strict';
 import { canonTitle, canonMovie, sameSong, createSeen } from '../src/services/homeFeed/normalize.js';
 import { rngFrom, hashSeed, dayKey, weightedOrder } from '../src/services/homeFeed/seed.js';
 import { assembleHome, pickSection, candidateWeight, MIN_ITEMS, MAX_ITEMS, MAX_PER_MOVIE, MAX_PER_ARTIST, ROTATION_PLAYS } from '../src/services/homeFeed/assemble.js';
+import { config } from '../src/config/env.js';
 
 const S = (id, title, album, artist = 'Artist ' + id, extra = {}) => ({ id, title, album, artist, singers: artist, year: '2020', ...extra });
 const many = (prefix, n, make = (i) => S(`${prefix}${i}`, `${prefix} song ${i}`, `${prefix} film ${i}`, `${prefix} singer ${i}`)) => Array.from({ length: n }, (_, i) => make(i));
@@ -132,8 +133,10 @@ musicCache.clear();
 clearHomeCache();
 const server = app.listen(5018);
 const BASE = 'http://localhost:5018/api';
+const origRequireLogin = config.requireLogin;
 const get = async (path) => { const r = await fetch(`${BASE}${path}`); return { status: r.status, json: await r.json() }; };
 try {
+  config.requireLogin = false;
   const home = await get('/home');
   assert.equal(home.status, 200);
   assert.equal(home.json.success, true);
@@ -160,5 +163,6 @@ try {
   assert.equal(noTab.status, 200, 'an unknown tab is ignored, not an error');
   console.log('✓ home feed API: one call, no repeats, Speed dial ids excluded, stable on refresh, tabs, bad input ignored');
 } finally {
+  config.requireLogin = origRequireLogin;
   server.close();
 }

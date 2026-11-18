@@ -149,8 +149,40 @@ async function runAudit() {
   console.log('✓ Playwright Chromium browser initialized');
 
   const setupMockRoutes = async (page) => {
+    await page.addInitScript(() => {
+      localStorage.setItem('tamiltunes_token', 'audit_token');
+      localStorage.setItem('tamiltunes_user', JSON.stringify({ id: 'u1', name: 'Tester', email: 'tester@example.com', role: 'user' }));
+    });
     await page.route('**/api/**', async (route) => {
       const url = route.request().url();
+      if (url.includes('/api/auth/me')) {
+        return route.fulfill({
+          status: 200,
+          contentType: 'application/json',
+          body: JSON.stringify({ success: true, user: { id: 'u1', name: 'Tester', email: 'tester@example.com', role: 'user' } })
+        });
+      }
+      if (url.includes('/api/me/speed-dial')) {
+        return route.fulfill({
+          status: 200,
+          contentType: 'application/json',
+          body: JSON.stringify({ success: true, items: mockHomeData.trending.map((s) => ({ ...s, isPinned: false, isHidden: false })) })
+        });
+      }
+      if (url.includes('/api/home')) {
+        return route.fulfill({
+          status: 200,
+          contentType: 'application/json',
+          body: JSON.stringify({
+            success: true,
+            seed: 'test',
+            hero: null,
+            sections: [
+              { id: 'trending', title: 'Trending now', kind: 'songs', items: mockHomeData.trending }
+            ]
+          })
+        });
+      }
       if (url.includes('/api/music/home')) {
         return route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ success: true, data: mockHomeData }) });
       }

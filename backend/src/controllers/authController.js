@@ -29,7 +29,9 @@ export const presentUser = (user) => ({
   id: user.id,
   name: user.name,
   email: user.email,
-  username: user.username ?? null
+  username: user.username ?? null,
+  role: user.role || 'user',
+  isActive: user.isActive !== false
 });
 
 const EXISTS = { success: false, code: 'EMAIL_EXISTS', message: 'An account with this email already exists' };
@@ -72,10 +74,47 @@ export const login = async (req, res, next) => {
     const { email, password } = req.body;
     const user = await db.user.findUnique({ where: { email } });
 
+    // Check temporary lockout if configured
+    if (user && user.lockedUntil && new Date(user.lockedUntil) > new Date()) {
+      const waitMinutes = Math.max(1, Math.ceil((new Date(user.lockedUntil).getTime() - Date.now()) / 60000));
+      return res.status(429).json({
+        success: false,
+        message: `Account is temporarily locked due to failed login attempts. Try again in ${waitMinutes} minute${waitMinutes === 1 ? '' : 's'}.`
+      });
+    }
+
     let ok = false;
     if (user) ok = await verifyPassword(password, user.password);
     else await spendTimeLikeAVerify(password);
-    if (!ok) return res.status(401).json(BAD_LOGIN);
+
+    if (!ok) {
+      if (user) {
+        const attempts = (user.failedLoginAttempts || 0) + 1;
+        const updateData = { failedLoginAttempts: attempts };
+        if (attempts >= 10) {
+          // Lock for 15 minutes after 10 consecutive failures (aligning with login rate limit)
+          updateData.lockedUntil = new Date(Date.now() + 15 * 60 * 1000);
+        }
+        await db.user.update({
+          where: { id: user.id },
+          data: updateData
+        }).catch(() => {});
+      }
+      return res.status(401).json(BAD_LOGIN);
+    }
+
+    // Check account active status
+    if (user.isActive === false) {
+      return res.status(403).json({ success: false, message: 'Account has been deactivated' });
+    }
+
+    // Reset failed login counter on successful authentication
+    if (user.failedLoginAttempts > 0 || user.lockedUntil) {
+      await db.user.update({
+        where: { id: user.id },
+        data: { failedLoginAttempts: 0, lockedUntil: null }
+      }).catch(() => {});
+    }
 
     res.json({ success: true, token: generateToken(user.id), user: presentUser(user) });
   } catch (err) {

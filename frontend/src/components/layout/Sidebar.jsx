@@ -23,7 +23,7 @@ const Tile = ({ className = '', children }) => (
 );
 
 const Sidebar = ({ onOpenCreatePlaylist }) => {
-  const { isAuthenticated } = useAuth();
+  const { user, isAuthenticated } = useAuth();
   const [playlists, setPlaylists] = useState([]);
   const [hasMorePlaylists, setHasMorePlaylists] = useState(false);
   const navigate = useNavigate();
@@ -87,6 +87,12 @@ const Sidebar = ({ onOpenCreatePlaylist }) => {
             <Search className="w-6 h-6" />
             <span>Search</span>
           </NavLink>
+          {user?.role === 'admin' && (
+            <NavLink to="/admin" className={navLinkClass}>
+              <ShieldAlert className="w-6 h-6 text-brand-400" />
+              <span>Admin Panel</span>
+            </NavLink>
+          )}
         </nav>
       </div>
 

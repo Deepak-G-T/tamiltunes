@@ -7,7 +7,8 @@ import {
   LogOut,
   Settings,
   Music,
-  Menu
+  Menu,
+  ShieldAlert
 } from 'lucide-react';
 import { useAuth } from '../../context/AuthContext';
 
@@ -99,6 +100,18 @@ const TopNav = ({ onToggleMobileSidebar }) => {
                   <Music className="w-3.5 h-3.5 text-zinc-400" />
                   <span>Favourites</span>
                 </button>
+                {user?.role === 'admin' && (
+                  <button
+                    onClick={() => {
+                      setDropdownOpen(false);
+                      navigate('/admin');
+                    }}
+                    className="w-full px-4 py-2 text-left text-xs text-brand-400 font-semibold hover:bg-brand-500/10 flex items-center gap-2"
+                  >
+                    <ShieldAlert className="w-3.5 h-3.5 text-brand-400" />
+                    <span>Admin Panel</span>
+                  </button>
+                )}
                 <div className="my-1 border-t border-zinc-800/60" />
                 <button
                   onClick={() => {

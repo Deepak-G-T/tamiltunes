@@ -33,7 +33,9 @@ console.log('✓ streamGuard URL validation');
 
 const server = app.listen(5003);
 const BASE = 'http://localhost:5003/api/music/stream';
+const origRequireLogin = config.requireLogin;
 try {
+  config.requireLogin = false;
   config.enableExternalStreams = false;
   let r = await fetch(`${BASE}?url=${encodeURIComponent('https://aac.saavncdn.com/a.mp4')}`);
   assert.equal(r.status, 403);
@@ -50,6 +52,7 @@ try {
   assert.equal(r.status, 400);
   console.log('✓ proxy enabled still rejects disallowed targets -> 403 (missing url -> 400)');
 } finally {
+  config.requireLogin = origRequireLogin;
   config.enableExternalStreams = false;
   server.close();
 }

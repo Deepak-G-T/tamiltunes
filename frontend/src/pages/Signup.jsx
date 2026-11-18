@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useSearchParams } from 'react-router-dom';
 import { ArrowRight } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import { AuthShell, TextField, EmailField, PasswordField, SubmitButton, FormError, AuthLink } from '../components/auth/AuthParts';
@@ -7,7 +7,9 @@ import { validateName, validateEmail, validateNewPassword, validateConfirm, reme
 
 const Signup = () => {
   const navigate = useNavigate();
-  const { signup } = useAuth();
+  const [searchParams] = useSearchParams();
+  const redirectParam = searchParams.get('redirect') || '/';
+  const { signup, isAuthenticated, isLoading: authLoading } = useAuth();
   const [name, setName] = useState('');
   const [email, setEmail] = useState(() => recallEmail(window.sessionStorage));
   const [password, setPassword] = useState('');
@@ -16,6 +18,13 @@ const Signup = () => {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   const [exists, setExists] = useState(false);
+
+  // If already authenticated, redirect to destination
+  React.useEffect(() => {
+    if (!authLoading && isAuthenticated) {
+      navigate(redirectParam, { replace: true });
+    }
+  }, [authLoading, isAuthenticated, redirectParam, navigate]);
 
   const errors = { name: validateName(name), email: validateEmail(email), password: validateNewPassword(password), confirm: validateConfirm(password, confirm) };
   const show = (f) => (touched[f] ? errors[f] : '');
@@ -29,30 +38,74 @@ const Signup = () => {
     setLoading(true);
     setError('');
     setExists(false);
-    const res = await signup(name.trim(), email.trim(), password);
+    const cleanEmail = email.trim().toLowerCase();
+    const res = await signup(name.trim(), cleanEmail, password);
     setLoading(false);
-    if (res.success) navigate('/');
-    else if (res.code === 'EMAIL_EXISTS') setExists(true);
-    else setError(res.error || 'Failed to create account');
+    if (res.success) {
+      navigate(redirectParam, { replace: true });
+    } else if (res.code === 'EMAIL_EXISTS') {
+      setExists(true);
+    } else {
+      setError(res.error || 'Failed to create account');
+    }
   };
 
+  const loginLink = redirectParam && redirectParam !== '/'
+    ? `/login?redirect=${encodeURIComponent(redirectParam)}`
+    : '/login';
+
   return (
-    <AuthShell title="Create your Account" subtitle="Start listening to authentic Tamil music with zero ads"
-      footer={<>Already have an account? <AuthLink to="/login">Log in</AuthLink></>}>
+    <AuthShell
+      title="Create your Account"
+      subtitle="Start listening to authentic Tamil music with zero ads"
+      footer={
+        <>
+          Already have an account? <AuthLink to={loginLink}>Log in</AuthLink>
+        </>
+      }
+    >
       <FormError>{error}</FormError>
       {exists && (
         <div role="alert" data-testid="email-exists" className="mb-5 p-3 rounded-xl bg-amber-500/10 border border-amber-500/30 text-amber-200 text-xs">
           <p className="font-semibold">An account with this email already exists.</p>
-          <p className="mt-1.5 flex flex-wrap gap-x-4 gap-y-1"><AuthLink to="/login">Log in instead</AuthLink><AuthLink to="/forgot-password">Forgot password?</AuthLink></p>
+          <p className="mt-1.5 flex flex-wrap gap-x-4 gap-y-1">
+            <AuthLink to={loginLink}>Log in instead</AuthLink>
+            <AuthLink to="/forgot-password">Forgot password?</AuthLink>
+          </p>
         </div>
       )}
       <form onSubmit={handleSubmit} noValidate className="space-y-4">
-        <TextField label="Your name" value={name} onChange={(e) => setName(e.target.value)} onBlur={blur('name')} error={show('name')} autoComplete="name" placeholder="Your name" />
+        <TextField
+          label="Your name"
+          value={name}
+          onChange={(e) => setName(e.target.value)}
+          onBlur={blur('name')}
+          error={show('name')}
+          autoComplete="name"
+          placeholder="Your name"
+        />
         <EmailField value={email} onChange={onEmail} onBlur={blur('email')} error={show('email')} />
-        <PasswordField value={password} onChange={(e) => setPassword(e.target.value)} onBlur={blur('password')} error={show('password')} autoComplete="new-password" placeholder="At least 8 characters" showStrength />
-        <PasswordField label="Confirm password" value={confirm} onChange={(e) => setConfirm(e.target.value)} onBlur={blur('confirm')} error={show('confirm')} autoComplete="new-password" placeholder="Type it again" />
+        <PasswordField
+          value={password}
+          onChange={(e) => setPassword(e.target.value)}
+          onBlur={blur('password')}
+          error={show('password')}
+          autoComplete="new-password"
+          placeholder="At least 8 characters"
+          showStrength
+        />
+        <PasswordField
+          label="Confirm password"
+          value={confirm}
+          onChange={(e) => setConfirm(e.target.value)}
+          onBlur={blur('confirm')}
+          error={show('confirm')}
+          autoComplete="new-password"
+          placeholder="Type it again"
+        />
         <SubmitButton loading={loading} loadingText="Creating account...">
-          <span>Sign Up Free</span><ArrowRight className="w-4 h-4" aria-hidden="true" />
+          <span>Sign Up Free</span>
+          <ArrowRight className="w-4 h-4" aria-hidden="true" />
         </SubmitButton>
       </form>
     </AuthShell>

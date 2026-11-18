@@ -36,8 +36,10 @@ const runTests = async () => {
 
   const server = app.listen(5002);
   const BASE = 'http://localhost:5002/api';
+  const origRequireLogin = config.requireLogin;
 
   try {
+    config.requireLogin = false; // allows guest verification of baseline search & stream APIs
     // 1. Trimmed health check (status & uptime only)
     const rootHealth = await fetch('http://localhost:5002/health').then((r) => r.json());
     if (rootHealth.status !== 'ok' || typeof rootHealth.uptime !== 'number') {
@@ -621,6 +623,7 @@ const runTests = async () => {
     console.error('Test execution failed:', err);
     process.exitCode = 1;
   } finally {
+    config.requireLogin = origRequireLogin;
     server.close();
   }
 };

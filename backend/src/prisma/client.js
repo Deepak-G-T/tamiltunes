@@ -23,6 +23,17 @@ class InMemoryDb {
     this.playlistSongs = new Map();
     this.favorites = new Map();
     this._historyItems = [];
+    this._auditLogs = [];
+    this._appSettings = new Map([
+      ['require_login', { enabled: true }],
+      ['maintenance_banner', { active: false, message: '' }],
+      ['announcement_text', { active: false, message: '' }],
+      ['home_featured_songs', { songIds: [] }],
+      ['home_category_chips', { chips: ['All', 'Romance', 'Mass', 'Melody', '90s Hits', 'Anirudh', 'AR Rahman', 'Yuvan', 'Harris'] }]
+    ]);
+    this._comments = new Map();
+    this._reports = new Map();
+    this._playEvents = [];
   }
 
   user = {
@@ -30,8 +41,35 @@ class InMemoryDb {
       for (const u of this.users.values()) {
         if (where.id && u.id === where.id) return { ...u };
         if (where.email && u.email === where.email.toLowerCase()) return { ...u };
+        if (where.username && u.username === where.username) return { ...u };
       }
       return null;
+    },
+    findMany: async ({ where, orderBy, take, skip, select } = {}) => {
+      let list = Array.from(this.users.values());
+      if (where) {
+        if (where.role) list = list.filter((u) => u.role === where.role);
+        if (where.isActive !== undefined) list = list.filter((u) => Boolean(u.isActive) === Boolean(where.isActive));
+        if (where.OR && Array.isArray(where.OR)) {
+          list = list.filter((u) => where.OR.some((cond) => {
+            if (cond.email?.contains) return (u.email || '').toLowerCase().includes(cond.email.contains.toLowerCase());
+            if (cond.name?.contains) return (u.name || '').toLowerCase().includes(cond.name.contains.toLowerCase());
+            return false;
+          }));
+        }
+      }
+      const start = skip || 0;
+      const end = take !== undefined ? start + take : undefined;
+      return list.slice(start, end).map((u) => ({ ...u }));
+    },
+    count: async ({ where } = {}) => {
+      let list = Array.from(this.users.values());
+      if (where) {
+        if (where.role) list = list.filter((u) => u.role === where.role);
+        if (where.isActive !== undefined) list = list.filter((u) => Boolean(u.isActive) === Boolean(where.isActive));
+        if (where.createdAt?.gte) list = list.filter((u) => new Date(u.createdAt) >= new Date(where.createdAt.gte));
+      }
+      return list.length;
     },
     update: async ({ where, data }) => {
       const u = this.users.get(where.id);
@@ -43,6 +81,13 @@ class InMemoryDb {
     create: async ({ data }) => {
       const user = {
         id: 'usr_' + Math.random().toString(36).substring(2, 11),
+        role: 'user',
+        isActive: true,
+        failedLoginAttempts: 0,
+        lockedUntil: null,
+        twoFactorEnabled: false,
+        twoFactorSecret: null,
+        twoFactorRecoveryCodes: [],
         ...data,
         email: data.email.toLowerCase(),
         createdAt: new Date(),
@@ -50,6 +95,11 @@ class InMemoryDb {
       };
       this.users.set(user.id, user);
       return { ...user };
+    },
+    delete: async ({ where }) => {
+      const u = this.users.get(where.id);
+      this.users.delete(where.id);
+      return u;
     }
   };
 
@@ -58,6 +108,40 @@ class InMemoryDb {
       const s = this.songs.get(where.id);
       return s ? { ...s } : null;
     },
+    findMany: async ({ where, orderBy, take, skip } = {}) => {
+      let list = Array.from(this.songs.values());
+      if (where) {
+        if (where.isHidden !== undefined) list = list.filter((s) => Boolean(s.isHidden) === Boolean(where.isHidden));
+        if (where.deletedAt === null) list = list.filter((s) => !s.deletedAt);
+        if (where.canonicalGroupId) list = list.filter((s) => s.canonicalGroupId === where.canonicalGroupId);
+        if (where.OR && Array.isArray(where.OR)) {
+          list = list.filter((s) => where.OR.some((cond) => {
+            if (cond.title?.contains) return (s.title || '').toLowerCase().includes(cond.title.contains.toLowerCase());
+            if (cond.artist?.contains) return (s.artist || '').toLowerCase().includes(cond.artist.contains.toLowerCase());
+            if (cond.movie?.contains) return (s.movie || '').toLowerCase().includes(cond.movie.contains.toLowerCase());
+            return false;
+          }));
+        }
+      }
+      const start = skip || 0;
+      const end = take !== undefined ? start + take : undefined;
+      return list.slice(start, end).map((s) => ({ ...s }));
+    },
+    count: async ({ where } = {}) => {
+      let list = Array.from(this.songs.values());
+      if (where) {
+        if (where.isHidden !== undefined) list = list.filter((s) => Boolean(s.isHidden) === Boolean(where.isHidden));
+        if (where.deletedAt === null) list = list.filter((s) => !s.deletedAt);
+      }
+      return list.length;
+    },
+    update: async ({ where, data }) => {
+      const s = this.songs.get(where.id);
+      if (!s) throw new Error('Song not found');
+      const updated = { ...s, ...data };
+      this.songs.set(where.id, updated);
+      return { ...updated };
+    },
     upsert: async ({ where, create, update }) => {
       const existing = this.songs.get(where.id);
       if (existing) {
@@ -65,10 +149,106 @@ class InMemoryDb {
         this.songs.set(where.id, updated);
         return { ...updated };
       }
-      const newSong = { id: where.id, ...create, createdAt: new Date() };
+      const newSong = { id: where.id, isHidden: false, deletedAt: null, ...create, createdAt: new Date() };
       this.songs.set(where.id, newSong);
       return { ...newSong };
     }
+  };
+
+  auditLog = {
+    create: async ({ data }) => {
+      const log = {
+        id: 'aud_' + Math.random().toString(36).substring(2, 11),
+        ...data,
+        createdAt: new Date()
+      };
+      this._auditLogs.unshift(log);
+      return { ...log };
+    },
+    findMany: async ({ where, orderBy, take, skip } = {}) => {
+      let list = this._auditLogs.slice();
+      if (where) {
+        if (where.action) list = list.filter((l) => l.action === where.action);
+        if (where.actorId) list = list.filter((l) => l.actorId === where.actorId);
+      }
+      const start = skip || 0;
+      const end = take !== undefined ? start + take : undefined;
+      return list.slice(start, end).map((l) => ({ ...l }));
+    },
+    count: async ({ where } = {}) => {
+      let list = this._auditLogs;
+      if (where) {
+        if (where.action) list = list.filter((l) => l.action === where.action);
+        if (where.actorId) list = list.filter((l) => l.actorId === where.actorId);
+      }
+      return list.length;
+    }
+  };
+
+  appSetting = {
+    findUnique: async ({ where }) => {
+      const val = this._appSettings.get(where.key);
+      if (!val) return null;
+      return { key: where.key, value: val, updatedAt: new Date() };
+    },
+    findMany: async () => {
+      return Array.from(this._appSettings.entries()).map(([key, value]) => ({
+        key,
+        value,
+        updatedAt: new Date()
+      }));
+    },
+    upsert: async ({ where, create, update }) => {
+      const val = update?.value !== undefined ? update.value : create?.value;
+      this._appSettings.set(where.key, val);
+      return { key: where.key, value: val, updatedAt: new Date() };
+    }
+  };
+
+  comment = {
+    findMany: async ({ where, include, orderBy, take, skip } = {}) => {
+      let list = Array.from(this._comments.values());
+      const start = skip || 0;
+      const end = take !== undefined ? start + take : undefined;
+      return list.slice(start, end).map((c) => ({
+        ...c,
+        user: this.users.get(c.userId) || { name: 'User' }
+      }));
+    },
+    findUnique: async ({ where }) => {
+      const c = this._comments.get(where.id);
+      return c ? { ...c } : null;
+    },
+    count: async () => this._comments.size,
+    update: async ({ where, data }) => {
+      const c = this._comments.get(where.id);
+      if (!c) throw new Error('Comment not found');
+      const updated = { ...c, ...data };
+      this._comments.set(where.id, updated);
+      return { ...updated };
+    },
+    delete: async ({ where }) => {
+      const c = this._comments.get(where.id);
+      this._comments.delete(where.id);
+      return c;
+    }
+  };
+
+  report = {
+    findMany: async ({ where, include, take, skip } = {}) => {
+      const list = Array.from(this._reports.values());
+      return list.map((r) => ({
+        ...r,
+        comment: this._comments.get(r.commentId),
+        reporter: this.users.get(r.reporterId)
+      }));
+    },
+    count: async () => this._reports.size
+  };
+
+  playEvent = {
+    count: async () => this._playEvents.length,
+    findMany: async ({ take } = {}) => this._playEvents.slice(0, take)
   };
 
   playlist = {

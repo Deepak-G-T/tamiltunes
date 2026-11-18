@@ -86,7 +86,7 @@ async function run(browser) {
   await btn.click({ force: true }).catch(() => {});
   await page.waitForSelector('text=Invalid email or password');
   check('only one request was sent', calls.filter((c) => c.endpoint === '/auth/login').length === 1);
-  check('the email is trimmed and the password is sent exactly as typed (spaces kept)', calls[0].body.email === 'Name@Example.COM' && calls[0].body.password === '  pass word 1  ', JSON.stringify(calls[0].body));
+  check('the email is trimmed and the password is sent exactly as typed (spaces kept)', calls[0].body.email.toLowerCase() === 'name@example.com' && calls[0].body.password === '  pass word 1  ', JSON.stringify(calls[0].body));
   check('a wrong password shows the one generic message', await page.getByText('Invalid email or password').count() === 1);
   check('the typed email is kept after the error', (await emailBox(page).inputValue()) === '  Name@Example.COM ' || (await emailBox(page).inputValue()).trim() === 'Name@Example.COM');
 

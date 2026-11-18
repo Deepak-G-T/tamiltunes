@@ -59,6 +59,7 @@ export const config = {
   corsOrigin: [process.env.CORS_ORIGIN, process.env.FRONTEND_URL].filter(Boolean).join(','),
   vercelTeamSlug: getVercelTeamSlug(),
   enableExternalStreams: process.env.ENABLE_EXTERNAL_STREAMS === 'true',
+  requireLogin: (process.env.REQUIRE_LOGIN || 'true').toLowerCase() !== 'false',
   trustProxy: parseTrustProxy(),
   ...parseVideoConfig()
 };
