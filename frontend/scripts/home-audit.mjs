@@ -29,20 +29,22 @@ const startServer = () => new Promise((resolve, reject) => {
 });
 
 const calls = [];
+// poll a condition (for things that happen outside the page, like requests); a slow machine just waits longer
+const waitFor = async (fn, ms = 8000) => { const t = Date.now(); while (Date.now() - t < ms) { if (fn()) return true; await new Promise((r) => setTimeout(r, 50)); } return false; };
 let failFolk = true;
 // Acts like the server for the parts that matter here: leaves out `exclude`d songs, answers after a short delay
 const homeHandler = async (route) => {
   const url = new URL(route.request().url());
   const exclude = (url.searchParams.get('exclude') || '').split(',').filter(Boolean);
   const tab = url.searchParams.get('tab');
-  calls.push({ exclude, tab });
+  calls.push({ exclude, tab, visit: url.searchParams.get('visit'), avoid: (url.searchParams.get('avoid') || '').split(',').filter(Boolean) });
   await new Promise((r) => setTimeout(r, 700));
   const drop = (list) => list.filter((s) => !exclude.includes(s.id));
   if (tab === 'folk' && failFolk) return route.fulfill({ status: 500, json: { success: false } });
   if (tab) return route.fulfill({ json: { success: true, seed: 's', hero: null, sections: [{ id: tab, title: 'Heartfelt melodies & love songs', kind: 'songs', items: M }], hidden: [] } });
   return route.fulfill({ json: { success: true, seed: 's', hero: drop([H[9]])[0] ? H[9] : null, hidden: ['continue'], sections: [
     { id: 'trending', title: 'Trending now', kind: 'songs', items: drop([...H.slice(0, 5), ...T]) },   // contains Speed Dial songs: they must be gone
-    { id: 'new', title: 'New releases', kind: 'songs', items: drop(N) },
+    { id: 'new', title: 'New releases', subtitle: 'Singer A, Singer B and more', kind: 'songs', items: drop(N) },
   ] } });
 };
 
@@ -102,7 +104,48 @@ async function run(browser) {
   await page.getByRole('button', { name: 'All Tamil Music' }).click();
   await page.waitForSelector('section[aria-label="Trending now"]');
   check('back on All the Speed Dial songs are left out again', (calls.at(-1).exclude || []).length > 0);
+  // a fresh mix: every app open has a visit token, tab switches keep it, Refresh makes a new one and sends what was on screen
+  const first = calls[0];
+  check('the page sends a visit token (a new mix on every app open)', /^[a-z0-9]{10}$/.test(first.visit || ''), JSON.stringify(first));
+  check('switching tabs keeps the same visit', calls.every((c) => c.visit === first.visit), calls.map((c) => c.visit).join(','));
+  check('a shelf shows its subtitle (Daily Mix style)', (await page.locator('section[aria-label="New releases"] >> text=Singer A, Singer B and more').count()) === 1);
+  const before = calls.length;
+  await page.getByRole('button', { name: 'Refresh for a fresh mix' }).click();
+  // wait for the refresh request itself (the old shelves stay on screen while it loads, so a selector would not wait)
+  await waitFor(() => calls.length >= before + 1);
+  await page.waitForSelector('button[aria-label="Refresh for a fresh mix"]:not([disabled])'); // the new mix has arrived
+  const refreshed = calls.at(-1);
+  check('Refresh asks for a new mix (a different visit token)', calls.length === before + 1 && refreshed.visit && refreshed.visit !== first.visit, JSON.stringify(refreshed));
+  check('Refresh sends the songs that were on screen so they sink', refreshed.avoid.length >= 5 && refreshed.avoid.every((id) => /^[\w.:~-]+$/.test(id)), JSON.stringify(refreshed.avoid));
   check('no page errors', errors.length === 0, errors.join(' | '));
+  await ctx.close();
+}
+
+// Pull down at the top of the page on a phone: the same fresh mix
+async function pullToRefresh(browser) {
+  const ctx = await browser.newContext({ viewport: { width: 390, height: 844 }, isMobile: true, hasTouch: true });
+  const page = await ctx.newPage();
+  const errors = [];
+  page.on('pageerror', (e) => errors.push(e.message));
+  await page.route('**/api/music/home', (r) => r.fulfill({ json: { success: true, data: FEED } }));
+  await page.route('**/api/home**', homeHandler);
+  await page.route('**/api/**', (r) => (/music\/home|\/api\/home/.test(r.request().url()) ? r.fallback() : r.fulfill({ json: { success: true } })));
+  await page.route('https://aac.saavncdn.com/**', (r) => r.abort());
+  calls.length = 0;
+  await page.goto(`${BASE}/`);
+  await page.waitForSelector('section[aria-label="Trending now"]');
+  const firstVisit = calls.at(-1).visit;
+  const n = calls.length;
+  const cdp = await ctx.newCDPSession(page);
+  await cdp.send('Input.dispatchTouchEvent', { type: 'touchStart', touchPoints: [{ x: 200, y: 150 }] });
+  for (let i = 1; i <= 8; i++) { await cdp.send('Input.dispatchTouchEvent', { type: 'touchMove', touchPoints: [{ x: 200, y: 150 + i * 25 }] }); await page.waitForTimeout(20); }
+  const indicator = await page.locator('[data-testid=pull-indicator]').innerText().catch(() => '');
+  check('pulling down shows "Release for a fresh mix"', /Release for a fresh mix/.test(indicator), indicator);
+  await cdp.send('Input.dispatchTouchEvent', { type: 'touchEnd', touchPoints: [] });
+  await waitFor(() => calls.length >= n + 1);
+  await page.waitForSelector('section[aria-label="Trending now"]');
+  check('letting go asks for a new mix', calls.length === n + 1 && calls.at(-1).visit !== firstVisit, JSON.stringify(calls.slice(n)));
+  check('no page errors (pull to refresh)', errors.length === 0, errors.join(' | '));
   await ctx.close();
 }
 
@@ -112,6 +155,7 @@ try {
   server = await startServer();
   browser = await chromium.launch({ ...(process.env.CHROMIUM_PATH ? { executablePath: process.env.CHROMIUM_PATH } : {}) });
   await run(browser);
+  await pullToRefresh(browser);
 } catch (err) {
   console.error('Home audit crashed:', String(err.message).split('\n').slice(0, 12).join('\n'));
   results.push({ ok: false });

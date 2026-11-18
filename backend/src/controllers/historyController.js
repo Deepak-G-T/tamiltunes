@@ -1,3 +1,4 @@
+import { clusterSongs } from '../services/related/identity.js';
 import { z } from 'zod';
 import { db } from '../prisma/client.js';
 
@@ -28,6 +29,12 @@ export const getHistory = async (req, res, next) => {
     ]);
 
     const hasMore = offset + history.length < total;
+
+    // Every row says which song it really is: copies of one song (another id, spelling or album) share a canonicalId,
+    // so "already played" rules can treat them as one. The log itself is not collapsed (every play stays).
+    const forId = history.map((h) => h.song).filter(Boolean).map((x) => ({ ...x, singers: (x.singers || []).join(', ') || x.artist }));
+    const canon = clusterSongs(forId).canonicalOf;
+    for (const h of history) if (h.song) h.song = { ...h.song, canonicalId: h.song.canonicalId || canon.get(h.song.id) || h.song.id };
 
     res.json({
       success: true,

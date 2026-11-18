@@ -34,3 +34,18 @@ searches per pool are in `QUERIES` in `homeFeedService.js`.
 ## UNTESTED
 The live JioSaavn pools (the tests use the offline catalogue and synthetic pools), and how full each shelf is with real data: a
 shelf with fewer than 8 unique songs is hidden, so a thin pool shows as a missing shelf.
+
+## A fresh mix on every visit, Daily Mix (feature/home-fresh-mixes)
+The page used to be the same all day (seeded by person + day). Now it changes like Spotify / YouTube Music:
+- **Visit token.** The page makes a random `visit` token on every app open (`lib/homeVisit.js`) and a new one when you pull down or tap the refresh button
+  (`hooks/useHomeFeed.refresh`, `hooks/usePullToRefresh.js`). The server seed is `person:day:visit`, so a new token is a new mix; the same token is
+  stable (Back, switching tabs). Category chips keep the same token.
+- **Rotation.** The ids shown last time are kept in localStorage (`tamiltunes_home_shown_v1`, 80 ids) and sent as `?avoid=`; they are treated like
+  songs played 3+ times this week (weight x0.15): they sink but stay if a shelf would otherwise be thin (never empties a shelf, never repeats on the page).
+- **Daily Mix 1-3.** Each mix is two of your favourite artists (most played in 90 days, a liked song counts as 3 plays) with a subtitle ("A, B and more");
+  pool = provider searches `"<artist> tamil songs"` and `"<artist> hits"`, minus songs played this week. They replace "Made for you"
+  (which stays as the fallback when there is no taste yet). A mix with fewer than 8 songs is hidden. Logged-out listeners send their top artists from
+  this browser (`?artists=`, up to 6, from `guestPlays`), so guests get mixes too.
+- Query params (all optional, validated): `visit` (<=24 chars `[\w-]`), `avoid` (<=80 ids), `artists` (<=6 names). The 3-minute cache key includes them.
+- Tuning: `MAX_MIXES`, `MAX_AVOID`, `planMixes` in `homeFeedService.js`; `LIKE_POINTS` in `signals.js`; `PULL_THRESHOLD` in `usePullToRefresh.js`.
+- UNTESTED: the live pools (how many songs `"<artist> tamil songs"` returns for your real top artists), real-phone pull feel.

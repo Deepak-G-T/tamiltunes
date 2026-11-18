@@ -120,3 +120,19 @@ Songs may carry an optional `videoId`. It comes from the curated map `backend/sr
   (`reset-password`, `verify-password`, `report:email-collisions`): `docs/AUTH.md`. Migrations `20261123000000_password_reset`, `20261123000100_email_lower_unique`
   (take the Neon backup BEFORE merging; the second one skips itself if two emails would collide). `npm run test:auth --prefix frontend` is the sign in / sign up browser audit.
 - UNTESTED: a real reset email from the provider; the migrations on Neon (they passed on a scratch Postgres 16).
+## No repeats in autoplay (fix/queue-duplicates)
+- Song identity (fingerprint, variant key) in `frontend/src/lib/songIdentity.js` and a copy in `backend/src/services/related/identity.js`: keep the two in sync (both have tests with the same examples).
+  Rules and limits in `docs/RADIO.md`. `npm run report:duplicate-songs --prefix backend` is report-only.
+
+## Duplicates v2 (fix/queue-duplicates-v2)
+- Fuzzy `isSameSong` + canonical groups (spelling variants, compilation copies): rules and where they are used are in `docs/RADIO.md` (last section). Migration
+  `20261124000000_songs_canonical_id` (additive; take the Neon backup BEFORE merging, as always). Report first: `npm run report:duplicate-songs --prefix backend`, then
+  `npm run backfill:canonical-ids --prefix backend` (dry run by default, `-- --apply` writes; nothing is ever deleted).
+- `songIdentity.js` and `backend/src/services/related/identity.js` are copies: change both. No Tamil script in source files (the English-only test): the transliteration table uses `\u` escapes.
+- Queue rows are 72px high (two-line title, one-line artists with the full list in the tooltip and at the top of the "..." menu); `useFlip` uses `ROW_HEIGHT`.
+- UNTESTED: the fuzzy rules against the live JioSaavn catalogue (tuned on the three reported pairs and fixtures; review the cluster report before trusting `--apply`), real-phone feel of the new rows.
+
+## Home fresh mixes (feature/home-fresh-mixes, on top of fix/queue-duplicates-v2)
+- New mix on every app open and on pull to refresh / the refresh button (`visit` token), last-shown songs sink (`avoid`), Daily Mix 1-3 from plays and likes
+  (guests: `artists` from the browser). No migration. Notes: `docs/HOME_FEED.md` (last section). Browser audit: `npm run test:home --prefix frontend` (24 checks).
+- UNTESTED: live JioSaavn pools for the mixes, real-phone pull to refresh.

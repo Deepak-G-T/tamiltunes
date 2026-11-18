@@ -24,6 +24,7 @@ import VideoSlot from './VideoSlot';
 import VideoModeToggle from './VideoModeToggle';
 import CommentsPanel from '../comments/CommentsPanel';
 import QueueContent from './queue/QueueContent';
+import MarqueeText from '../common/MarqueeText';
 import { useSongActions } from '../common/SongActionsSheet';
 import { useSwipe } from '../../lib/swipe';
 import { haptic } from '../../lib/haptics';
@@ -53,8 +54,16 @@ const FullScreenPlayer = ({ isOpen, onClose: onCloseProp, onToggleFavorite, isFa
     toggleRepeat,
     activeEngine,
     queue,
-    queueIndex
+    queueIndex,
+    queueSections
   } = useAudio();
+
+  // The full source name: the playlist or album being played, or the radio and what it started from
+  const sourceName = (() => {
+    const label = queueSections?.nextFrom?.label || '';
+    if (queueSections?.mode === 'context' && label.startsWith('Next from ')) return label.slice('Next from '.length);
+    return currentSong?.album ? `Radio · ${currentSong.album}` : 'TamilTunes';
+  })();
 
   const [commentsOpen, setCommentsOpen] = useState(false);
   const [view, setView] = useState('player'); // 'player' | 'queue' (the Queue tab inside Now Playing)
@@ -150,9 +159,8 @@ const FullScreenPlayer = ({ isOpen, onClose: onCloseProp, onToggleFavorite, isFa
         </button>
 
         <div className="text-center px-2 min-w-0">
-          <p className="text-[10px] sm:text-xs uppercase tracking-widest text-zinc-400 font-semibold truncate">
-            Playing From {currentSong.album ? `"${currentSong.album}"` : 'TamilTunes'}
-          </p>
+          <p className="text-[10px] sm:text-xs uppercase tracking-widest text-zinc-500 font-semibold">Playing from</p>
+          <MarqueeText text={sourceName} className="text-xs sm:text-sm uppercase tracking-widest text-zinc-300 font-semibold" />
         </div>
 
         <div className="flex items-center gap-2">

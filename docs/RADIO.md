@@ -63,3 +63,47 @@ Other knobs: `VARIETY.maxRun` (3), `VARIETY.discoveryRatio` (0.3), `VARIETY.simi
 - "Add to queue", "Play next", remove and drag-to-reorder keep the user-added songs ahead of the radio ones.
 - Shuffle reorders the remaining playlist songs (and restores the order when turned off); repeat is off / all / one.
 - The queue is not yet wired into the player UI: that is phase 3.
+
+
+## No repeats (fingerprint and variant rules)
+The same song comes back under other ids, covers and singer order, and versions of a song (unplugged, remix ...) must not fill a radio block.
+`frontend/src/lib/songIdentity.js` (copy: `backend/src/services/related/identity.js`, same tests) defines:
+- **songFingerprint**: the title without bracketed text, "- From ...", punctuation (NFKC, lower case; version words inside brackets are kept)
+  plus the singers sorted alphabetically. Two songs are the same song when the titles match and the film matches (or is missing) or the
+  singers overlap.
+- **variantKey**: the same without version words (unplugged, acoustic, remix, reprise, lofi, slowed, reverb, instrumental, karaoke, cover,
+  male / female version, 8D).
+
+Autoplay (engine, `applyRefill`): a song is added only if it is not, by id, fingerprint or variant, the playing song, any song in the queue
+(yours and the radio's), one of the last 50 played, or one skipped this session. Songs played earlier this session are also kept out by id (500).
+At most one song per variant in the radio block; at most 2 songs per film within any 10 songs; at most 3 in a row by one artist. The check
+runs against the live queue when the answer arrives, so songs you queued while the request was running are respected. Songs you add yourself
+always win: a duplicate asks "Already in queue - add again?" and is then added; a version is added without asking.
+Queues are cleaned when loaded and when the playing song changes (`cleanRadioDuplicates`): autoplay entries that repeat the playing song,
+an earlier entry or a version of either are removed; your own songs are never touched.
+
+Server (`/api/songs/:id/related`): the seed, its copies and its versions are never offered; duplicates among candidates collapse to one copy
+(most played, then the original over a version, then the most complete data); excluded ids also keep out their copies and versions; at most
+2 songs per film per 10; "same singer" cannot be the only reason for more than 30% of a batch. Fingerprints are computed in memory on the
+candidate pool (cached 5 minutes), so there is no extra database column and no extra query.
+
+`npm run report:duplicate-songs --prefix backend` lists duplicate groups in the songs table (report only, it changes nothing).
+
+## Fuzzy duplicates and canonical songs (fix/queue-duplicates-v2)
+
+The exact-title fingerprint above missed copies whose title is spelled differently or whose film/singers differ (a "Romantic Hits"
+compilation copy). `isSameSong(a, b)` in `frontend/src/lib/songIdentity.js` (copy: `backend/src/services/related/identity.js`, keep both in sync) is now the one rule:
+
+1. Equal `isrc`, `sourceTrackId` or `audioHash` = the same song. (The JioSaavn provider passes an `isrc` through when the API sends one; none of these exist in the stored data today.)
+2. Otherwise ALL of: durations within 2 s, a shared artist or music director (names are compared without dots/spaces, and one name inside the other counts, 5+ letters), and a title similarity >= 0.85 on the phonetic form.
+   A missing or provider-guessed duration (`durationEstimated`), or a missing artist, needs similarity >= 0.95; with no duration, two different films are different songs unless one is a compilation.
+3. Version words (unplugged, remix, reprise ...) and numbers (Part 1 / Part 2) must be equal, so versions never merge. `sameVariant` still keeps versions out of one radio block.
+
+Phonetic form: lowercase, NFKC, brackets and "From ..." removed, Tamil script transliterated, then zh->l, th/dh->t, h after a consonant dropped, ae/ai/ay->e, aa->a, ee/ii->i, oo/uu->u, w->v, trailing y->i, doubled letters single. Similarity = the lower of Jaro-Winkler and the Levenshtein ratio, with equal consonant skeletons as a fallback.
+
+`clusterSongs` groups songs and gives each group a `canonicalId` = the id of the best copy: not a compilation/playlist-style album ("Romantic Hits", "Konjam Paatu", "POV", "Best of", "Jukebox", "Mashup", "Top 10" ...), then most played, then a playable source, then completeness.
+Used by: the radio refill and exclusion (current + queue + radio block + last 50 played + skipped), `GET /api/songs/:id/related` (items carry `canonicalId`), search results (collapsed to the best copy), home shelves, Speed Dial (plays of copies add up, one tile) and history rows (`canonicalId`).
+Autoplay rows that repeat the playing song or an earlier row are removed when a queue loads (also from a saved queue), when the song changes, and Refresh recommendations replaces the whole radio block; songs you added are never touched.
+
+Database: `songs.canonical_id` (migration `20261124000000_songs_canonical_id`, additive). Review first, then fill it (neither deletes anything):
+`npm run report:duplicate-songs --prefix backend` (report only) and `npm run backfill:canonical-ids --prefix backend` (dry run; add `-- --apply` to write; run with the UNPOOLED url).

@@ -5,6 +5,7 @@ import { checkStreamUrl, MAX_STREAM_BYTES, STREAM_TIMEOUT_MS } from '../services
 import { musicService } from '../services/music/providerManager.js';
 import { videoLookup } from '../services/music/videoLookup.js';
 import { searchPublicPlaylists } from '../services/playlistSearch.js';
+import { withCanonical } from '../services/related/identity.js';
 
 const SONG_LIST_KEYS = [
   'trending', 'latest', 'gana', 'nineties', 'twoThousands',
@@ -48,7 +49,7 @@ export const searchMusic = async (req, res, next) => {
       type === 'playlists' ? { songs: [], albums: [], artists: [] } : musicService.search(query.trim(), type),
       wantsPlaylists ? searchPublicPlaylists(query).catch(() => []) : [],
     ]);
-    const data = { ...found, songs: videoLookup.attach(found.songs || []), playlists };
+    const data = { ...found, songs: videoLookup.attach(withCanonical(found.songs || [])), playlists };
     res.json({
       success: true,
       data

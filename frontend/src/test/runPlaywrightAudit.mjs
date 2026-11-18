@@ -319,7 +319,7 @@ async function runAudit() {
     await miniPlayer.tap();
     await page.waitForTimeout(500);
 
-    const fullScreenHeading = page.locator('text=Playing From "Leo"');
+    const fullScreenHeading = page.locator('[data-testid=marquee-text][aria-label*="Leo"]');
     const isFullVisible = await fullScreenHeading.isVisible();
     console.log(`[${cfg.name}] Assertion: Tapping mini-player opens full-screen ->`, isFullVisible ? 'PASS' : 'FAIL');
     if (!isFullVisible) throw new Error(`FullScreenPlayer failed to open via tap() on ${cfg.name}`);

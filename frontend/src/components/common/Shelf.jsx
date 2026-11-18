@@ -15,7 +15,7 @@ const SkeletonCard = () => (
  * Titled horizontal row of cards. `loading` shows skeleton cards.
  * Children are wrapped to a fixed width; the row scrolls with scroll-snap on touch.
  */
-const Shelf = ({ title, onShowAll, loading = false, children }) => {
+const Shelf = ({ title, subtitle, onShowAll, loading = false, children }) => {
   const items = React.Children.toArray(children).filter(Boolean);
   if (!loading && items.length === 0) return null;
 
@@ -30,6 +30,7 @@ const Shelf = ({ title, onShowAll, loading = false, children }) => {
               {title}
             </h2>
           )}
+          {!loading && subtitle && <p className="text-xs md:text-sm text-zinc-400 mt-0.5 truncate" title={subtitle}>{subtitle}</p>}
         </div>
         {onShowAll && (
           <button onClick={onShowAll} className="text-sm font-bold text-zinc-400 hover:text-white hover:underline">
