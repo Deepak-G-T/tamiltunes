@@ -426,7 +426,7 @@ async function runVideoLists(browser) {
   await videosChip.click();
   await page.waitForSelector('[data-testid=search-videos]');
   check(`[${tag}] Search: the videos chip asks the server for songs (it has no "videos" type)`, searchTypes.at(-1) === 'songs' && !searchTypes.includes('videos'), searchTypes.join(','));
-  check(`[${tag}] Search: the videos chip shows only the songs with a video`, (await page.locator('[data-testid=search-videos] [data-testid=video-thumb-card]').count()) === 4 && (await page.locator('text=Plain Audio Song').count()) === 0);
+  check(`[${tag}] Search: the videos chip shows only the songs with a video`, (await page.waitForFunction(() => document.querySelectorAll('[data-testid=search-videos] [data-testid=video-thumb-card]').length === 4, null, { timeout: 5000 }).then(() => true, () => false)) && (await page.locator('text=Plain Audio Song').count()) === 0);
 
   // Artist page: a Videos section
   await page.goto(`http://127.0.0.1:${PORT}/artist/a1`);
