@@ -1,5 +1,6 @@
 import assert from 'node:assert/strict';
 import app from '../src/app.js';
+import { config } from '../src/config/env.js';
 import { initDb } from '../src/prisma/client.js';
 import { musicService } from '../src/services/music/providerManager.js';
 import { musicCache } from '../src/services/cacheService.js';
@@ -9,12 +10,14 @@ musicService.setProvider('mock'); // offline curated catalogue: fast and determi
 musicCache.clear();
 const server = app.listen(5013);
 const BASE = 'http://localhost:5013/api';
+const origRequireLogin = config.requireLogin;
 const get = async (path, token) => {
   const res = await fetch(`${BASE}${path}`, { headers: token ? { Authorization: `Bearer ${token}` } : {} });
   return { status: res.status, json: await res.json() };
 };
 
 try {
+  config.requireLogin = false;
   // seed: "Badass (Leo)": other songs from Leo / Anirudh should come first
   const r = await get('/songs/tt_trending_1/related?limit=10');
   assert.equal(r.status, 200);
@@ -52,5 +55,6 @@ try {
   assert.equal(p.json.meta.personalised, true);
   console.log('✓ GET /api/songs/:id/related: same-film songs first, no seed, no duplicates, exclude honoured, cached, validated, 404, personalised');
 } finally {
+  config.requireLogin = origRequireLogin;
   server.close();
 }

@@ -28,7 +28,8 @@ const ResetPassword = () => {
     setError('');
     const res = await resetPassword(token, password);
     setLoading(false);
-    if (res.success) navigate('/', { replace: true }); // signed in with the new password
+    const redirectTo = params.get('redirect') || '/';
+    if (res.success) navigate(redirectTo, { replace: true }); // signed in with the new password
     else if (res.code === 'RESET_INVALID') setDead(true);
     else setError(res.error || 'Something went wrong. Please try again.');
   };

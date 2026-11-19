@@ -42,11 +42,22 @@ let searchCalls = [];
 async function open(browser, { legacy } = {}) {
   const ctx = await browser.newContext({ viewport: { width: 1280, height: 800 } });
   const page = await ctx.newPage();
+  await page.addInitScript(() => {
+    localStorage.setItem('tamiltunes_token', 'audit_token');
+    localStorage.setItem('tamiltunes_user', JSON.stringify({ id: 'u1', name: 'Tester', email: 'tester@example.com', role: 'user' }));
+  });
   if (legacy) await page.addInitScript(([k, v]) => { if (!localStorage.getItem('__seeded')) { localStorage.setItem(k, v); localStorage.setItem('__seeded', '1'); } }, [LEGACY, JSON.stringify(legacy)]);
   searchCalls = [];
-  await page.route('**/api/music/search**', (r) => { searchCalls.push(new URL(r.request().url()).searchParams.get('query')); return r.fulfill({ json: { success: true, data: results } }); });
-  await page.route('**/api/music/home', (r) => r.fulfill({ json: { success: true, data: { trending: [], latest: [], gana: [], nineties: [], twoThousands: [], melodies: [], love: [], sad: [], folk: [], instrumental: [], popularAlbums: [], popularArtists: [], albums: [], artists: [] } } }));
-  await page.route('**/api/**', (r) => (/music\/(search|home)/.test(r.request().url()) ? r.fallback() : r.fulfill({ json: { success: true } })));
+  await page.route('**/api/**', (r) => {
+    const u = r.request().url();
+    if (/\/auth\/me/.test(u)) return r.fulfill({ json: { success: true, user: { id: 'u1', name: 'Tester', email: 'tester@example.com', role: 'user' } } });
+    if (/\/music\/search/.test(u)) {
+      searchCalls.push(new URL(u).searchParams.get('query'));
+      return r.fulfill({ json: { success: true, data: results } });
+    }
+    if (/\/music\/home/.test(u)) return r.fulfill({ json: { success: true, data: { trending: [], latest: [], gana: [], nineties: [], twoThousands: [], melodies: [], love: [], sad: [], folk: [], instrumental: [], popularAlbums: [], popularArtists: [], albums: [], artists: [] } } });
+    return r.fulfill({ json: { success: true } });
+  });
   await page.route('https://aac.saavncdn.com/**', (r) => r.fulfill({ status: 200, contentType: 'audio/wav', body: wav }));
   await page.route('https://www.youtube.com/iframe_api', (r) => r.fulfill({ contentType: 'application/javascript', body: '' }));
   await page.goto(`${BASE}/search`);
