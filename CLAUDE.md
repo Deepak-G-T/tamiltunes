@@ -153,3 +153,11 @@ Songs may carry an optional `videoId`. It comes from the curated map `backend/sr
 - Migration `20261126000000_song_videos` (additive; songs.video_id / video_available / video_flagged_at + video_reports). Neon dev branch first, backup branch BEFORE merging.
 - A video is hidden for everyone only after 2 signed-in people report it (served video only); one failed embed hides it for that person (7 days, browser only).
 - UNTESTED: everything on a real phone (rotation/full screen, screen lock, Back from full screen, Bluetooth/headset, Wi-Fi only on mobile data).
+
+## App updates (feature/app-updater, on top of the Android app)
+- Profile > Check for updates reads `version.json` from the newest GitHub Release of this (public) repository and installs `app-release.apk` from it. No token is ever in the app.
+  Rules, setup (keystore, four secrets) and release steps: `docs/APP_UPDATES.md`. Release = push a tag `vX.Y.Z` (workflow `android-release.yml`); versionCode = major*10000+minor*100+patch.
+- `AppUpdaterPlugin.java` is the ONLY native code that downloads or writes a file, only to the private cache folder, only from `https://github.com/Deepak-G-T/tamiltunes/releases/...`
+  (every redirect hop checked against the host list kept in sync with `src/lib/appUpdate.js` by a test). Never widen the host list; never store audio or video.
+- Never commit a keystore, `keystore.properties` or passwords. Never resolve a promise with the `AppUpdater` plugin object (same Capacitor rule as above).
+- UNTESTED on a real phone: the whole flow (install v1, publish v2, tap the button, download, installer prompt, login and data kept). A debug APK cannot be updated by a release APK (different signing key).
