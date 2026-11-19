@@ -189,7 +189,7 @@ const Search = () => {
             <VideoGrid songs={(results.songs || []).filter((s) => s.videoId)} title="Videos" testId="search-videos" />
           )}
           {activeFilter === 'videos' && !(results.songs || []).some((s) => s.videoId) && (
-            <p className="py-10 text-center text-sm text-zinc-400" data-testid="search-no-videos">No video songs for this search.</p>
+            <p className="py-10 text-center text-sm text-zinc-400" data-testid="search-no-videos">No video songs for this search. Only some songs have a video so far; try All or Songs.</p>
           )}
 
           {/* Songs Section */}
