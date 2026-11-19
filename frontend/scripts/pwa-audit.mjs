@@ -45,6 +45,10 @@ const until = async (fn, ms = 8000) => { const t = Date.now(); while (Date.now()
 
 async function run(browser) {
   const ctx = await browser.newContext({ viewport: { width: 390, height: 844 }, isMobile: true, hasTouch: true });
+  await ctx.addInitScript(() => {
+    localStorage.setItem('tamiltunes_token', 'audit_token');
+    localStorage.setItem('tamiltunes_user', JSON.stringify({ id: 'u1', name: 'Tester', email: 'tester@example.com', role: 'user' }));
+  });
   const page = await ctx.newPage();
   const errors = [];
   page.on('pageerror', (e) => errors.push(e.message));
