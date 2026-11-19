@@ -8,6 +8,7 @@ import FollowButton from './FollowButton';
 import PeopleSheet from './PeopleSheet';
 import EditProfileSheet from './EditProfileSheet';
 import SettingsSheet from './SettingsSheet';
+import AppUpdateCard from '../native/AppUpdateCard';
 import { compactCount } from '../../lib/format';
 import { usePageMeta } from '../../hooks/usePageMeta';
 import { avatarSrc } from '../../lib/communityApi';
@@ -122,6 +123,8 @@ const ProfileView = ({ profile, isSelf, onProfileChange }) => {
           <button type="button" onClick={share} aria-label="Share profile" className="press p-2.5 rounded-full bg-white/10 hover:bg-white/15 text-white"><Share2 className="w-5 h-5" /></button>
           <span role="status" className="text-xs text-brand-300">{shareMsg}</span>
         </div>
+
+        {isSelf && <AppUpdateCard />}
 
         <div className={`mt-4 grid ${isPrivate ? 'grid-cols-2' : 'grid-cols-5'} gap-1 rounded-xl bg-black/30 px-1`}>
           {!isPrivate && <Stat label="Liked" value={stats.favorites ?? 0} />}
