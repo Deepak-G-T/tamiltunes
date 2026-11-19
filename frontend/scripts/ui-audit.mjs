@@ -98,11 +98,14 @@ const state = (page) =>
 const box = async (loc) => (await loc.boundingBox());
 
 const reports = []; // video-report requests the app sent
-async function setupRoutes(page) {
-  await page.addInitScript(() => {
-    localStorage.setItem('tamiltunes_token', 'audit_token');
-    localStorage.setItem('tamiltunes_user', JSON.stringify({ id: 'u1', name: 'Tester', email: 'tester@example.com', role: 'user' }));
-  });
+async function setupRoutes(page, { loggedIn = true } = {}) {
+  await page.addInitScript(({ loggedIn }) => {
+    localStorage.setItem('tamiltunes_require_login', 'false');
+    if (loggedIn) {
+      localStorage.setItem('tamiltunes_token', 'audit_token');
+      localStorage.setItem('tamiltunes_user', JSON.stringify({ id: 'u1', name: 'Tester', email: 'tester@example.com', role: 'user' }));
+    }
+  }, { loggedIn });
   await page.route('**/api/**', (r) => {
     const u = r.request().url();
     if (/\/auth\/me/.test(u)) return r.fulfill({ json: { success: true, user: { id: 'u1', name: 'Tester', email: 'tester@example.com', role: 'user' } } });
@@ -133,7 +136,7 @@ async function runViewport(browser, width, height) {
   page.on('pageerror', (e) => errors.push(e.message));
 
   let bothPlaying = false;
-  await setupRoutes(page);
+  await setupRoutes(page, { loggedIn: false });
 
   await page.goto(`http://127.0.0.1:${PORT}/`);
   await page.waitForSelector('text=Plain Audio Song');

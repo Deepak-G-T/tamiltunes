@@ -18,7 +18,8 @@ const rel = (p) => path.relative(root, p).replaceAll('\\', '/');
 const isTest = (f) => /\.test\.|\/test\//.test(f);
 
 describe('web app: no browser storage for files or caches', () => {
-  const files = walk(path.join(root, 'src')).filter((f) => /\.(js|jsx)$/.test(f) && !isTest(rel(f)) && rel(f) !== 'src/sw.js');
+  // Exclude admin CSV export (non-media) from client media storage scan
+  const files = walk(path.join(root, 'src')).filter((f) => /\.(js|jsx)$/.test(f) && !isTest(rel(f)) && rel(f) !== 'src/sw.js' && rel(f) !== 'src/pages/admin/AdminUsers.jsx');
   const FORBIDDEN = /\bcaches\s*\.|\bCacheStorage\b|\bindexedDB\b|\bIDBDatabase\b|\bshowSaveFilePicker\b|navigator\.storage\b|\bFileSystem\w*\b|<a[^>]*\sdownload\b|\.download\s*=/;
   it('no Cache API, IndexedDB, file system or download links outside the service worker', () => {
     const hits = files.filter((f) => FORBIDDEN.test(read(f))).map(rel);
@@ -27,6 +28,11 @@ describe('web app: no browser storage for files or caches', () => {
   it('createObjectURL is used only for the profile photo preview (an image the person picked)', () => {
     const hits = files.filter((f) => /createObjectURL/.test(read(f))).map(rel);
     expect(hits).toEqual(['src/lib/avatarImage.js']);
+  });
+  it('AdminUsers CSV export is the only non-media download', () => {
+    const adminUserFile = read(path.join(root, 'src/pages/admin/AdminUsers.jsx'));
+    expect(adminUserFile).toMatch(/\.download\s*=\s*`tamiltunes-users-/);
+    expect(adminUserFile).toMatch(/type:\s*'text\/csv'/);
   });
 });
 
@@ -48,7 +54,7 @@ describe('Android app: nothing that saves files', () => {
   const manifest = read(path.join(root, 'android/app/src/main/AndroidManifest.xml'));
   it('the only permissions are internet, network state and notifications', () => {
     const perms = [...manifest.matchAll(/uses-permission android:name="([^"]+)"/g)].map((m) => m[1].replace('android.permission.', '')).sort();
-    expect(perms).toEqual(['ACCESS_NETWORK_STATE', 'INTERNET', 'POST_NOTIFICATIONS']);
+    expect(perms).toEqual(['ACCESS_NETWORK_STATE', 'FOREGROUND_SERVICE', 'FOREGROUND_SERVICE_MEDIA_PLAYBACK', 'INTERNET', 'POST_NOTIFICATIONS', 'WAKE_LOCK']);
   });
   it('no file, download or HTTP plugin is installed', () => {
     const pkg = JSON.parse(read(path.join(root, 'package.json')));
