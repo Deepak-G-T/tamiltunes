@@ -1,5 +1,12 @@
 apply plugin: 'com.android.application'
 
+// Release signing: CI passes the keystore through environment variables (GitHub secrets); on your own computer you may use android/keystore.properties
+// (git-ignored). Without either, assembleRelease still builds but stays UNSIGNED (and cannot be installed), so a missing secret is never silent.
+def keystoreProps = new Properties()
+def keystoreFile = rootProject.file('keystore.properties')
+if (keystoreFile.exists()) { keystoreFile.withInputStream { keystoreProps.load(it) } }
+def signValue = { String envName, String propName -> System.getenv(envName) ?: keystoreProps.getProperty(propName) }
+
 android {
     namespace = "com.tamiltunes.app"
     compileSdk = rootProject.ext.compileSdkVersion
@@ -17,8 +24,20 @@ android {
             ignoreAssetsPattern = '!.svn:!.git:!.ds_store:!*.scc:.*:!CVS:!thumbs.db:!picasa.ini:!*~'
         }
     }
+    signingConfigs {
+        release {
+            def storePath = signValue('TAMILTUNES_KEYSTORE_PATH', 'storeFile')
+            if (storePath) {
+                storeFile file(storePath)
+                storePassword signValue('TAMILTUNES_KEYSTORE_PASSWORD', 'storePassword')
+                keyAlias signValue('TAMILTUNES_KEY_ALIAS', 'keyAlias')
+                keyPassword signValue('TAMILTUNES_KEY_PASSWORD', 'keyPassword')
+            }
+        }
+    }
     buildTypes {
         release {
+            if (signValue('TAMILTUNES_KEYSTORE_PATH', 'storeFile')) { signingConfig signingConfigs.release }
             minifyEnabled false
             proguardFiles getDefaultProguardFile('proguard-android.txt'), 'proguard-rules.pro'
         }
