@@ -1,3 +1,4 @@
+import { VideoGrid } from '../components/cards/VideoThumbCard';
 import React, { useState, useEffect } from 'react';
 import { useParams, useNavigate, useOutletContext } from 'react-router-dom';
 import { Play, Pause, Heart, ArrowLeft, Loader2, Music2, Disc } from 'lucide-react';
@@ -138,6 +139,8 @@ const ArtistDetail = () => {
           </div>
         </section>
       )}
+
+      <VideoGrid songs={(artist.topSongs || []).filter((s) => s.videoId)} title="Videos" testId="artist-videos" />
 
       {/* Albums Discography */}
       {artist.albums?.length > 0 && (

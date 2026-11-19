@@ -102,7 +102,7 @@ export const getAlbumById = async (req, res, next) => {
 
     res.json({
       success: true,
-      album
+      album: Array.isArray(album.songs) ? { ...album, songs: videoLookup.attach(album.songs) } : album // videoId where known (no network)
     });
   } catch (err) {
     next(err);
@@ -123,7 +123,7 @@ export const getArtistById = async (req, res, next) => {
 
     res.json({
       success: true,
-      artist
+      artist: Array.isArray(artist.topSongs) ? { ...artist, topSongs: videoLookup.attach(artist.topSongs) } : artist // videoId where known (no network)
     });
   } catch (err) {
     next(err);
@@ -174,6 +174,7 @@ export const proxyStream = async (req, res) => {
     }
 
     res.status(response.status);
+    res.setHeader('Cache-Control', 'no-store'); // audio is streamed through, never kept by a browser, a CDN or this server
     for (const key of ['content-type', 'content-length', 'content-range', 'accept-ranges']) {
       const val = response.headers.get(key);
       if (val) res.setHeader(key, val);

@@ -15,12 +15,16 @@ import {
   Heart,
   Disc,
   MessageCircle,
-  MoreHorizontal
+  MoreHorizontal,
+  Maximize,
+  Settings2
 } from 'lucide-react';
 import { useAudio } from '../../context/AudioContext';
 import ProgressBar from './ProgressBar';
 import VolumeSlider from './VolumeSlider';
 import VideoSlot from './VideoSlot';
+import { enterVideoFullscreen } from '../../lib/videoFullscreen';
+import VideoSettings from './VideoSettings';
 import VideoModeToggle from './VideoModeToggle';
 import ScreenLockNotice from './ScreenLockNotice';
 import CommentsPanel from '../comments/CommentsPanel';
@@ -56,6 +60,8 @@ const FullScreenPlayer = ({ isOpen, onClose: onCloseProp, onToggleFavorite, isFa
     repeatMode,
     toggleRepeat,
     activeEngine,
+    canToggleVideo,
+    videoBlocked,
     queue,
     queueIndex,
     queueSections
@@ -71,6 +77,7 @@ const FullScreenPlayer = ({ isOpen, onClose: onCloseProp, onToggleFavorite, isFa
   const [commentsOpen, setCommentsOpen] = useState(false);
   const [view, setView] = useState('player'); // 'player' | 'queue' (the Queue tab inside Now Playing)
   const songActions = useSongActions();
+  const [showVideoSettings, setShowVideoSettings] = useState(false);
   useEffect(() => { if (!isOpen) setView('player'); }, [isOpen]);
   // Every way of closing the player also closes the comments sheet
   const onClose = () => { setCommentsOpen(false); onCloseProp(); };
@@ -194,7 +201,14 @@ const FullScreenPlayer = ({ isOpen, onClose: onCloseProp, onToggleFavorite, isFa
       <div className="relative z-10 flex flex-col items-center justify-center my-auto max-w-sm sm:max-w-md mx-auto w-full py-4">
         {/* Video surface (YouTube engine active) or album cover */}
         {activeEngine === 'youtube' && (
-          <VideoSlot className="w-full aspect-video mb-6 shadow-2xl border border-zinc-800/80" />
+          <>
+            {/* 16:9 space reserved before the video loads, so nothing jumps */}
+            <VideoSlot className="w-full aspect-video mb-2 shadow-2xl border border-zinc-800/80" />
+            <button type="button" onClick={() => enterVideoFullscreen()} aria-label="Full screen video" data-testid="video-fullscreen"
+              className="press self-end mb-4 inline-flex items-center gap-1.5 min-h-11 px-3 rounded-full text-xs font-semibold text-zinc-300 hover:text-white hover:bg-white/10">
+              <Maximize className="w-4 h-4" aria-hidden="true" /> Full screen
+            </button>
+          </>
         )}
         {activeEngine !== 'youtube' && (
         <div
@@ -234,7 +248,18 @@ const FullScreenPlayer = ({ isOpen, onClose: onCloseProp, onToggleFavorite, isFa
         </div>
         )}
 
-        <VideoModeToggle className="mb-4" />
+        {(canToggleVideo || videoBlocked) && (
+          <div className="flex items-center gap-2 mb-4">
+            <VideoModeToggle />
+            <button type="button" onClick={() => setShowVideoSettings((v) => !v)} aria-expanded={showVideoSettings} aria-label="Video settings" data-testid="video-settings-button"
+              className="press w-11 h-11 inline-flex items-center justify-center rounded-full text-zinc-400 hover:text-white hover:bg-white/10">
+              <Settings2 className="w-4 h-4" aria-hidden="true" />
+            </button>
+          </div>
+        )}
+        {showVideoSettings && (canToggleVideo || videoBlocked) && (
+          <div className="w-full mb-4 rounded-xl bg-black/40 border border-white/10 px-4"><VideoSettings /></div>
+        )}
         <ScreenLockNotice song={currentSong} engine={activeEngine} className="mb-4 px-1" />
 
         {/* Title, Artist, & Favorite */}

@@ -76,7 +76,7 @@ export function assembleHome(plan, { exclude = [], seed, weekPlays = new Map(), 
     const items = pickSection(spec.pool || [], { seen, rng, weekPlays, max: spec.max ?? MAX_ITEMS, caps: spec.caps !== false });
     if (items.length < min) { hidden.push(spec.id); continue; } // hide rather than repeat or show a thin shelf
     for (const s of items) seen.add(s);
-    sections.push({ id: spec.id, title: spec.title, ...(spec.subtitle ? { subtitle: spec.subtitle } : {}), kind: 'songs', items });
+    sections.push({ id: spec.id, title: spec.title, ...(spec.subtitle ? { subtitle: spec.subtitle } : {}), ...(spec.display ? { display: spec.display } : {}), kind: 'songs', items });
   }
   return { hero: heroSong, sections, hidden };
 }

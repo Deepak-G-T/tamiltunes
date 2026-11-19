@@ -73,4 +73,23 @@ assert.equal(top[0], 'Yuvan Shankar Raja', 'a liked song counts like three plays
 assert.ok(top.includes('Anirudh Ravichander'));
 await buildHome({ userId: user.id, visit: 'p1' });
 console.log('✓ home fresh: buildHome takes visit, avoid and artist hints; likes count towards taste');
+
+// ---- video songs: a shelf / tab of songs that have a video, shown as thumbnails; the same song never twice on the page
+{
+  const vs = (i) => ({ id: `v${i}`, title: `video song ${i}`, artist: `singer v${i}`, album: `film v${i}`, year: '2020', videoId: `VIDEOID${String(i).padStart(4, '0')}` });
+  const r = assembleHome([
+    { id: 'videos', title: 'Video songs', display: 'video', pool: Array.from({ length: 6 }, (_, i) => vs(i)), min: 4, max: 12 },
+    { id: 'trending', title: 'Trending now', pool: [...Array.from({ length: 6 }, (_, i) => vs(i)), ...pool('t', 20)] },
+  ], { seed: 'u:2026-11-19:x', hero: false });
+  const v = r.sections.find((x) => x.id === 'videos');
+  assert.equal(v.display, 'video', 'the shelf says it shows video thumbnails');
+  assert.equal(v.items.length, 6);
+  const t = r.sections.find((x) => x.id === 'trending');
+  assert.ok(!t.items.some((x) => /^v\d$/.test(x.id)), 'a song in the video shelf is not repeated in Trending');
+  const thin = assembleHome([{ id: 'videos', title: 'Video songs', display: 'video', pool: [vs(1), vs(2)], min: 4 }], { seed: 's', hero: false });
+  assert.deepEqual(thin.hidden, ['videos'], 'a video shelf with fewer than 4 songs is hidden');
+  const tab = await buildHome({ tab: 'videos', visit: 'v1' });
+  assert.ok(tab.sections.every((sec) => sec.display === 'video' && sec.items.every((x) => x.videoId)), 'the Videos tab holds only songs with a video');
+  console.log('✓ home fresh: Video songs shelf (thumbnails, 4 or more, no repeats with other shelves) and Videos tab');
+}
 process.exit(0);

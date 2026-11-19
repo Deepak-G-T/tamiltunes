@@ -45,13 +45,26 @@ const YouTubePlayer = forwardRef(({
     }
   }, [propVideoId]);
 
-  // Load YouTube IFrame API script once
+  // The YouTube script (and YouTube's cookies) load only the first time a video is actually wanted, never on a plain page load
+  const [apiWanted, setApiWanted] = useState(false);
+  useEffect(() => { if (propVideoId) setApiWanted(true); }, [propVideoId]);
+
+  // Destroy the player with the component
+  useEffect(() => () => {
+    stopProgressTimer();
+    if (playerRef.current && typeof playerRef.current.destroy === 'function') {
+      try { playerRef.current.destroy(); } catch { /* already gone */ }
+    }
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
+
+  // Load YouTube IFrame API script once, on first use
   useEffect(() => {
+    if (!apiWanted) return undefined;
     if (window.YT && window.YT.Player) {
       if (pendingVideoIdRef.current) {
         initPlayer(pendingVideoIdRef.current, pendingIntentRef.current.autoPlay, pendingIntentRef.current.startSeconds);
       }
-      return;
+      return undefined;
     }
 
     // Check if script already appended
@@ -72,15 +85,8 @@ const YouTubePlayer = forwardRef(({
       }
     };
 
-    return () => {
-      stopProgressTimer();
-      if (playerRef.current && typeof playerRef.current.destroy === 'function') {
-        try {
-          playerRef.current.destroy();
-        } catch (e) {}
-      }
-    };
-  }, []);
+    return undefined;
+  }, [apiWanted]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const initPlayer = (vid, autoPlay = true, startSeconds = 0) => {
     if (playerRef.current || !window.YT || !window.YT.Player) return;
@@ -101,6 +107,7 @@ const YouTubePlayer = forwardRef(({
       const opts = {
         height: '100%',
         width: '100%',
+        host: 'https://www.youtube-nocookie.com', // privacy-enhanced mode: YouTube sets no tracking cookies until the video is played
         playerVars,
         events: {
           onReady: (event) => {
@@ -180,6 +187,7 @@ const YouTubePlayer = forwardRef(({
 
   useImperativeHandle(ref, () => ({
     loadVideo(videoId, autoPlay = true, startSeconds = 0) {
+      setApiWanted(true);
       if (!videoId) return;
       pendingVideoIdRef.current = videoId;
       pendingIntentRef.current = { autoPlay, startSeconds };

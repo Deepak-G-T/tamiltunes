@@ -53,6 +53,7 @@ model User {
   auditLogs        AuditLog[]
 
   @@map("users")
+  videoReports VideoReport[]
 }
 
 model Song {
@@ -80,6 +81,13 @@ model Song {
   // The id of the best copy of this song (same song under another id, spelling or album). Filled by scripts/backfill-canonical-ids.mjs
   canonicalId String? @map("canonical_id")
 
+  // Video: an admin-chosen YouTube id (beats the automatic lookup), and whether the embed works. video_available turns false after
+  // 2 logged-in people report a failed embed; an admin restores it. Stream-only through the official embed: nothing is ever stored.
+  videoId        String?       @map("video_id")
+  videoAvailable Boolean       @default(true) @map("video_available")
+  videoFlaggedAt DateTime?     @map("video_flagged_at")
+  videoReports   VideoReport[]
+
   playlistSongs    PlaylistSong[]
   favorites        Favorite[]
   listeningHistory ListeningHistory[]
@@ -88,7 +96,25 @@ model Song {
   @@index([language, year])
   @@index([canonicalGroupId])
   @@index([canonicalId])
+  @@index([videoAvailable])
   @@map("songs")
+}
+
+/// One person's report that a song's video would not embed (error 101/150, removed, region block). One row per person, song and video.
+model VideoReport {
+  id        String   @id @default(uuid())
+  songId    String   @map("song_id")
+  userId    String   @map("user_id")
+  videoId   String   @map("video_id")
+  code      Int?
+  createdAt DateTime @default(now()) @map("created_at")
+
+  song Song @relation(fields: [songId], references: [id], onDelete: Cascade)
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([songId, userId, videoId])
+  @@index([songId])
+  @@map("video_reports")
 }
 
 model Album {

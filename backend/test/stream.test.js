@@ -51,6 +51,24 @@ try {
   r = await fetch(BASE);
   assert.equal(r.status, 400);
   console.log('✓ proxy enabled still rejects disallowed targets -> 403 (missing url -> 400)');
+
+  // A successful pass-through: audio is streamed straight through, never kept. The upstream is faked, and says "cache this for a year".
+  const realFetch = globalThis.fetch;
+  const audio = Buffer.alloc(4096, 7);
+  globalThis.fetch = (u, opts) => (String(u).startsWith('https://aac.saavncdn.com/')
+    ? Promise.resolve(new Response(audio, { status: 200, headers: { 'content-type': 'audio/mpeg', 'content-length': String(audio.length), 'accept-ranges': 'bytes', 'cache-control': 'public, max-age=31536000', etag: '"abc"' } }))
+    : realFetch(u, opts));
+  try {
+    r = await fetch(`${BASE}?url=${encodeURIComponent('https://aac.saavncdn.com/a.mp4')}`);
+    assert.equal(r.status, 200);
+    assert.equal(r.headers.get('cache-control'), 'no-store', 'the browser and any CDN are told never to keep the audio');
+    assert.equal(r.headers.get('etag'), null, 'no validator that would invite a stored copy');
+    assert.equal(r.headers.get('content-type'), 'audio/mpeg');
+    assert.equal(Buffer.from(await r.arrayBuffer()).equals(audio), true, 'the bytes pass through unchanged');
+    console.log('✓ proxy pass-through: audio is streamed unchanged with Cache-Control: no-store (the upstream cache headers are not forwarded)');
+  } finally {
+    globalThis.fetch = realFetch;
+  }
 } finally {
   config.requireLogin = origRequireLogin;
   config.enableExternalStreams = false;

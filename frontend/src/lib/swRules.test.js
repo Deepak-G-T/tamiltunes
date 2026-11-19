@@ -23,9 +23,13 @@ describe('what the service worker may cache', () => {
     expect(isStreamRequest(req(), url('https://rr1.googlevideo.com/videoplayback'))).toBe(true);
     expect(isStreamRequest(req(), url('/local-songs/a.mp3'))).toBe(true);
   });
-  it('covers from the CDN are pictures, not streams', () => {
+  it('covers from the audio CDN are pictures and may be cached', () => {
     expect(isStreamRequest(req({}, 'image'), url('https://c.saavncdn.com/cover.jpg'))).toBe(false);
-    expect(isStreamRequest(req({}, 'image'), url('https://i.ytimg.com/vi/x/hq.jpg'))).toBe(false);
+  });
+  it('nothing from YouTube is touched, thumbnails included', () => {
+    for (const u of ['https://i.ytimg.com/vi/AbCdEfGhIj1/mqdefault.jpg', 'https://yt3.ggpht.com/a.jpg', 'https://www.youtube.com/embed/AbCdEfGhIj1', 'https://www.youtube-nocookie.com/embed/AbCdEfGhIj1', 'https://rr1---sn-x.googlevideo.com/videoplayback']) {
+      for (const dest of ['', 'image', 'iframe', 'script', 'video']) expect(isStreamRequest(req({}, dest), url(u)), `${u} (${dest})`).toBe(true);
+    }
   });
 });
 

@@ -49,7 +49,7 @@ const Install = () => {
           <Step n={2}>If Android asks, allow your browser (for example Chrome) to <b>install unknown apps</b>, then go back and tap <b>Install</b>.</Step>
           <Step n={3}>Open <b>TamilTunes</b> from your app list. Later versions install over this one and keep your account.</Step>
         </ol>
-        <p className="text-xs text-zinc-500">Only install the file from this page. All versions are listed on the <a className="underline hover:text-white" href={RELEASES_URL}>releases page</a>.</p>
+        <p className="text-xs text-zinc-500"><a className="underline hover:text-white" href="/privacy">Privacy</a> · Only install the file from this page. All versions are listed on the <a className="underline hover:text-white" href={RELEASES_URL}>releases page</a>.</p>
       </Card>
 
       <Card icon={Monitor} title="Install from the browser (no download)">

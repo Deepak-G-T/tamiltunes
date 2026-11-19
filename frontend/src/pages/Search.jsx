@@ -1,3 +1,4 @@
+import { VideoGrid } from '../components/cards/VideoThumbCard';
 import React, { useState, useEffect } from 'react';
 import { useSearchParams, useOutletContext, useNavigate } from 'react-router-dom';
 import { Search as SearchIcon, X, Loader2, Music, Disc, User, Clock, ListMusic } from 'lucide-react';
@@ -60,7 +61,7 @@ const Search = () => {
     api.get('/music/search', {
       params: {
         query: debouncedTerm,
-        type: activeFilter
+        type: activeFilter === 'videos' ? 'songs' : activeFilter // "Videos" = songs that have a video, picked out here (the server has no videos type)
       }
     })
       .then(({ data }) => {
@@ -148,7 +149,7 @@ const Search = () => {
       {/* Filter Tabs */}
       {debouncedTerm && (
         <div className="flex items-center gap-2">
-          {['all', 'songs', 'albums', 'artists', 'playlists'].map((tab) => (
+          {['all', 'songs', 'videos', 'albums', 'artists', 'playlists'].map((tab) => (
             <button
               key={tab}
               onClick={() => setActiveFilter(tab)}
@@ -183,6 +184,14 @@ const Search = () => {
       {/* Results View */}
       {!loading && debouncedTerm && hasResults && (
         <div className="space-y-8" onClickCapture={onResultsClick}>
+          {/* Videos: the songs that have an official video, as thumbnails (nothing plays until tapped) */}
+          {activeFilter === 'videos' && (results.songs || []).some((s) => s.videoId) && (
+            <VideoGrid songs={(results.songs || []).filter((s) => s.videoId)} title="Videos" testId="search-videos" />
+          )}
+          {activeFilter === 'videos' && !(results.songs || []).some((s) => s.videoId) && (
+            <p className="py-10 text-center text-sm text-zinc-400" data-testid="search-no-videos">No video songs for this search.</p>
+          )}
+
           {/* Songs Section */}
           {(activeFilter === 'all' || activeFilter === 'songs') && results.songs?.length > 0 && (
             <div>

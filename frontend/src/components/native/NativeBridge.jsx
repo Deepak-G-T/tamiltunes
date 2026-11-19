@@ -4,11 +4,12 @@ import { useAudio } from '../../context/AudioContext';
 import { isNativeApp } from '../../lib/platform';
 import { decideBack, topOverlay } from '../../lib/backAction';
 import { pathFromLink } from '../../lib/native';
+import { isVideoFullscreen, exitVideoFullscreen } from '../../lib/videoFullscreen';
 import { SITE_URL } from '../../config/app';
 
 /**
  * Android-only glue (renders nothing, does nothing in a browser):
- *  - the Back button closes a menu / dialog, then the player, then the queue, then goes back a page, then exits (lib/backAction.js);
+ *  - the Back button leaves video full screen, closes a menu / dialog, then the player, then the queue, then goes back a page, then exits (lib/backAction.js);
  *  - links to our site (App Links) open the right page inside the app.
  */
 const NativeBridge = () => {
@@ -27,8 +28,9 @@ const NativeBridge = () => {
       const back = await App.addListener('backButton', ({ canGoBack }) => {
         const a = latest.current;
         const overlay = topOverlay();
-        const action = decideBack({ overlayOpen: Boolean(overlay), fullScreen: a.isFullScreen, queueOpen: a.isQueueOpen, canGoBack });
-        if (action === 'close-overlay') overlay.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true, cancelable: true }));
+        const action = decideBack({ videoFullscreen: isVideoFullscreen(), overlayOpen: Boolean(overlay), fullScreen: a.isFullScreen, queueOpen: a.isQueueOpen, canGoBack });
+        if (action === 'exit-fullscreen') exitVideoFullscreen();
+        else if (action === 'close-overlay') overlay.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true, cancelable: true }));
         else if (action === 'close-player') a.setIsFullScreen(false);
         else if (action === 'close-queue') a.setIsQueueOpen(false);
         else if (action === 'back') window.history.back();

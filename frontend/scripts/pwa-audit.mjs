@@ -127,6 +127,11 @@ async function run(browser) {
   check('"Install TamilTunes now" appears when the browser offers installing', await until(async () => (await page.locator('[data-testid=install-now]').count()) === 1));
   await page.locator('[data-testid=install-now]').click();
   check('and it opens the browser install dialog', await until(() => page.evaluate(() => window.__prompted === true)));
+  // ---- the Privacy page (public): mentions YouTube's embed and its cookies
+  await page.goto(`${BASE}/privacy`);
+  await page.waitForSelector('[data-testid=privacy-page]');
+  const privacy = await page.locator('[data-testid=privacy-page]').innerText();
+  check('the Privacy page opens for a guest and explains the YouTube embed and its cookies', /youtube-nocookie\.com/.test(privacy) && /cookies/i.test(privacy) && /never downloaded/i.test(privacy), privacy.slice(0, 120));
   check('no page errors', errors.length === 0, errors.join(' | '));
   await ctx.close();
 }
