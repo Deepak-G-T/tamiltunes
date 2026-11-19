@@ -60,6 +60,7 @@ await db.song.upsert({ where: { id: songId }, create: { id: songId, title: `Vide
 try {
   const [A, B, C, ADM] = await Promise.all(['a', 'b', 'c', 'adm'].map(signup));
   await makeAdmin(ADM.user.id);
+  process.env.ADMIN_VIDEO_USER_IDS = ADM.user.id; // the owner's setting on the server: this account may use the admin video routes
   // a fresh login so the token carries no stale role (role is read from the database on every request anyway)
 
   // admin endpoints: not for guests or normal users
