@@ -68,3 +68,14 @@ pwa-audit: privacy page, nothing cached). `UI_AUDIT_ONLY=viewports|report|settin
 6. Wi-Fi only video on mobile data (turn Wi-Fi off): Video does not start; a playing video switches to audio. [UNTESTED]
 7. A video that will not embed: the message shows, audio continues, the toggle is gone for that song. [UNTESTED]
 8. Video songs shelf and thumbnails on a slow connection: thumbnails appear, the page does not jump, a tap plays the video. [UNTESTED]
+
+## Safety notes (before merging)
+- **Admin routes** (`/api/admin/videos/*`) use `requireOwnerAdmin('ADMIN_VIDEO_USER_IDS')`: the account must have `users.role = 'admin'` AND its id must be in the
+  env list `ADMIN_VIDEO_USER_IDS` (comma-separated, read on every request). Empty or unset = 403 for everyone (fail closed). Logged out = 401, normal user = 403.
+  Test: `backend/test/admin-video-access.test.js`. When the login-gate/admin work (PR #31) is in, move these routes onto its admin check (with 2FA) and drop the list.
+- **No media is stored**: the stream proxy sends `Cache-Control: no-store` and forwards no upstream cache headers; the service worker never touches YouTube
+  hosts, audio hosts (other than cover pictures), Range or audio/video requests; the Android app has no file or download permission or plugin.
+  Guards: `backend/test/no-media-storage.test.js`, `frontend/src/lib/noMediaStorage.test.js`, `swRules.test.js`, `stream.test.js`.
+- **Migration** `20261126000000_song_videos` starts with `SET lock_timeout = '10s'` (a lock wait longer than that aborts and rolls back the whole script).
+  If it ever fails on Neon: `npx prisma migrate resolve --rolled-back 20261126000000_song_videos`, then redeploy. Statements are only ADD COLUMN (constant default,
+  no table rewrite), one plain CREATE INDEX on songs (blocks writes for a moment; CONCURRENTLY cannot run inside Prisma's transaction) and a new table.
