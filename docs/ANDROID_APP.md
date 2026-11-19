@@ -81,7 +81,7 @@ Chrome on Android, installed from the browser (menu > Install app, or the bar on
 
 ### Extra checks for the APK (all UNTESTED)
 10. Install the debug APK (allow "install unknown apps" for your file manager or browser); the app opens with the green icon and a dark splash, no white flash. [UNTESTED]
-11. Android 13+: the first start asks to allow notifications; after allowing, playing a song shows the media notification with the cover, and its buttons and seek bar work with the screen on and off. [UNTESTED]
+11. Android 13+: the first start asks to allow notifications; after allowing, playing a song shows the media notification with the cover, and its buttons and seek bar work with the screen on and off. [CONFIRMED on phone]
 12. Pull the headphones out (or turn Bluetooth off): the song pauses. [UNTESTED]
 13. Log in, force-close the app, reopen: you are still logged in. [UNTESTED]
 14. Turn off Wi-Fi and data: the "You are offline" bar appears; turn them on: it goes away. [UNTESTED]
