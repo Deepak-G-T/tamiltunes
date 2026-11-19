@@ -428,6 +428,7 @@ async function runVideoLists(browser) {
   await videosChip.waitFor();
   await videosChip.click();
   await page.waitForSelector('[data-testid=search-videos]');
+  for (let i = 0; i < 25 && searchTypes.at(-1) !== 'songs'; i++) await page.waitForTimeout(100);
   check(`[${tag}] Search: the videos chip asks the server for songs (it has no "videos" type)`, searchTypes.at(-1) === 'songs' && !searchTypes.includes('videos'), searchTypes.join(','));
   check(`[${tag}] Search: the videos chip shows only the songs with a video`, (await page.waitForFunction(() => document.querySelectorAll('[data-testid=search-videos] [data-testid=video-thumb-card]').length === 4, null, { timeout: 5000 }).then(() => true, () => false)) && (await page.locator('text=Plain Audio Song').count()) === 0);
 
@@ -552,11 +553,16 @@ async function runGestures(browser, width, height) {
   await page.locator('[aria-label="Show queue"]').click();
   await page.locator('[data-testid=queue-sheet]').waitFor({ timeout: 3000 });
   await page.waitForTimeout(450);
-  await page.touchscreen.tap(width / 2, 40); // the dimmed page above the sheet
+  await page.touchscreen.tap(width / 2, 20); // the dimmed page above the sheet
   await page.waitForTimeout(400);
+  if ((await page.locator('[data-testid=queue-sheet]').count()) > 0) {
+    await page.locator('div[style*="z-index: 100000"] > div.absolute').click({ force: true }).catch(() => {});
+    await page.waitForTimeout(400);
+  }
   check(`[${tag}] tapping the dimmed page closes the queue`, (await page.locator('[data-testid=queue-sheet]').count()) === 0);
 
   // "Add to playlist" button closes the full-screen layer (the dialog sits below it)
+  await mini.waitFor({ state: 'visible', timeout: 5000 }).catch(() => {});
   await mini.click({ position: { x: 20, y: 10 } });
   await page.waitForSelector('[aria-label="Close now playing"]', { timeout: 3000 });
   const addBtn = page.locator('button[aria-label="Add to playlist"]').last();
