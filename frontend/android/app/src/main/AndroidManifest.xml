@@ -1,5 +1,6 @@
 <?xml version="1.0" encoding="utf-8" ?>
-<manifest xmlns:android="http://schemas.android.com/apk/res/android">
+<manifest xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:tools="http://schemas.android.com/tools">
     <application
         android:allowBackup="false"
         android:usesCleartextTraffic="false"
@@ -29,12 +30,26 @@
             android:grantUriPermissions="true">
             <meta-data android:name="android.support.FILE_PROVIDER_PATHS" android:resource="@xml/file_paths" />
         </provider>
+
+        <!-- Media notification & background audio foreground service -->
+        <service
+            android:name="com.ingageco.capacitormusiccontrols.MusicControlsNotificationKiller"
+            android:exported="false"
+            android:foregroundServiceType="mediaPlayback"
+            tools:node="merge"
+            tools:replace="android:foregroundServiceType" />
     </application>
 
     <!-- Permissions -->
 
     <uses-permission android:name="android.permission.INTERNET" />
     <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE" />
-    <!-- Android 13+: the music notification (lock-screen controls) needs this; MainActivity asks once -->
+    <!-- Android 9+: required to run a foreground service -->
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
+    <!-- Android 14+: required to run a mediaPlayback foreground service -->
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE_MEDIA_PLAYBACK" />
+    <!-- Required to keep CPU running with screen locked while playing -->
+    <uses-permission android:name="android.permission.WAKE_LOCK" />
+    <!-- Android 13+: the music notification (lock-screen controls) needs this -->
     <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
 </manifest>
