@@ -30,12 +30,11 @@ const NativeMediaControls = () => {
   const [devToast, setDevToast] = useState('');
   const checkedPermission = useRef(false);
 
-  const load = useCallback(async () => {
+  const ensure = useCallback(async () => {
     if (!plugin.current) {
       const mod = await import('capacitor-music-controls-plugin');
       plugin.current = mod.CapacitorMusicControls;
     }
-    return plugin.current;
   }, []);
 
   // Check and prompt for notification permission on first playback
@@ -48,8 +47,9 @@ const NativeMediaControls = () => {
         const { value: promptShown } = await Preferences.get({ key: PREF_PROMPT_SHOWN });
         if (promptShown === 'true') return;
 
-        const controls = await load();
-        if (typeof controls.checkPermissions === 'function') {
+        await ensure();
+        const controls = plugin.current;
+        if (typeof controls?.checkPermissions === 'function') {
           const status = await controls.checkPermissions();
           if (status?.notifications === 'granted') {
             await Preferences.set({ key: PREF_PROMPT_SHOWN, value: 'true' });
@@ -61,15 +61,16 @@ const NativeMediaControls = () => {
         console.warn('[NativeMediaControls] Permission check warning:', err?.message || err);
       }
     })();
-  }, [native, show, audio.isPlaying, load]);
+  }, [native, show, audio.isPlaying, ensure]);
 
   const handleAllowNotifications = async () => {
     setShowPermissionPrompt(false);
     try {
       await Preferences.set({ key: PREF_PROMPT_SHOWN, value: 'true' });
-      const controls = await load();
+      await ensure();
+      const controls = plugin.current;
       let granted = false;
-      if (typeof controls.requestPermissions === 'function') {
+      if (typeof controls?.requestPermissions === 'function') {
         const res = await controls.requestPermissions({ permissions: ['notifications'] });
         granted = res?.notifications === 'granted';
       }
@@ -96,8 +97,9 @@ const NativeMediaControls = () => {
   const handleOpenSettings = async () => {
     setShowDeniedHint(false);
     try {
-      const controls = await load();
-      if (typeof controls.openNotificationSettings === 'function') {
+      await ensure();
+      const controls = plugin.current;
+      if (typeof controls?.openNotificationSettings === 'function') {
         await controls.openNotificationSettings();
       }
     } catch (err) {
@@ -111,8 +113,9 @@ const NativeMediaControls = () => {
     let cancelled = false;
     (async () => {
       try {
-        const controls = await load();
-        if (cancelled) return;
+        await ensure();
+        const controls = plugin.current;
+        if (cancelled || !controls) return;
         if (show) {
           const a = latest.current;
           await controls.create(controlsOptions(a.currentSong, { isPlaying: a.isPlaying, duration: a.duration, currentTime: a.currentTime }));
@@ -130,7 +133,7 @@ const NativeMediaControls = () => {
       }
     })();
     return () => { cancelled = true; };
-  }, [native, show, song?.id, durationKnown, load]);
+  }, [native, show, song?.id, durationKnown, ensure]);
 
   // Play / pause state, and a position refresh every 10 s (the system moves the bar on by itself in between)
   useEffect(() => {
@@ -138,7 +141,11 @@ const NativeMediaControls = () => {
     const push = async () => {
       if (!created.current) return;
       try {
-        (await load()).updateElapsed({ isPlaying: latest.current.isPlaying, elapsed: Math.round(latest.current.currentTime) });
+        await ensure();
+        const controls = plugin.current;
+        if (controls) {
+          await controls.updateElapsed({ isPlaying: latest.current.isPlaying, elapsed: Math.round(latest.current.currentTime) });
+        }
       } catch (err) {
         console.warn('[NativeMediaControls] Failed to update elapsed:', err?.message || err);
       }
@@ -146,7 +153,7 @@ const NativeMediaControls = () => {
     push();
     const t = audio.isPlaying ? setInterval(push, 10000) : null;
     return () => { if (t) clearInterval(t); };
-  }, [native, show, audio.isPlaying, song?.id, load]);
+  }, [native, show, audio.isPlaying, song?.id, ensure]);
 
   // Buttons on the notification, the headset and the lock screen (Android delivers them as a document event)
   useEffect(() => {
