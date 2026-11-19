@@ -40,6 +40,12 @@ jobs:
           "$SDKMANAGER" "platforms;android-36" "build-tools;36.0.0" "platform-tools"
 
       - run: npm ci
+      - name: Verify plugin patch was applied
+        run: |
+          grep -q "tamiltunes:audio_playback" node_modules/capacitor-music-controls-plugin/android/src/main/java/com/ingageco/capacitormusiccontrols/MusicControlsNotificationKiller.java || {
+            echo "::error::capacitor-music-controls-plugin patch was not applied by postinstall!"
+            exit 1
+          }
       - run: npm test
       - name: Build the web app and copy it into the Android project
         run: npm run build:android

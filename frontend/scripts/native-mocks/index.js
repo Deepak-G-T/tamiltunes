@@ -26,8 +26,17 @@ export const StatusBar = {
   setBackgroundColor: async (o) => { log('StatusBar.setBackgroundColor', o); },
 };
 export const SplashScreen = { hide: async (o) => { log('SplashScreen.hide', o); } };
+let notificationPermission = 'prompt';
 export const CapacitorMusicControls = {
   create: async (o) => { log('MusicControls.create', o); },
   updateElapsed: async (o) => { log('MusicControls.updateElapsed', o); },
   destroy: async () => { log('MusicControls.destroy'); },
+  checkPermissions: async () => ({ notifications: notificationPermission }),
+  requestPermissions: async (p) => {
+    log('MusicControls.requestPermissions', p);
+    notificationPermission = 'granted';
+    return { notifications: 'granted' };
+  },
+  openNotificationSettings: async () => { log('MusicControls.openNotificationSettings'); },
+  openBatterySettings: async () => { log('MusicControls.openBatterySettings'); },
 };

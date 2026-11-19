@@ -5,11 +5,11 @@
 // Run: npm run test:native --prefix frontend      (CHROMIUM_PATH=/path/to/chrome if Playwright's own browser is not installed)
 import { createRequire } from 'node:module';
 import { spawn } from 'node:child_process';
-import path from 'node:path';
+import nodePath from 'node:path';
 
 const require = createRequire(import.meta.url);
 const { chromium } = require('playwright');
-const viteBin = path.join(path.dirname(require.resolve('vite/package.json')), 'bin', 'vite.js');
+const viteBin = nodePath.join(nodePath.dirname(require.resolve('vite/package.json')), 'bin', 'vite.js');
 const PORT = 4180;
 const BASE = `http://127.0.0.1:${PORT}`;
 const API = 'https://tamiltunes-backend.onrender.com';
@@ -97,6 +97,13 @@ async function run(browser) {
   check('playing a song creates the media notification (title, artist, previous / next, seek bar, branded icon)', await until(async () => (await log()).some((x) => x.name === 'MusicControls.create' && x.arg.track === 'Song 1' && x.arg.artist === 'Test Artist' && x.arg.hasPrev && x.arg.hasNext && x.arg.notificationIcon === 'ic_notification' && x.arg.dismissable === false)), JSON.stringify((await log()).filter((x) => x.name.startsWith('MusicControls')).slice(0, 2)));
   check('...and it is not made again every second', await (async () => { await page.waitForTimeout(2500); return (await log()).filter((x) => x.name === 'MusicControls.create').length <= 2; })());
 
+  const hasPrompt = await until(async () => (await page.locator('[aria-label="Notification permission"]').count()) === 1);
+  check('permission flow: in-app notification prompt appears on first playback', hasPrompt);
+  if (hasPrompt) {
+    await page.getByRole('button', { name: 'Allow' }).click();
+    check('permission flow: tapping Allow requests notification permission', await until(async () => (await log()).some((x) => x.name === 'MusicControls.requestPermissions')));
+  }
+
   const press = (message, extra = {}) => native(({ message, extra }) => { const e = new Event('controlsNotification'); e.message = message; Object.assign(e, extra); document.dispatchEvent(e); }, { message, extra });
   const playing = () => native(() => !!window.__tamiltunes_audio && !window.__tamiltunes_audio.paused);
   check('the notification Pause button pauses the music', await (async () => { await until(playing); await press('music-controls-pause'); return until(async () => !(await playing())); })());
@@ -149,6 +156,43 @@ async function run(browser) {
   await fire('appUrlOpen', { url: `${SITE}/admin` });
   await page.waitForTimeout(300);
   check('links to other sites or to pages that must not open from a link are ignored', (await path()) === '/u/someone');
+
+  // ---- real AndroidManifest.xml checks (permissions, foreground service, wake lock)
+  const fs = await import('node:fs');
+  const manifestPath = nodePath.resolve('android/app/src/main/AndroidManifest.xml');
+  const manifestXml = fs.existsSync(manifestPath) ? fs.readFileSync(manifestPath, 'utf8') : '';
+  check('manifest declares FOREGROUND_SERVICE permission', manifestXml.includes('android.permission.FOREGROUND_SERVICE'));
+  check('manifest declares FOREGROUND_SERVICE_MEDIA_PLAYBACK permission', manifestXml.includes('android.permission.FOREGROUND_SERVICE_MEDIA_PLAYBACK'));
+  check('manifest declares WAKE_LOCK permission', manifestXml.includes('android.permission.WAKE_LOCK'));
+  check('manifest declares POST_NOTIFICATIONS permission', manifestXml.includes('android.permission.POST_NOTIFICATIONS'));
+  check(
+    'manifest declares MusicControlsNotificationKiller with mediaPlayback and tools:replace',
+    manifestXml.includes('MusicControlsNotificationKiller') &&
+    manifestXml.includes('android:foregroundServiceType="mediaPlayback"') &&
+    manifestXml.includes('tools:replace="android:foregroundServiceType"') &&
+    manifestXml.includes('xmlns:tools="http://schemas.android.com/tools"')
+  );
+
+  const mergedGlob = nodePath.resolve('android/app/build/intermediates/merged_manifests');
+  if (fs.existsSync(mergedGlob)) {
+    const findMerged = (dir) => {
+      for (const entry of fs.readdirSync(dir, { withFileTypes: true })) {
+        const full = nodePath.join(dir, entry.name);
+        if (entry.isDirectory()) {
+          const res = findMerged(full);
+          if (res) return res;
+        } else if (entry.name === 'AndroidManifest.xml') {
+          return full;
+        }
+      }
+      return null;
+    };
+    const mergedPath = findMerged(mergedGlob);
+    if (mergedPath) {
+      const mergedXml = fs.readFileSync(mergedPath, 'utf8');
+      check('merged manifest retains foregroundServiceType="mediaPlayback"', mergedXml.includes('foregroundServiceType="mediaPlayback"'));
+    }
+  }
 
   check('no page errors', errors.length === 0, errors.join(' | '));
   await ctx.close();
