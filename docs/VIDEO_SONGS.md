@@ -21,7 +21,7 @@
 3. Signed in: `POST /api/songs/:id/video-report { videoId, code }` (rate limited 20/hour per account). Only counts for the video the server
    actually offers for that song, once per person. After 2 different people the video is hidden for everyone until an admin restores it.
 
-## API (admin = `users.role` "admin"; the admin screens come with the admin panel, PR #31)
+## API (admin = `users.role` "admin")
 | Method | Path | What |
 |---|---|---|
 | POST | `/api/songs/:id/video-report` | report a failed embed (signed in) |
