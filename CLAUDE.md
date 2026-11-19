@@ -143,6 +143,7 @@ Songs may carry an optional `videoId`. It comes from the curated map `backend/sr
 - Icons are generated from the login-page logo: `node scripts/make-icons.mjs` (needs CHROMIUM_PATH if Playwright's browser is missing). `npm run test:pwa --prefix frontend` needs port 5000 free.
 - Phase 2 (Capacitor, `frontend/android/`): details, the Render CORS setting (`CORS_ORIGIN` must list `https://localhost,capacitor://localhost`), build commands and the phone checklist are in `docs/ANDROID_APP.md`. The Gradle build can only run in CI or on a computer with the Android SDK; `npm run test:native --prefix frontend` checks our own native code paths in a browser. UNTESTED: everything on a real phone.
 - Never commit a keystore, `keystore.properties` or `local.properties` (they are git-ignored); the login token lives in `lib/tokenStore.js` (private storage in the app), never read `localStorage` for it directly.
+- Never resolve a promise with a Capacitor plugin object (async return or then-chain): the proxy answers .then() as a native method and rejects. Keep plugins in refs; native mocks in scripts/native-mocks mimic this.
 
 ## Video songs (feature/video-songs-v2, on top of feature/android-app)
 - Admin routes are fail-closed: owner admin role AND `ADMIN_VIDEO_USER_IDS` (env, comma-separated user ids) or 403 for everyone. No media is cached or stored (guard tests in `no-media-storage.test.js` and `noMediaStorage.test.js`). See `docs/VIDEO_SONGS.md` "Safety notes".

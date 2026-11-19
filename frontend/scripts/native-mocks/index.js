@@ -5,29 +5,40 @@ const log = (name, arg) => n.log.push({ name, arg: arg === undefined ? undefined
 const prefs = () => { try { return JSON.parse(sessionStorage.getItem('__native_prefs') || '{}'); } catch { return {}; } };
 const savePrefs = (p) => sessionStorage.setItem('__native_prefs', JSON.stringify(p)); // survives a reload, like private storage does
 
-export const App = {
+const asPlugin = (name, target) => new Proxy(target, {
+  get(obj, prop, receiver) {
+    if (prop === 'then') {
+      return () => {
+        throw new Error(`"${name}.then()" is not implemented on android`);
+      };
+    }
+    return Reflect.get(obj, prop, receiver);
+  },
+});
+
+export const App = asPlugin('App', {
   addListener: async (event, cb) => { n.listeners[event] = cb; return { remove: () => { delete n.listeners[event]; } }; },
   exitApp: async () => { log('App.exitApp'); },
-};
-export const Preferences = {
+});
+export const Preferences = asPlugin('Preferences', {
   get: async ({ key }) => ({ value: prefs()[key] ?? null }),
   set: async ({ key, value }) => { const p = prefs(); p[key] = value; savePrefs(p); log('Preferences.set', { key }); },
   remove: async ({ key }) => { const p = prefs(); delete p[key]; savePrefs(p); log('Preferences.remove', { key }); },
-};
-export const Network = {
+});
+export const Network = asPlugin('Network', {
   getStatus: async () => ({ connected: n.online !== false }),
   addListener: async (event, cb) => { n.listeners[event] = cb; return { remove: () => { delete n.listeners[event]; } }; },
-};
-export const Share = { share: async (o) => { log('Share.share', o); return {}; } };
-export const Haptics = { vibrate: async (o) => { log('Haptics.vibrate', o); } };
+});
+export const Share = asPlugin('Share', { share: async (o) => { log('Share.share', o); return {}; } });
+export const Haptics = asPlugin('Haptics', { vibrate: async (o) => { log('Haptics.vibrate', o); } });
 export const Style = { Dark: 'DARK', Light: 'LIGHT', Default: 'DEFAULT' };
-export const StatusBar = {
+export const StatusBar = asPlugin('StatusBar', {
   setStyle: async (o) => { log('StatusBar.setStyle', o); },
   setBackgroundColor: async (o) => { log('StatusBar.setBackgroundColor', o); },
-};
-export const SplashScreen = { hide: async (o) => { log('SplashScreen.hide', o); } };
+});
+export const SplashScreen = asPlugin('SplashScreen', { hide: async (o) => { log('SplashScreen.hide', o); } });
 let notificationPermission = 'prompt';
-export const CapacitorMusicControls = {
+export const CapacitorMusicControls = asPlugin('CapacitorMusicControls', {
   create: async (o) => { log('MusicControls.create', o); },
   updateElapsed: async (o) => { log('MusicControls.updateElapsed', o); },
   destroy: async () => { log('MusicControls.destroy'); },
@@ -39,4 +50,4 @@ export const CapacitorMusicControls = {
   },
   openNotificationSettings: async () => { log('MusicControls.openNotificationSettings'); },
   openBatterySettings: async () => { log('MusicControls.openBatterySettings'); },
-};
+});

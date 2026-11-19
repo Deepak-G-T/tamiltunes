@@ -40,7 +40,9 @@ async function run(browser) {
   const ctx = await browser.newContext({ viewport: { width: 390, height: 844 }, isMobile: true, hasTouch: true });
   const page = await ctx.newPage();
   const errors = [];
-  page.on('pageerror', (e) => errors.push(e.message));
+  const consoleErrors = [];
+  page.on('pageerror', (e) => { errors.push(e.message); consoleErrors.push(e.message); });
+  page.on('console', (msg) => { if (msg.type() === 'error' || msg.text().includes('is not implemented')) consoleErrors.push(msg.text()); });
   page.on('request', (r) => { const u = new URL(r.url()); if (u.pathname.startsWith('/api/') && u.origin !== API) seen.wrongOrigin.push(r.url()); });
   await page.addInitScript(() => { window.Capacitor = { isNativePlatform: () => true, getPlatform: () => 'android' }; });
 
@@ -203,6 +205,7 @@ async function run(browser) {
     }
   }
 
+  check("no 'is not implemented' errors in the page console", !consoleErrors.some((e) => e.includes('is not implemented')), consoleErrors.filter((e) => e.includes('is not implemented')).join(' | '));
   check('no page errors', errors.length === 0, errors.join(' | '));
   await ctx.close();
 }
