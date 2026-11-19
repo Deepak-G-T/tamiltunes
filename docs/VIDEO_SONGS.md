@@ -21,7 +21,7 @@
 3. Signed in: `POST /api/songs/:id/video-report { videoId, code }` (rate limited 20/hour per account). Only counts for the video the server
    actually offers for that song, once per person. After 2 different people the video is hidden for everyone until an admin restores it.
 
-## API (admin = `users.role` "admin")
+## API (admin routes need users.role "admin" AND the user id in env ADMIN_VIDEO_USER_IDS; there is no admin screen for videos yet)
 | Method | Path | What |
 |---|---|---|
 | POST | `/api/songs/:id/video-report` | report a failed embed (signed in) |
@@ -31,7 +31,7 @@
 | PUT | `/api/admin/videos/:songId` `{ videoId }` | choose the video (clears flag and reports) |
 | DELETE | `/api/admin/videos/:songId` | remove the choice (automatic lookup again) |
 | POST | `/api/admin/videos/:songId/restore` | show the video again, forget the reports |
-When PR #31 merges, put `/api/admin/videos` behind its admin check (2FA included).
+Admin routes require both the admin role and inclusion in `ADMIN_VIDEO_USER_IDS` (fail-closed, 403 otherwise).
 
 ## Player
 - Toggle only in Now Playing; the mini player stays audio. Closing Now Playing during a video switches to audio at the same spot.
