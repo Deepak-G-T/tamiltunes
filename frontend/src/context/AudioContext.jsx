@@ -1,3 +1,4 @@
+import { mediaArtwork } from '../lib/mediaSession';
 import React, { createContext, useContext, useState, useRef, useEffect, useCallback, useMemo } from 'react';
 import api from '../services/api';
 import YouTubePlayer from '../components/player/YouTubePlayer';
@@ -21,6 +22,7 @@ import ContinueHerePrompt from '../components/player/ContinueHerePrompt';
 import Toast from '../components/common/Toast';
 import { getCoverColor, rgbVar } from '../lib/coverColor';
 import { engineFor, canToggleVideo, getVideoId, planSwitch, planEmbedError } from '../lib/playbackLogic';
+import { getToken } from '../lib/tokenStore';
 
 const AudioContext = createContext();
 const QUEUE_ACTIONS = ['jumpToUid', 'removeUids', 'moveUidsToQueue', 'reorderByUid', 'clearQueue', 'refreshRecommendations', 'removeCurrentSong', 'playFromHistoryAt', 'saveQueueAsPlaylist', 'toggleStopAfter', 'startSleepTimer', 'cancelSleepTimer', 'setAutoplay', 'continueWithRadio', 'startRadio', 'addToQueue', 'playNext'];
@@ -322,7 +324,7 @@ export const AudioProvider = ({ children }) => {
   const checkRecordHistory = useCallback((song, time) => {
     if (time > 5 && song && historyRecordedSongId !== song.id) {
       setHistoryRecordedSongId(song.id);
-      const token = localStorage.getItem('tamiltunes_token');
+      const token = getToken();
       if (token) {
         api.post('/history', {
           songId: song.id,
@@ -1061,47 +1063,52 @@ export const AudioProvider = ({ children }) => {
     return () => clearTimeout(t);
   }, [nextUpId, currentSong?.id]); // eslint-disable-line react-hooks/exhaustive-deps
 
-  // Media Session API integration for Lock-screen, Headphone, & Bluetooth controls
-  useEffect(() => {
-    if (!('mediaSession' in navigator) || !currentSong) return;
+  // Media Session API: lock screen, notification, headphone and Bluetooth controls.
+  // The handlers are registered once and read the latest functions through a ref (the old effect re-ran every second because it
+  // depended on currentTime, rebuilding the metadata and every handler each tick).
+  const mediaCtl = useRef({});
+  mediaCtl.current = { resume, pause, previousTrack, nextTrack, seek, currentTime, duration };
 
+  useEffect(() => {
+    if (!('mediaSession' in navigator)) return undefined;
+    const ms = navigator.mediaSession;
+    const handlers = {
+      play: () => mediaCtl.current.resume(),
+      pause: () => mediaCtl.current.pause(),
+      stop: () => mediaCtl.current.pause(),
+      previoustrack: () => mediaCtl.current.previousTrack(),
+      nexttrack: () => mediaCtl.current.nextTrack(),
+      seekto: (d) => { if (d?.seekTime !== undefined) mediaCtl.current.seek(d.seekTime); },
+      seekbackward: (d) => mediaCtl.current.seek(Math.max(0, mediaCtl.current.currentTime - (d?.seekOffset || 10))),
+      seekforward: (d) => mediaCtl.current.seek(Math.min(mediaCtl.current.duration || Infinity, mediaCtl.current.currentTime + (d?.seekOffset || 10))),
+    };
+    for (const [action, fn] of Object.entries(handlers)) { try { ms.setActionHandler(action, fn); } catch { /* this browser does not support that action */ } }
+    return () => { for (const action of Object.keys(handlers)) { try { ms.setActionHandler(action, null); } catch { /* ignore */ } } };
+  }, []);
+
+  useEffect(() => {
+    if (!('mediaSession' in navigator)) return;
+    if (!currentSong) { navigator.mediaSession.metadata = null; return; }
     try {
       navigator.mediaSession.metadata = new window.MediaMetadata({
         title: currentSong.title,
         artist: currentSong.artist || currentSong.singers || 'TamilTunes Artist',
         album: currentSong.album || 'TamilTunes',
-        artwork: currentSong.image
-          ? ['96x96', '256x256', '512x512'].map((sizes) => ({ src: currentSong.image, sizes, type: 'image/jpeg' }))
-          : []
+        artwork: mediaArtwork(currentSong),
       });
-
-      navigator.mediaSession.setActionHandler('play', () => resume());
-      navigator.mediaSession.setActionHandler('pause', () => pause());
-      navigator.mediaSession.setActionHandler('previoustrack', () => previousTrack());
-      navigator.mediaSession.setActionHandler('nexttrack', () => nextTrack());
-      navigator.mediaSession.setActionHandler('seekto', (details) => {
-        if (details.seekTime !== undefined) seek(details.seekTime);
-      });
-      navigator.mediaSession.setActionHandler('seekbackward', (d) => seek(Math.max(0, currentTime - (d?.seekOffset || 10))));
-      navigator.mediaSession.setActionHandler('seekforward', (d) => seek(Math.min(duration || Infinity, currentTime + (d?.seekOffset || 10))));
     } catch (e) {
-      console.warn('MediaSession handler warning:', e);
+      console.warn('MediaSession metadata warning:', e);
     }
+  }, [currentSong?.id, currentSong?.title, currentSong?.artist, currentSong?.image]); // eslint-disable-line react-hooks/exhaustive-deps
 
-    return () => {
-      if ('mediaSession' in navigator) {
-        try {
-          navigator.mediaSession.setActionHandler('play', null);
-          navigator.mediaSession.setActionHandler('pause', null);
-          navigator.mediaSession.setActionHandler('previoustrack', null);
-          navigator.mediaSession.setActionHandler('nexttrack', null);
-          navigator.mediaSession.setActionHandler('seekto', null);
-          navigator.mediaSession.setActionHandler('seekbackward', null);
-          navigator.mediaSession.setActionHandler('seekforward', null);
-        } catch (e) {}
-      }
-    };
-  }, [currentSong, queueIndex, queue, isShuffle, repeatMode, currentTime]);
+  // The lock screen needs the length and position to draw its seek bar; the system moves it on by itself while playing,
+  // so this only needs refreshing when the song, the play state or the position jumps (every 5 s is plenty).
+  useEffect(() => {
+    if (!('mediaSession' in navigator) || !currentSong || !(duration > 0) || !navigator.mediaSession.setPositionState) return;
+    try {
+      navigator.mediaSession.setPositionState({ duration, playbackRate: 1, position: Math.min(Math.max(0, currentTime), duration) });
+    } catch { /* position outside the song: ignore */ }
+  }, [currentSong?.id, duration, isPlaying, Math.floor(currentTime / 5)]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // Sync playback state to MediaSession
   useEffect(() => {

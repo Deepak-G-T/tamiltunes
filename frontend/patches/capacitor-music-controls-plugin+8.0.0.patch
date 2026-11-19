@@ -1,0 +1,417 @@
+diff --git a/node_modules/capacitor-music-controls-plugin/android/src/main/java/com/ingageco/capacitormusiccontrols/CapacitorMusicControls.java b/node_modules/capacitor-music-controls-plugin/android/src/main/java/com/ingageco/capacitormusiccontrols/CapacitorMusicControls.java
+index 144c4a7..c5595dd 100644
+--- a/node_modules/capacitor-music-controls-plugin/android/src/main/java/com/ingageco/capacitormusiccontrols/CapacitorMusicControls.java
++++ b/node_modules/capacitor-music-controls-plugin/android/src/main/java/com/ingageco/capacitormusiccontrols/CapacitorMusicControls.java
+@@ -5,6 +5,9 @@ import com.getcapacitor.Plugin;
+ import com.getcapacitor.PluginCall;
+ import com.getcapacitor.PluginMethod;
+ import com.getcapacitor.annotation.CapacitorPlugin;
++import com.getcapacitor.annotation.Permission;
++import android.Manifest;
++import android.provider.Settings;
+ 
+ 
+ import android.graphics.Bitmap;
+@@ -45,7 +48,12 @@ import java.io.InputStream;
+ import java.net.HttpURLConnection;
+ import java.net.URL;
+ 
+-@CapacitorPlugin(name="CapacitorMusicControls")
++@CapacitorPlugin(
++	name = "CapacitorMusicControls",
++	permissions = {
++		@Permission(alias = "notifications", strings = { Manifest.permission.POST_NOTIFICATIONS })
++	}
++)
+ public class CapacitorMusicControls extends Plugin {
+ 
+ 	private static final String TAG = "CapacitorMusicControls";
+@@ -275,6 +283,55 @@ public class CapacitorMusicControls extends Plugin {
+ 		call.resolve();
+ 	}
+ 
++	@PluginMethod()
++	public void openNotificationSettings(PluginCall call) {
++		Activity activity = getActivity();
++		if (activity != null) {
++			Intent intent = new Intent();
++			if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
++				intent.setAction(Settings.ACTION_APP_NOTIFICATION_SETTINGS);
++				intent.putExtra(Settings.EXTRA_APP_PACKAGE, activity.getPackageName());
++			} else {
++				intent.setAction(Settings.ACTION_APPLICATION_DETAILS_SETTINGS);
++				intent.setData(Uri.parse("package:" + activity.getPackageName()));
++			}
++			intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
++			try {
++				activity.startActivity(intent);
++			} catch (Exception e) {
++				Intent fallback = new Intent(Settings.ACTION_APPLICATION_DETAILS_SETTINGS);
++				fallback.setData(Uri.parse("package:" + activity.getPackageName()));
++				fallback.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
++				activity.startActivity(fallback);
++			}
++		}
++		call.resolve();
++	}
++
++	@PluginMethod()
++	public void openBatterySettings(PluginCall call) {
++		Activity activity = getActivity();
++		if (activity != null) {
++			Intent intent = new Intent();
++			if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
++				intent.setAction(Settings.ACTION_IGNORE_BATTERY_OPTIMIZATION_SETTINGS);
++			} else {
++				intent.setAction(Settings.ACTION_APPLICATION_DETAILS_SETTINGS);
++				intent.setData(Uri.parse("package:" + activity.getPackageName()));
++			}
++			intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
++			try {
++				activity.startActivity(intent);
++			} catch (Exception e) {
++				Intent fallback = new Intent(Settings.ACTION_APPLICATION_DETAILS_SETTINGS);
++				fallback.setData(Uri.parse("package:" + activity.getPackageName()));
++				fallback.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
++				activity.startActivity(fallback);
++			}
++		}
++		call.resolve();
++	}
++
+ 
+ 	protected void handleOnDestroy() {
+ 
+diff --git a/node_modules/capacitor-music-controls-plugin/android/src/main/java/com/ingageco/capacitormusiccontrols/MusicControlsNotification.java b/node_modules/capacitor-music-controls-plugin/android/src/main/java/com/ingageco/capacitormusiccontrols/MusicControlsNotification.java
+index 84ea69e..f309317 100644
+--- a/node_modules/capacitor-music-controls-plugin/android/src/main/java/com/ingageco/capacitormusiccontrols/MusicControlsNotification.java
++++ b/node_modules/capacitor-music-controls-plugin/android/src/main/java/com/ingageco/capacitormusiccontrols/MusicControlsNotification.java
+@@ -200,7 +200,7 @@ public class MusicControlsNotification {
+ 		builder.setVisibility(Notification.VISIBILITY_PUBLIC);
+ 
+ 		//Set SmallIcon
+-		boolean usePlayingIcon = this.infos.notificationIcon.isEmpty();
++		boolean usePlayingIcon = this.infos.notificationIcon == null || this.infos.notificationIcon.isEmpty();
+ 		if(!usePlayingIcon){
+ 			int resId = this.getResourceId(this.infos.notificationIcon, 0);
+ 			usePlayingIcon = resId == 0;
+@@ -280,7 +280,7 @@ public class MusicControlsNotification {
+ 
+ 	private int getResourceId(String name, int fallback){
+ 		try{
+-			if(name.isEmpty()){
++			if(name == null || name.isEmpty()){
+ 				return fallback;
+ 			}
+ 
+diff --git a/node_modules/capacitor-music-controls-plugin/android/src/main/java/com/ingageco/capacitormusiccontrols/MusicControlsNotificationKiller.java b/node_modules/capacitor-music-controls-plugin/android/src/main/java/com/ingageco/capacitormusiccontrols/MusicControlsNotificationKiller.java
+index 9470c31..525c635 100644
+--- a/node_modules/capacitor-music-controls-plugin/android/src/main/java/com/ingageco/capacitormusiccontrols/MusicControlsNotificationKiller.java
++++ b/node_modules/capacitor-music-controls-plugin/android/src/main/java/com/ingageco/capacitormusiccontrols/MusicControlsNotificationKiller.java
+@@ -2,86 +2,209 @@ package com.ingageco.capacitormusiccontrols;
+ 
+ import android.app.Activity;
+ import android.app.Notification;
++import android.app.NotificationChannel;
++import android.app.NotificationManager;
+ import android.app.Service;
++import android.content.Context;
++import android.content.Intent;
++import android.content.pm.ServiceInfo;
+ import android.os.Build;
+ import android.os.IBinder;
+ import android.os.Binder;
+-import android.app.NotificationManager;
+-import android.content.Intent;
++import android.os.PowerManager;
+ import android.util.Log;
+ 
+ public class MusicControlsNotificationKiller extends Service {
+ 	private static final String TAG = "MusicControlsNotificationKiller";
++	private static final String CHANNEL_ID = "capacitor-music-channel-id";
++	private static final long WAKE_LOCK_TIMEOUT_MS = 6 * 60 * 60 * 1000L; // 6 hours safety timeout
+ 
+-	private static int NOTIFICATION_ID;
++	private static int NOTIFICATION_ID = 7824;
+ 	private NotificationManager mNM;
+ 	private final IBinder mBinder = new KillBinder(this);
+ 	private boolean isRunning = false;
++	private PowerManager.WakeLock wakeLock = null;
++
++	public static volatile boolean isPlaying = false;
++
++	public static boolean isMediaPlaying() {
++		return isPlaying;
++	}
+ 
+ 	@Override
+ 	public IBinder onBind(Intent intent) {
+-		this.NOTIFICATION_ID=intent.getIntExtra("notificationID",1);
++		this.NOTIFICATION_ID = intent.getIntExtra("notificationID", 7824);
+ 		return mBinder;
+ 	}
+ 
+ 	@Override
+ 	public int onStartCommand(Intent intent, int flags, int startId) {
+ 		Log.i(TAG, "onStartCommand");
+-
+-		return Service.START_STICKY;
++		return Service.START_NOT_STICKY;
+ 	}
+ 
+ 	@Override
+ 	public void onCreate() {
++		super.onCreate();
+ 		Log.i(TAG, "onCreate");
++		mNM = (NotificationManager) getSystemService(NOTIFICATION_SERVICE);
++		initWakeLock();
++	}
++
++	private synchronized void initWakeLock() {
++		if (wakeLock == null) {
++			try {
++				PowerManager pm = (PowerManager) getSystemService(Context.POWER_SERVICE);
++				if (pm != null) {
++					wakeLock = pm.newWakeLock(PowerManager.PARTIAL_WAKE_LOCK, "tamiltunes:audio_playback");
++					wakeLock.setReferenceCounted(false);
++				}
++			} catch (Exception e) {
++				Log.w(TAG, "Failed to create wake lock: " + e.getMessage());
++			}
++		}
++	}
+ 
+-		// this.startForeground();
++	private synchronized void acquireWakeLock() {
++		try {
++			if (wakeLock == null) {
++				initWakeLock();
++			}
++			if (wakeLock != null && !wakeLock.isHeld()) {
++				wakeLock.acquire(WAKE_LOCK_TIMEOUT_MS);
++				Log.i(TAG, "WakeLock acquired with 6h timeout");
++			}
++		} catch (Exception e) {
++			Log.w(TAG, "Failed to acquire wake lock: " + e.getMessage());
++		}
++	}
+ 
+-		mNM = (NotificationManager) getSystemService(NOTIFICATION_SERVICE);
+-		mNM.cancel(NOTIFICATION_ID);
++	private synchronized void releaseWakeLock() {
++		try {
++			if (wakeLock != null && wakeLock.isHeld()) {
++				wakeLock.release();
++				Log.i(TAG, "WakeLock released");
++			}
++		} catch (Exception e) {
++			Log.w(TAG, "Failed to release wake lock: " + e.getMessage());
++		}
+ 	}
+ 
+ 	@Override
+ 	public void onDestroy() {
+ 		Log.i(TAG, "onDestroy");
+-
+-		// make sure the notification cannot outlive the service, even if it
+-		// was previously detached via STOP_FOREGROUND_DETACH
+-		this.stopForeground(STOP_FOREGROUND_REMOVE);
+-		mNM = (NotificationManager) getSystemService(NOTIFICATION_SERVICE);
+-		mNM.cancel(NOTIFICATION_ID);
++		releaseWakeLock();
++		try {
++			if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.N) {
++				this.stopForeground(STOP_FOREGROUND_REMOVE);
++			} else {
++				this.stopForeground(true);
++			}
++		} catch (Exception e) {
++			Log.w(TAG, "onDestroy stopForeground exception: " + e.getMessage());
++		}
++		if (mNM != null) {
++			mNM.cancel(NOTIFICATION_ID);
++		}
+ 		this.isRunning = false;
++		isPlaying = false;
++		super.onDestroy();
+ 	}
+ 
+ 	@Override
+ 	public void onTaskRemoved(Intent intent) {
+-		Log.i(TAG, "onTaskRemoved");
+-
+-		mNM = (NotificationManager) getSystemService(NOTIFICATION_SERVICE);
+-		mNM.cancel(NOTIFICATION_ID);
++		Log.i(TAG, "onTaskRemoved - stopping service and clearing notification");
++		releaseWakeLock();
++		try {
++			if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.N) {
++				this.stopForeground(STOP_FOREGROUND_REMOVE);
++			} else {
++				this.stopForeground(true);
++			}
++		} catch (Exception e) {
++			Log.w(TAG, "onTaskRemoved stopForeground exception: " + e.getMessage());
++		}
++		if (mNM != null) {
++			mNM.cancel(NOTIFICATION_ID);
++		}
++		this.isRunning = false;
++		isPlaying = false;
++		stopSelf();
+ 	}
+ 
+ 	public void setForeground(Notification notification, Activity activity) {
+-
+ 		Log.i(TAG, "setForeground");
++		if (notification == null) {
++			clearForeground();
++			return;
++		}
+ 
+ 		if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O && !this.isRunning) {
+-            Log.i(TAG, "startForegroundService");
+-            this.isRunning = true;
+-            this.startForegroundService(new Intent(activity, MusicControlsNotificationKiller.class));
+-        }
++			Log.i(TAG, "startForegroundService");
++			this.isRunning = true;
++			try {
++				this.startForegroundService(new Intent(activity, MusicControlsNotificationKiller.class));
++			} catch (Exception e) {
++				Log.w(TAG, "startForegroundService exception: " + e.getMessage());
++			}
++		}
++
++		try {
++			if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
++				this.startForeground(this.NOTIFICATION_ID, notification, ServiceInfo.FOREGROUND_SERVICE_TYPE_MEDIA_PLAYBACK);
++			} else {
++				this.startForeground(this.NOTIFICATION_ID, notification);
++			}
++			acquireWakeLock();
++			isPlaying = true;
++		} catch (Exception e) {
++			Log.e(TAG, "startForeground failed: " + e.getMessage(), e);
++		}
++	}
+ 
+-		this.startForeground(this.NOTIFICATION_ID, notification);
++	public void ensureForegroundStarted(Activity activity) {
++		if (!this.isRunning) return;
++		try {
++			Notification fallback = createFallbackNotification();
++			if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
++				this.startForeground(this.NOTIFICATION_ID, fallback, ServiceInfo.FOREGROUND_SERVICE_TYPE_MEDIA_PLAYBACK);
++			} else {
++				this.startForeground(this.NOTIFICATION_ID, fallback);
++			}
++		} catch (Exception e) {
++			Log.w(TAG, "ensureForegroundStarted failed: " + e.getMessage());
++		}
++	}
++
++	private Notification createFallbackNotification() {
++		if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O && mNM != null) {
++			NotificationChannel channel = new NotificationChannel(CHANNEL_ID, "Audio Controls", NotificationManager.IMPORTANCE_LOW);
++			channel.setDescription("Control Playing Audio");
++			mNM.createNotificationChannel(channel);
++		}
++		Notification.Builder builder;
++		if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
++			builder = new Notification.Builder(this, CHANNEL_ID);
++		} else {
++			builder = new Notification.Builder(this);
++		}
++		builder.setContentTitle("TamilTunes")
++		       .setContentText("Playing audio")
++		       .setSmallIcon(android.R.drawable.ic_media_play);
++		return builder.build();
+ 	}
+ 
+ 	public void clearForeground() {
++		Log.i(TAG, "clearForeground");
++		releaseWakeLock();
++		isPlaying = false;
+ 		if (android.os.Build.VERSION.SDK_INT < Build.VERSION_CODES.N) {
+ 			return;
+ 		}
+-
+-		Log.i(TAG, "clearForeground");
+-
+-		this.stopForeground(STOP_FOREGROUND_DETACH);
++		try {
++			this.stopForeground(STOP_FOREGROUND_DETACH);
++		} catch (Exception e) {
++			Log.w(TAG, "clearForeground exception: " + e.getMessage());
++		}
+ 	}
+-
+ }
+diff --git a/node_modules/capacitor-music-controls-plugin/android/src/main/java/com/ingageco/capacitormusiccontrols/MusicControlsServiceConnection.java b/node_modules/capacitor-music-controls-plugin/android/src/main/java/com/ingageco/capacitormusiccontrols/MusicControlsServiceConnection.java
+index 10950ad..c0e4f93 100644
+--- a/node_modules/capacitor-music-controls-plugin/android/src/main/java/com/ingageco/capacitormusiccontrols/MusicControlsServiceConnection.java
++++ b/node_modules/capacitor-music-controls-plugin/android/src/main/java/com/ingageco/capacitormusiccontrols/MusicControlsServiceConnection.java
+@@ -17,6 +17,9 @@ public class MusicControlsServiceConnection implements ServiceConnection {
+     protected MusicControlsNotificationKiller service;
+     protected Activity activity;
+ 
++    private Notification pendingNotification;
++    private boolean pendingIsPlaying;
++
+     MusicControlsServiceConnection(Activity activity) {
+         this.activity = activity;
+     }
+@@ -30,24 +33,45 @@ public class MusicControlsServiceConnection implements ServiceConnection {
+         if (Build.VERSION.SDK_INT < Build.VERSION_CODES.O) {
+             this.service.startService(new Intent(activity, MusicControlsNotificationKiller.class));
+         }
++
++        if (this.pendingNotification != null) {
++            Log.i(TAG, "Dispatching pending notification onServiceConnected");
++            setNotification(this.pendingNotification, this.pendingIsPlaying);
++            this.pendingNotification = null;
++        } else if (this.service != null) {
++            this.service.ensureForegroundStarted(this.activity);
++        }
+     }
+ 
+     public void onServiceDisconnected(ComponentName className) {
+         Log.i(TAG, "onServiceDisconnected");
+-
++        this.service = null;
+     }
+ 
+     void setNotification(Notification notification, boolean isPlaying) {
++        MusicControlsNotificationKiller.isPlaying = isPlaying;
+         if (this.service == null) {
++            Log.i(TAG, "Service not bound yet, storing pending notification");
++            if (isPlaying && notification != null) {
++                this.pendingNotification = notification;
++                this.pendingIsPlaying = isPlaying;
++            } else {
++                this.pendingNotification = null;
++                this.pendingIsPlaying = false;
++            }
+             return;
+         }
+ 
+-        Log.i(TAG, "setNotification");
++        Log.i(TAG, "setNotification isPlaying=" + isPlaying);
+ 
+-        if (isPlaying) {
+-            this.service.setForeground(notification, this.activity);
+-        } else {
+-            this.service.clearForeground();
++        try {
++            if (isPlaying) {
++                this.service.setForeground(notification, this.activity);
++            } else {
++                this.service.clearForeground();
++            }
++        } catch (Exception e) {
++            Log.w(TAG, "setNotification service call failed: " + e.getMessage());
+         }
+     }
+ }
+\ No newline at end of file

@@ -17,8 +17,11 @@ import { useAudio, useQueue } from '../../context/AudioContext';
 import { useAuth } from '../../context/AuthContext';
 import ProgressBar from './ProgressBar';
 import VolumeSlider from './VolumeSlider';
-import QueueDrawer from './QueueDrawer';
-import FullScreenPlayer from './FullScreenPlayer';
+// The full-screen player and the queue panel (drag and drop, comments ...) are not needed for the first page: their code is loaded once a song
+// is on and kept in state. (Not React.lazy: React holds back a lazy component behind Suspense on its first showing, which made the first open
+// of the queue ~170 ms slower.)
+const loadPanels = () => Promise.all([import('./QueueDrawer'), import('./FullScreenPlayer')])
+  .then(([q, f]) => ({ QueueDrawer: q.default, FullScreenPlayer: f.default }));
 import api from '../../services/api';
 
 const MUSIC_COVER_FALLBACK = "data:image/svg+xml;charset=UTF-8,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 300 300'%3E%3Cdefs%3E%3ClinearGradient id='bg' x1='0%25' y1='0%25' x2='100%25' y2='100%25'%3E%3Cstop offset='0%25' stop-color='%23143d24'/%3E%3Cstop offset='50%25' stop-color='%230f2a1a'/%3E%3Cstop offset='100%25' stop-color='%23071a10'/%3E%3C/linearGradient%3E%3C/defs%3E%3Crect width='300' height='300' rx='16' fill='url(%23bg)'/%3E%3Ccircle cx='150' cy='150' r='60' fill='%231db954' opacity='0.2'/%3E%3Cpath d='M135 180V120l50-14v54m-50 0a16 16 0 11-32 0 16 16 0 0132 0zm50-14a16 16 0 11-32 0 16 16 0 0132 0z' stroke='%236ee9a0' stroke-width='6' fill='none' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E";
@@ -51,6 +54,17 @@ const MusicPlayer = ({ onAddToPlaylist }) => {
   const nextUp = useQueue().queueSections.nextUp; // "Next up: <song>" under the title, so you always know what is coming
 
   const { isAuthenticated } = useAuth();
+  const hasSong = Boolean(currentSong);
+  const [panels, setPanels] = useState(null);
+  const wantPanels = hasSong || isQueueOpen || isFullScreen; // a song is on, or a panel was opened with nothing playing (the empty queue)
+  useEffect(() => { // not before that: it would slow the first page load
+    if (!wantPanels || panels) return undefined;
+    let alive = true;
+    loadPanels().then((p) => { if (alive) setPanels(p); }).catch(() => { /* offline: the panels open once the code can load */ });
+    return () => { alive = false; };
+  }, [wantPanels, panels]);
+  const QueueDrawer = panels?.QueueDrawer;
+  const FullScreenPlayer = panels?.FullScreenPlayer;
   const [isFavorite, setIsFavorite] = useState(false);
 
   // Check if currentSong is in user favorites via lightweight IDs endpoint
@@ -123,7 +137,7 @@ const MusicPlayer = ({ onAddToPlaylist }) => {
             <ListMusic className="w-5 h-5" />
           </button>
         </footer>
-        <QueueDrawer isOpen={isQueueOpen} onClose={() => setIsQueueOpen(false)} />
+        {isQueueOpen && QueueDrawer && <QueueDrawer isOpen={isQueueOpen} onClose={() => setIsQueueOpen(false)} />}
       </>
     );
   }
@@ -298,16 +312,18 @@ const MusicPlayer = ({ onAddToPlaylist }) => {
       </footer>
 
       {/* Slide-out Queue Drawer */}
-      <QueueDrawer isOpen={isQueueOpen} onClose={() => setIsQueueOpen(false)} />
+      {isQueueOpen && QueueDrawer && <QueueDrawer isOpen={isQueueOpen} onClose={() => setIsQueueOpen(false)} />}
 
       {/* Full-screen Now Playing Modal */}
-      <FullScreenPlayer
-        isOpen={isFullScreen}
-        onClose={() => setIsFullScreen(false)}
-        onToggleFavorite={toggleFavorite}
-        isFavorite={isFavorite}
-        onAddToPlaylist={onAddToPlaylist}
-      />
+      {isFullScreen && FullScreenPlayer && (
+        <FullScreenPlayer
+          isOpen={isFullScreen}
+          onClose={() => setIsFullScreen(false)}
+          onToggleFavorite={toggleFavorite}
+          isFavorite={isFavorite}
+          onAddToPlaylist={onAddToPlaylist}
+        />
+      )}
     </>
   );
 };

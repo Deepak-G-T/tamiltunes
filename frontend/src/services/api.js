@@ -1,7 +1,8 @@
 import axios from 'axios';
+import { API_BASE_URL } from '../config/app';
 import { API_TIMEOUT_MS, coldStartRetryDelay } from '../lib/coldStart';
+import { getToken, clearToken } from '../lib/tokenStore';
 
-const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || '/api';
 
 const api = axios.create({
   baseURL: API_BASE_URL,
@@ -22,7 +23,7 @@ const notifySlowStatus = (isSlow) => {
 // Request interceptor to attach JWT token & track 5s cold starts
 api.interceptors.request.use(
   (config) => {
-    const token = localStorage.getItem('tamiltunes_token');
+    const token = getToken();
     if (token) {
       config.headers.Authorization = `Bearer ${token}`;
     }
@@ -76,7 +77,7 @@ api.interceptors.response.use(
 
     if (error.response && error.response.status === 401) {
       // Clear token if invalid or expired
-      localStorage.removeItem('tamiltunes_token');
+      clearToken();
       localStorage.removeItem('tamiltunes_user');
       if (typeof window !== 'undefined' && !window.location.pathname.startsWith('/login') && !window.location.pathname.startsWith('/signup')) {
         window.location.href = '/login';

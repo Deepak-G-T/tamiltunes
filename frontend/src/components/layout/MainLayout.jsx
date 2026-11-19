@@ -4,6 +4,10 @@ import { RefreshCw } from 'lucide-react';
 import Sidebar from './Sidebar';
 import TopNav from './TopNav';
 import MobileNav from './MobileNav';
+import PwaBar from '../common/PwaBar';
+import OfflineBanner from '../common/OfflineBanner';
+import NativeBridge from '../native/NativeBridge';
+import NativeMediaControls from '../native/NativeMediaControls';
 import MusicPlayer from '../player/MusicPlayer';
 import MiniPlayer from '../player/MiniPlayer';
 import CreatePlaylistModal from '../modals/CreatePlaylistModal';
@@ -26,7 +30,7 @@ const MainLayout = () => {
   }, []);
 
   return (
-    <div className="flex flex-col h-screen w-screen bg-black text-white overflow-hidden">
+    <div className="flex flex-col h-full w-full bg-black text-white overflow-hidden">
       <div className="flex flex-1 min-h-0 md:p-2 md:gap-2">
       {/* Desktop Sidebar */}
       <div className="hidden md:flex flex-shrink-0 h-full w-[280px] lg:w-[320px]">
@@ -58,6 +62,9 @@ const MainLayout = () => {
         {/* Top Navbar */}
         <TopNav onToggleMobileSidebar={() => setMobileSidebarOpen(true)} />
 
+        <OfflineBanner />
+        <PwaBar />
+
         {/* Cold Start Indicator for Render Free Tier */}
         {isServerWaking && (
           <div
@@ -81,6 +88,9 @@ const MainLayout = () => {
             }} />
           </div>
         </main>
+
+        <NativeBridge />
+        <NativeMediaControls />
 
         {/* Visible video surface when the YouTube engine is active */}
 

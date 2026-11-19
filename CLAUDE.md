@@ -136,3 +136,10 @@ Songs may carry an optional `videoId`. It comes from the curated map `backend/sr
 - New mix on every app open and on pull to refresh / the refresh button (`visit` token), last-shown songs sink (`avoid`), Daily Mix 1-3 from plays and likes
   (guests: `artists` from the browser). No migration. Notes: `docs/HOME_FEED.md` (last section). Browser audit: `npm run test:home --prefix frontend` (24 checks).
 - UNTESTED: live JioSaavn pools for the mixes, real-phone pull to refresh.
+
+## App (feature/android-app): PWA now, Android APK later
+- Direct APK + installable web app only (no Play Store: unlicensed JioSaavn source). Notes, the Lighthouse numbers and the real-phone checklist: `docs/ANDROID_APP.md`.
+- The service worker (`frontend/src/sw.js`, rules `lib/swRules.js`) NEVER caches audio, auth or personal endpoints; only the public `/api/music/home|search|albums|artists` GETs. Do not widen that list.
+- Icons are generated from the login-page logo: `node scripts/make-icons.mjs` (needs CHROMIUM_PATH if Playwright's browser is missing). `npm run test:pwa --prefix frontend` needs port 5000 free.
+- Phase 2 (Capacitor, `frontend/android/`): details, the Render CORS setting (`CORS_ORIGIN` must list `https://localhost,capacitor://localhost`), build commands and the phone checklist are in `docs/ANDROID_APP.md`. The Gradle build can only run in CI or on a computer with the Android SDK; `npm run test:native --prefix frontend` checks our own native code paths in a browser. UNTESTED: everything on a real phone.
+- Never commit a keystore, `keystore.properties` or `local.properties` (they are git-ignored); the login token lives in `lib/tokenStore.js` (private storage in the app), never read `localStorage` for it directly.

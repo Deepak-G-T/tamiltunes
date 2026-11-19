@@ -590,6 +590,16 @@ async function phone(browser, width, height) {
   page.on('pageerror', (e) => errors.push(e.message));
   await setup(page);
   currentPage = page;
+  await page.addInitScript(() => { // watch what the app tells the lock screen
+    window.__msHandlers = {}; window.__msMeta = 0; window.__msPos = [];
+    const ms = navigator.mediaSession;
+    const set = ms.setActionHandler.bind(ms);
+    ms.setActionHandler = (a, fn) => { if (fn) window.__msHandlers[a] = fn; else delete window.__msHandlers[a]; return set(a, fn); };
+    const pos = ms.setPositionState?.bind(ms);
+    if (pos) ms.setPositionState = (st) => { window.__msPos.push(st); return pos(st); };
+    const Meta = window.MediaMetadata;
+    window.MediaMetadata = class extends Meta { constructor(init) { super(init); window.__msMeta += 1; window.__msLast = init; } };
+  });
   if (process.env.QUEUE_AUDIT_THROTTLE) { const t = await ctx.newCDPSession(page); await t.send('Emulation.setCPUThrottlingRate', { rate: Number(process.env.QUEUE_AUDIT_THROTTLE) }); } // simulate a slower computer
   await page.goto(`${BASE}/`);
   await page.waitForSelector('section[aria-label="Trending now"] button[aria-label="More actions for Queue Song 1"]');
@@ -604,6 +614,24 @@ async function phone(browser, width, height) {
   check(`${tag} tabs, Now playing and rows are shown`, (await page.getByRole('tab').count()) === 2 && (await nowPlaying(page)) === 'Queue Song 1' && (await titles(page)).length >= 3);
   check(`${tag} the header actions are reachable (Clear queue, Save as playlist, Select)`, await page.getByRole('button', { name: 'Clear queue' }).isVisible() && await page.getByRole('button', { name: 'Save as playlist' }).isVisible() && await page.getByRole('button', { name: 'Select', exact: true }).isVisible());
   check(`${tag} no horizontal scroll`, await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth + 1));
+  // lock-screen / notification controls (Media Session)
+  await sleep(page, 2500);
+  const ms = await page.evaluate(() => ({ title: window.__msLast?.title, artist: window.__msLast?.artist, art: window.__msLast?.artwork?.length, handlers: Object.keys(window.__msHandlers).sort(), metaCount: window.__msMeta, pos: window.__msPos.at(-1) }));
+  check(`${tag} the lock screen gets the title, artist and artwork`, ms.title === 'Queue Song 1' && ms.artist === 'Test Artist' && ms.art >= 2, JSON.stringify(ms));
+  check(`${tag} play, pause, previous, next, seek and stop are wired`, ['nexttrack', 'pause', 'play', 'previoustrack', 'seekbackward', 'seekforward', 'seekto', 'stop'].every((a) => ms.handlers.includes(a)), ms.handlers.join(','));
+  check(`${tag} the lock-screen metadata is built once per song, not every second`, ms.metaCount <= 2, String(ms.metaCount));
+  check(`${tag} the lock screen gets the song length and position`, ms.pos && ms.pos.duration > 0 && ms.pos.position >= 0, JSON.stringify(ms.pos));
+  await page.evaluate(() => window.__msHandlers.pause());
+  check(`${tag} the lock-screen pause button pauses`, await until(page, async () => (await page.evaluate(() => navigator.mediaSession.playbackState)) === 'paused'));
+  await page.evaluate(() => window.__msHandlers.play());
+  check(`${tag} and play resumes`, await until(page, async () => (await page.evaluate(() => navigator.mediaSession.playbackState)) === 'playing'));
+  check(`${tag} the mini player controls and the bottom bar are at least 44px, the page fills the visible height`, await page.evaluate(() => {
+    const box = (sel) => { const el = document.querySelector(sel); return el ? el.getBoundingClientRect() : null; };
+    const ok = (b) => b && b.width >= 44 && b.height >= 44;
+    const nav = document.querySelector('nav.fixed');
+    const tabs = [...nav.querySelectorAll('a')].map((a) => a.getBoundingClientRect());
+    return ok(box('[aria-label="Show queue"]')) && ok(box('[aria-label="Next song"]')) && (ok(box('button[aria-label="Pause"]')) || ok(box('button[aria-label="Play"]'))) && tabs.every((t) => t.width >= 44 && t.height >= 44) && Math.abs(document.getElementById('root').getBoundingClientRect().height - window.innerHeight) <= 1 && getComputedStyle(document.body).overscrollBehaviorY === 'none';
+  }));
   check(`${tag} rows have a visible drag handle and at least 44 px touch targets for the main actions`, await (async () => {
     const h = await page.locator('[data-testid=queue-row]').first().locator('button[aria-label^="Reorder"]').boundingBox();
     const row = await page.locator('[data-testid=queue-row]').first().boundingBox();

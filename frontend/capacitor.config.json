@@ -1,0 +1,31 @@
+{
+  "appId": "com.tamiltunes.app",
+  "appName": "TamilTunes",
+  "webDir": "dist",
+  "backgroundColor": "#09090B",
+  "server": {
+    "androidScheme": "https"
+  },
+  "android": {
+    "allowMixedContent": false,
+    "webContentsDebuggingEnabled": false,
+    "backgroundColor": "#09090B"
+  },
+  "plugins": {
+    "SplashScreen": {
+      "launchAutoHide": false,
+      "backgroundColor": "#09090B",
+      "androidScaleType": "CENTER_INSIDE",
+      "showSpinner": false
+    },
+    "StatusBar": {
+      "style": "DARK",
+      "backgroundColor": "#09090B"
+    },
+    "SystemBars": {
+      "insetsHandling": "native",
+      "initialViewportFitHint": "cover",
+      "style": "DARK"
+    }
+  }
+}

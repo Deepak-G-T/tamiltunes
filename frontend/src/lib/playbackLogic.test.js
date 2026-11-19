@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import {
-  canToggleVideo, engineFor, hasAudioStream, isFatalEmbedError, planSwitch, planEmbedError, getVideoId
+  canToggleVideo, engineFor, hasAudioStream, isFatalEmbedError, planSwitch, planEmbedError, getVideoId, screenLockNotice
 } from './playbackLogic';
 
 const jio = { id: 'j1', source: 'audio', streamUrl: 'https://aac.saavncdn.com/a.mp4' };
@@ -68,4 +68,17 @@ describe('embed errors', () => {
     expect(planEmbedError({ song: ytOnly, code: 101 })).toEqual({ action: 'skip' }));
   it('other codes keep the existing skip behaviour', () =>
     expect(planEmbedError({ song: jioVideo, code: 2 })).toEqual({ action: 'skip' }));
+});
+
+describe('screen-lock notice (YouTube pauses when the screen locks)', () => {
+  const yt = { id: 'yt_abc', source: 'youtube', videoId: 'abc', title: 'T' };
+  const both = { id: 'saavn_1', streamUrl: 'https://x/a.mp4', videoId: 'abc', title: 'T' };
+  it('a YouTube song shows the notice, with no audio switch offered when it has no audio stream', () => {
+    expect(screenLockNotice(yt, 'youtube')).toEqual({ text: 'This song pauses when the screen locks.', canSwitchToAudio: false });
+  });
+  it('a song in video mode offers switching to audio', () => expect(screenLockNotice(both, 'youtube').canSwitchToAudio).toBe(true));
+  it('audio-engine songs and no song show nothing', () => {
+    expect(screenLockNotice(both, 'audio')).toBeNull();
+    expect(screenLockNotice(null, 'youtube')).toBeNull();
+  });
 });

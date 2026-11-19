@@ -148,6 +148,7 @@ async function runAudit() {
   const browser = await chromium.launch({ headless: true, ...chromiumOverride });
   console.log('✓ Playwright Chromium browser initialized');
 
+  // Every context below runs with serviceWorkers: 'block': this audit mocks the server with page.route, and page.route cannot see requests made by a service worker.
   const setupMockRoutes = async (page) => {
     await page.addInitScript(() => {
       localStorage.setItem('tamiltunes_token', 'audit_token');
@@ -252,7 +253,7 @@ async function runAudit() {
 
   // Capture static viewports
   for (const vp of viewports) {
-    const context = await browser.newContext({
+    const context = await browser.newContext({ serviceWorkers: 'block',
       viewport: { width: vp.width, height: vp.height },
       isMobile: vp.isMobile,
       hasTouch: vp.hasTouch
@@ -269,7 +270,7 @@ async function runAudit() {
 
   // Interaction tests on Desktop (1366x768)
   {
-    const context = await browser.newContext({ viewport: { width: 1366, height: 768 } });
+    const context = await browser.newContext({ serviceWorkers: 'block', viewport: { width: 1366, height: 768 } });
     const page = await context.newPage();
     await setupMockRoutes(page);
 
@@ -324,7 +325,7 @@ async function runAudit() {
 
   for (const cfg of mobileConfigs) {
     console.log(`\n--- Running Mobile Tests on ${cfg.name} (hasTouch: true, isMobile: true, real Home page) ---`);
-    const context = await browser.newContext({
+    const context = await browser.newContext({ serviceWorkers: 'block',
       viewport: { width: cfg.width, height: cfg.height },
       hasTouch: true,
       isMobile: true
@@ -442,7 +443,7 @@ async function runAudit() {
   });
 
   try {
-    const ytContext = await ytAutoplayBrowser.newContext({
+    const ytContext = await ytAutoplayBrowser.newContext({ serviceWorkers: 'block',
       viewport: { width: 390, height: 844 },
       hasTouch: true,
       isMobile: true

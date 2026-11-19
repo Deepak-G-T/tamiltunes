@@ -29,6 +29,7 @@ const ForgotPassword = lazy(() => import('./pages/ForgotPassword'));
 const ResetPassword = lazy(() => import('./pages/ResetPassword'));
 const Profile = lazy(() => import('./pages/Profile'));
 const UserProfile = lazy(() => import('./pages/UserProfile'));
+const Install = lazy(() => import('./pages/Install'));
 
 // Lazy-loaded Admin Section (non-admins never download this code)
 const AdminRoute = lazy(() => import('./components/auth/AdminRoute'));
@@ -50,11 +51,12 @@ function App() {
           <SongActionsProvider>
             <Suspense fallback={<PageLoader />}>
               <Routes>
-                {/* Public Auth Routes */}
+                {/* Public Auth & PWA Routes */}
                 <Route path="/login" element={<Login />} />
                 <Route path="/signup" element={<Signup />} />
                 <Route path="/forgot-password" element={<ForgotPassword />} />
                 <Route path="/reset-password" element={<ResetPassword />} />
+                <Route path="/install" element={<Install />} />
 
                 {/* Lazy Protected Admin Management Section */}
                 <Route

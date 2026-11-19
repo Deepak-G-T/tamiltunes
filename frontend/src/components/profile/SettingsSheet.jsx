@@ -5,6 +5,7 @@ import BottomSheet from '../common/BottomSheet';
 import { profileApi } from '../../lib/communityApi';
 import { useAuth } from '../../context/AuthContext';
 import { useAudio } from '../../context/AudioContext';
+import { isNativeApp } from '../../lib/platform';
 
 const Toggle = ({ label, hint, checked, onChange, disabled }) => {
   const id = useId();
@@ -51,6 +52,17 @@ const SettingsSheet = ({ profile, open, onClose, onChange }) => {
 
   const signOut = () => { onClose(); logout(); navigate('/'); };
 
+  const openBattery = async () => {
+    try {
+      const { CapacitorMusicControls } = await import('capacitor-music-controls-plugin');
+      if (typeof CapacitorMusicControls?.openBatterySettings === 'function') {
+        await CapacitorMusicControls.openBatterySettings();
+      }
+    } catch (e) {
+      console.warn('Failed to open battery settings:', e?.message || e);
+    }
+  };
+
   const destroy = async (e) => {
     e.preventDefault();
     if (!confirmed || !password) return;
@@ -74,6 +86,21 @@ const SettingsSheet = ({ profile, open, onClose, onChange }) => {
         <Toggle label="Public profile" hint="Anyone with your link can see your profile. Off shows only your name and photo." checked={profile.isPublicProfile} onChange={(v) => update({ isPublicProfile: v })} />
         <Toggle label="Show listening history" hint="Let visitors see your recently played songs." checked={profile.showHistory} disabled={!profile.isPublicProfile} onChange={(v) => update({ showHistory: v })} />
         <Toggle label="Autoplay similar songs" hint="When your songs run out, keep playing songs like them. Also in the play queue." checked={autoplay} onChange={setAutoplay} />
+        {isNativeApp() && (
+          <div className="flex items-center justify-between gap-4 py-3">
+            <div className="min-w-0">
+              <span className="block text-sm font-semibold text-white">Background playback</span>
+              <p className="text-xs text-zinc-400">Set battery to Unrestricted if playback stops with the screen off</p>
+            </div>
+            <button
+              type="button"
+              onClick={openBattery}
+              className="press px-3 py-1.5 rounded-full bg-white/10 hover:bg-white/15 text-xs font-semibold text-white flex-shrink-0"
+            >
+              Battery settings
+            </button>
+          </div>
+        )}
       </div>
       {error && <p role="alert" className="text-xs text-rose-400 mt-2">{error}</p>}
 

@@ -22,12 +22,15 @@ import ProgressBar from './ProgressBar';
 import VolumeSlider from './VolumeSlider';
 import VideoSlot from './VideoSlot';
 import VideoModeToggle from './VideoModeToggle';
+import ScreenLockNotice from './ScreenLockNotice';
 import CommentsPanel from '../comments/CommentsPanel';
 import QueueContent from './queue/QueueContent';
 import MarqueeText from '../common/MarqueeText';
 import { useSongActions } from '../common/SongActionsSheet';
 import { useSwipe } from '../../lib/swipe';
 import { haptic } from '../../lib/haptics';
+import { canShare as canShareLink, shareLink } from '../../lib/share';
+import { SITE_URL } from '../../config/app';
 import { getUpNext } from '../../lib/upNext';
 
 const MUSIC_COVER_FALLBACK = "data:image/svg+xml;charset=UTF-8,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 300 300'%3E%3Cdefs%3E%3ClinearGradient id='bg' x1='0%25' y1='0%25' x2='100%25' y2='100%25'%3E%3Cstop offset='0%25' stop-color='%23143d24'/%3E%3Cstop offset='50%25' stop-color='%230f2a1a'/%3E%3Cstop offset='100%25' stop-color='%23071a10'/%3E%3C/linearGradient%3E%3C/defs%3E%3Crect width='300' height='300' rx='16' fill='url(%23bg)'/%3E%3Ccircle cx='150' cy='150' r='60' fill='%231db954' opacity='0.2'/%3E%3Cpath d='M135 180V120l50-14v54m-50 0a16 16 0 11-32 0 16 16 0 0132 0zm50-14a16 16 0 11-32 0 16 16 0 0132 0z' stroke='%236ee9a0' stroke-width='6' fill='none' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E";
@@ -108,19 +111,15 @@ const FullScreenPlayer = ({ isOpen, onClose: onCloseProp, onToggleFavorite, isFa
   });
 
   const upNext = getUpNext(queue, queueIndex, { isShuffle, repeatMode });
-  const canShare = typeof navigator !== 'undefined' && typeof navigator.share === 'function';
+  const canShare = canShareLink();
 
   const shareSong = async () => {
     haptic(10);
-    try {
-      await navigator.share({
-        title: currentSong.title,
-        text: `${currentSong.title} – ${currentSong.artist || currentSong.singers || ''}`.trim(),
-        url: window.location.origin
-      });
-    } catch {
-      /* cancelled by the user: nothing to do */
-    }
+    await shareLink({
+      title: currentSong.title,
+      text: `${currentSong.title} – ${currentSong.artist || currentSong.singers || ''}`.trim(),
+      url: SITE_URL,
+    });
   };
 
   if (!isOpen || !currentSong) return null;
@@ -236,6 +235,7 @@ const FullScreenPlayer = ({ isOpen, onClose: onCloseProp, onToggleFavorite, isFa
         )}
 
         <VideoModeToggle className="mb-4" />
+        <ScreenLockNotice song={currentSong} engine={activeEngine} className="mb-4 px-1" />
 
         {/* Title, Artist, & Favorite */}
         <div className="w-full flex items-start justify-between mb-3 px-1">

@@ -2,17 +2,18 @@ import React, { createContext, useContext, useState, useEffect } from 'react';
 import api from '../services/api';
 import { migrateGuestPlays } from '../lib/guestPlays';
 import { speedDialApi } from '../lib/speedDialApi';
+import { getToken, setToken as saveToken, clearToken } from '../lib/tokenStore';
 
 const AuthContext = createContext();
 
 export const AuthProvider = ({ children }) => {
   const [user, setUser] = useState(null);
-  const [token, setToken] = useState(() => localStorage.getItem('tamiltunes_token'));
+  const [token, setToken] = useState(() => getToken());
   const [isLoading, setIsLoading] = useState(true);
 
   useEffect(() => {
     const fetchMe = async () => {
-      const storedToken = localStorage.getItem('tamiltunes_token');
+      const storedToken = getToken();
       if (!storedToken) {
         setIsLoading(false);
         return;
@@ -26,7 +27,7 @@ export const AuthProvider = ({ children }) => {
         }
       } catch (err) {
         console.warn('Auth check failed:', err.message);
-        localStorage.removeItem('tamiltunes_token');
+        clearToken();
         localStorage.removeItem('tamiltunes_user');
         setToken(null);
         setUser(null);
@@ -40,7 +41,7 @@ export const AuthProvider = ({ children }) => {
 
   // Both sign in and sign up start the same kind of session
   const startSession = (data) => {
-    localStorage.setItem('tamiltunes_token', data.token);
+    saveToken(data.token); // website: localStorage, Android app: private storage (lib/tokenStore.js)
     localStorage.setItem('tamiltunes_user', JSON.stringify(data.user));
     setToken(data.token);
     setUser(data.user);
@@ -103,7 +104,7 @@ export const AuthProvider = ({ children }) => {
   };
 
   const logout = () => {
-    localStorage.removeItem('tamiltunes_token');
+    clearToken();
     localStorage.removeItem('tamiltunes_user');
     setToken(null);
     setUser(null);

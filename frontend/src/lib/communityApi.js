@@ -9,8 +9,9 @@
  *   editedAt: string|null, createdAt: string, author: Author }} Comment
  */
 import api from '../services/api';
+import { API_BASE_URL as BASE } from '../config/app';
 
-const BASE = import.meta.env.VITE_API_BASE_URL || '/api';
+
 
 /** Absolute URL for an avatar path returned by the API ("/users/x/avatar?v=1"). */
 export const avatarSrc = (path) => (path ? `${BASE}${path}` : null);

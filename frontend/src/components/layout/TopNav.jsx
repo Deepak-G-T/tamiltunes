@@ -35,6 +35,7 @@ const TopNav = ({ onToggleMobileSidebar }) => {
       <div className="flex items-center gap-2">
         <button
           onClick={onToggleMobileSidebar}
+          aria-label="Open menu"
           className="md:hidden p-2 rounded-lg text-zinc-400 hover:text-white hover:bg-zinc-800/60"
         >
           <Menu className="w-5 h-5" />

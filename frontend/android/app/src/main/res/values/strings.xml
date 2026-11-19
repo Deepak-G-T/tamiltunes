@@ -1,0 +1,7 @@
+<?xml version='1.0' encoding='utf-8'?>
+<resources>
+    <string name="app_name">TamilTunes</string>
+    <string name="title_activity_main">TamilTunes</string>
+    <string name="package_name">com.tamiltunes.app</string>
+    <string name="custom_url_scheme">com.tamiltunes.app</string>
+</resources>

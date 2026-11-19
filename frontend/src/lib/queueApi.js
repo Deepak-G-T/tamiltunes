@@ -1,5 +1,6 @@
 import api from '../services/api';
 import { withRetry } from './queuePersist';
+import { getToken } from './tokenStore';
 
 // The server may be waking from idle (Render) or its database may be (Neon). Transient failures are retried quietly;
 // a real answer (401, 400 ...) is not. Callers decide whether a final failure is worth mentioning (it usually is not).
@@ -29,7 +30,7 @@ export async function resolveSongIds(ids) {
 /** Best-effort save while the page is closing or hidden: keepalive lets the request finish after the tab is gone. */
 export function saveServerQueueOnExit(saved) {
   try {
-    const token = localStorage.getItem('tamiltunes_token');
+    const token = getToken();
     if (!token) return;
     fetch(`${api.defaults.baseURL}/me/queue`, {
       method: 'PUT',
