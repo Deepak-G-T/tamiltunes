@@ -27,19 +27,19 @@ describe('radio block: zero duplicates by canonicalSongId', () => {
     const s = applyRefill(playFromSearch(createQueueState(), other(9)), [naan1, { ...naan2, album: '24' }, other(1), other(2)]);
     expect(s.upcoming.find((e) => /naan un/i.test(e.song.title)).song.id).toBe('n2'); // "Romantic Hits" loses to the film album
   });
-  it('songs played in the last 50, and skipped ones, are kept out by canonical id, not only by id', () => {
+  it('a song played earlier may come back, even under another id (history is not a rule; only the queue is protected)', () => {
     let s = playFromSearch(createQueueState(), annul1);
     s = applyRefill(s, [other(1), other(2), other(3)]);
-    s = advance(s).state; // annul1 now in history
-    const fresh = filterNewSongs(s, [annul2, other(7)]);
-    expect(fresh.map((x) => x.id)).toEqual(['o7']);
+    s = advance(s).state; // annul1 is now in the history; other(1) plays
+    expect(filterNewSongs(s, [annul2, other(7)]).map((x) => x.id)).toEqual(['a2', 'o7']);
+    expect(filterNewSongs(s, [other(1), other(7)]).map((x) => x.id)).toEqual(['o7']); // the PLAYING song is still protected
   });
   it('the exclusion list is built from ids, and fuzzy twins of the queue never come back from the server', () => {
     let s = playFromSearch(createQueueState(), other(0));
     s = addToQueue(s, naan1);
     const out = filterNewSongs(s, [naan2, other(5)]);
     expect(out.map((x) => x.id)).toEqual(['o5']);
-    expect(startRefill(s).request.exclude).toContain('n1');
+    expect(startRefill(s).request.exclude).toEqual(['o0', 'n1']); // the playing song and what is queued
   });
 });
 

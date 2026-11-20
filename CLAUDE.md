@@ -124,7 +124,7 @@ Songs may carry an optional `videoId`. It comes from the curated map `backend/sr
 - UNTESTED: a real reset email from the provider; the migrations on Neon (they passed on a scratch Postgres 16).
 ## No repeats in autoplay (fix/queue-duplicates)
 - Song identity (fingerprint, variant key) in `frontend/src/lib/songIdentity.js` and a copy in `backend/src/services/related/identity.js`: keep the two in sync (both have tests with the same examples).
-  Rules and limits in `docs/RADIO.md`. `npm run report:duplicate-songs --prefix backend` is report-only.
+  Rules and limits in `docs/RADIO.md` and `docs/NO_REPEAT.md`. `npm run report:duplicate-songs --prefix backend` is report-only.
 
 ## Duplicates v2 (fix/queue-duplicates-v2)
 - Fuzzy `isSameSong` + canonical groups (spelling variants, compilation copies): rules and where they are used are in `docs/RADIO.md` (last section). Migration
@@ -168,11 +168,13 @@ Songs may carry an optional `videoId`. It comes from the curated map `backend/sr
 - `frontend/src/lib/playbackEnd.js` holds the rules (one real length per song, finish on ended / stalled / error / stop within 20 s of the end, one retry in the middle, then skip). At a natural end the player keeps saying "playing" until the next song decides, so the Android notification and foreground service never flip to paused between tracks. Phone checks in `docs/ANDROID_APP.md` (19-24): UNTESTED.
 - Do not set `isPlaying` false on the audio element's `pause` that comes from the stream ending; `pauseKind()` decides. Do not use the catalog duration when the audio element has a real one.
 
-## No repeats (feature/no-repeat, on master)
-- Notes, settings and rules: `docs/NO_REPEAT.md`; knobs in `backend/src/services/noRepeat/config.js`. Memory = `play_events` (rolling 200 + cool-downs) + `queue_state.heard` (session) + `user_song_blocks`.
-- Migration `20261128000000_no_repeat` (additive; Neon backup BEFORE merging). Passed on a scratch Postgres 16 (migrate deploy, re-run, API suite, store round trips).
-- Blocked songs never return, even with allow repeats. Blocks take only a song id (the server looks the song up).
-- UNTESTED: live JioSaavn widening, the exhausted card and "Don't recommend this" in a browser/phone, guests (blocks need sign-in).
+## No repeats (simple rule, fix/no-repeat-simple)
+- **The same song must not appear twice inside the queue. That is all.** Notes, settings and what was removed: `docs/NO_REPEAT.md`; numbers in `backend/src/services/noRepeat/config.js` (soft preference: avoid the last 20 played, dropped when fewer than 15 songs would remain)
+  and `REFILL_THRESHOLD` 5 / `REFILL_BATCH` 50 in `frontend/src/lib/radioQueue.js`. Listening history is NOT a rule (no rolling history, no cool-downs, no session memory); do not bring them back without the owner's say-so (they emptied the queue).
+- Hard rules: not the playing song or its versions, not the same song as anything queued (canonical matching), one copy per batch, "Don't recommend this" (`user_song_blocks`, blocks take only a song id) and hidden songs. After every refill the whole queue is de-duplicated (keep the first; songs you added are never touched).
+- Banners (small, not cards): "Out of new songs" only when the server says `meta.exhausted`; "Couldn't load more songs - Retry" on a failed request. `npm run test:refill --prefix frontend`.
+- `queue_state.heard` / `allow_repeats` columns are unused and left in place (older apps may still send them; ignored). Home keeps its own 24 h "played recently" shelf rule (`docs/HOME_FEED.md`).
+- UNTESTED: live JioSaavn catalogue (how many songs a refill finds), real phone.
 
 ## Safe areas and Now Playing (fix/now-playing-safe-area)
 - Use `var(--safe-top|bottom|left|right)` (defined once in `frontend/src/index.css`, env() first); never raw `env(safe-area-*)`, never add a native inset value on top (double gap on old WebViews). Anything `position: fixed` must add them itself (`#root` pads normal pages). `--sim-safe-*` is for audits only.

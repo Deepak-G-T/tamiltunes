@@ -14,7 +14,7 @@ repeats. The player uses it to fill "Up next" and to keep refilling. All numbers
 3. **Mix**: about 30% of the batch is "discovery" (less similar, most popular first), spread evenly through the list;
    the rest is very similar (score at or above 2.0).
 4. **Break up runs**: never more than 3 songs in a row from the same artist or the same film.
-5. **Exclude**: ids in `exclude` (everything already played this session) and the seed are never returned.
+5. **Exclude** (the no-repeat rule, `docs/NO_REPEAT.md`): the seed, its versions, and the ids in `exclude` (what is already in the queue) are never returned, nor copies of them under another id, cover or spelling. Listening history is not a rule.
 
 ## Weights (score = sum of the signals that apply)
 | Signal | Weight | Meaning |
@@ -29,12 +29,12 @@ repeats. The player uses it to fill "Up next" and to keep refilling. All numbers
 | `sameShelf` | +0.8 | both on the same home-feed shelf: a stand-in for genre and mood (no genre data exists) |
 | `popularity` | up to +0.4 | tie-breaker only, from the provider's play count (log scale) |
 | `liked` | +0.6 | the signed-in user liked this song |
-| `recentlyPlayed` | -3.0 | played in the last 6 hours |
-| `skippedRecently` | -2.5 | skipped before 30 seconds in the last 7 days |
+| `recentlyPlayed` | -3.0 | played in the last 6 hours (ranks lower; never removes a song) |
+| `skippedRecently` | -2.5 | skipped before 30 seconds in the last 7 days (ranks lower; never removes a song) |
 | `differentLanguage` | -10.0 | stronger than everything positive combined, so Telugu/Hindi never appear |
 
 Other knobs: `VARIETY.maxRun` (3), `VARIETY.discoveryRatio` (0.3), `VARIETY.similarMinScore` (2.0),
-`LIMITS.candidatePool` (120), cache lifetimes, `USER_WINDOWS` (6 h recent, 7 days skips, 30 s "early").
+`LIMITS.candidatePool` (200; `maxLimit` 60, the app asks for 50), cache lifetimes, `USER_WINDOWS` (6 h recent, 7 days skips, 30 s "early").
 
 ## Tuning tips
 - Radio feels samey: raise `discoveryRatio`, lower `sameComposer`/`sameMovie`.
@@ -74,9 +74,9 @@ The same song comes back under other ids, covers and singer order, and versions 
 - **variantKey**: the same without version words (unplugged, acoustic, remix, reprise, lofi, slowed, reverb, instrumental, karaoke, cover,
   male / female version, 8D).
 
-Autoplay (engine, `applyRefill`): a song is added only if it is not, by id, fingerprint or variant, the playing song, any song in the queue
-(yours and the radio's), one of the last 50 played, or one skipped this session. Songs played earlier this session are also kept out by id (500).
-At most one song per variant in the radio block; at most 2 songs per film within any 10 songs; at most 3 in a row by one artist. The check
+Autoplay (engine, `applyRefill`; the rule and its settings are in `docs/NO_REPEAT.md`): a song is added only if it is not the playing song (or a version of it) and not
+the same song (any id, cover or spelling) as anything in the queue (yours and the radio's). Songs played earlier may come back. One copy of a song per batch;
+at most 2 songs per film within any 10 songs; at most 3 in a row by one artist. The check
 runs against the live queue when the answer arrives, so songs you queued while the request was running are respected. Songs you add yourself
 always win: a duplicate asks "Already in queue - add again?" and is then added; a version is added without asking.
 Queues are cleaned when loaded and when the playing song changes (`cleanRadioDuplicates`): autoplay entries that repeat the playing song,
@@ -102,7 +102,7 @@ compilation copy). `isSameSong(a, b)` in `frontend/src/lib/songIdentity.js` (cop
 Phonetic form: lowercase, NFKC, brackets and "From ..." removed, Tamil script transliterated, then zh->l, th/dh->t, h after a consonant dropped, ae/ai/ay->e, aa->a, ee/ii->i, oo/uu->u, w->v, trailing y->i, doubled letters single. Similarity = the lower of Jaro-Winkler and the Levenshtein ratio, with equal consonant skeletons as a fallback.
 
 `clusterSongs` groups songs and gives each group a `canonicalId` = the id of the best copy: not a compilation/playlist-style album ("Romantic Hits", "Konjam Paatu", "POV", "Best of", "Jukebox", "Mashup", "Top 10" ...), then most played, then a playable source, then completeness.
-Used by: the radio refill and exclusion (current + queue + radio block + last 50 played + skipped), `GET /api/songs/:id/related` (items carry `canonicalId`), search results (collapsed to the best copy), home shelves, Speed Dial (plays of copies add up, one tile) and history rows (`canonicalId`).
+Used by: the radio refill and exclusion (the playing song + what is queued), `GET /api/songs/:id/related` (items carry `canonicalId`), search results (collapsed to the best copy), home shelves, Speed Dial (plays of copies add up, one tile) and history rows (`canonicalId`).
 Autoplay rows that repeat the playing song or an earlier row are removed when a queue loads (also from a saved queue), when the song changes, and Refresh recommendations replaces the whole radio block; songs you added are never touched.
 
 Database: `songs.canonical_id` (migration `20261124000000_songs_canonical_id`, additive). Review first, then fill it (neither deletes anything):

@@ -68,9 +68,8 @@ Touch drag and swipe on a real phone, a second real device for "Continue on this
   action functions, so it is not redrawn on every tick of the song clock; only the "time left" text follows the clock.
 - **Touch.** Rows are 60 px high with a 40 px drag handle; a left swipe reveals a red "Remove" layer that grows with the swipe; short
   haptic taps on supported phones (add, remove, drag start/drop, jump).
-- **Smarter autoplay** (`lib/radioQueue.js`): each refill asks for 10 songs and says "Added 10 similar songs."; never more than 3 songs in a
-  row by one artist (`spreadByArtist`, counting what is already queued); keeps the last 50 (in fact 500) played songs and the songs
-  currently shown on the home page (`lib/shownOnHome.js`) out of the suggestions.
+- **Smarter autoplay** (`lib/radioQueue.js`): the radio refills when fewer than 5 songs remain, asks for 50 and says "Added N similar songs."; never more than 3 songs in a
+  row by one artist (`spreadByArtist`, counting what is already queued). Only the queue is kept out of the suggestions (docs/NO_REPEAT.md): not the history, not the home page.
 - **Measured** (`npm run test:queue --prefix frontend`, headless Linux): the panel opens with its rows in about 25 ms; "Add to queue" shows the
   song within 100 ms; 3 seconds of playing redraw the panel at most once.
 

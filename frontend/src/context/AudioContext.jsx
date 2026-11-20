@@ -7,11 +7,10 @@ import {
   createQueueState, playFromSearch, playFromContext, switchToRadio, advance, previous, jumpTo,
   addToQueue as queueAdd, playNext as queuePlayNext, removeFromUpcoming, removeFromHistory, reorderUpcoming,
   clearUserQueue, setShuffle as queueSetShuffle, setRepeat as queueSetRepeat, nextRepeat, setAutoplay as queueSetAutoplay,
-  needsRefill, runRefill, allowRepeatsNow as allowRepeatsNowState, playSomethingDifferent as playSomethingDifferentState, dismissExhausted as dismissExhaustedState, toFlatQueue, getSections, isQueueFull, findQueued, moveToQueue, indexOfUid, MAX_QUEUE,
+  needsRefill, runRefill, retryRefill, isExhausted, refillFailedBanner, toFlatQueue, getSections, isQueueFull, findQueued, moveToQueue, indexOfUid, MAX_QUEUE,
   removeByUids, restoreRemoved, moveManyToQueue, clearRadio, removeCurrent, setStopAfter, playFromHistory
 } from '../lib/radioQueue';
 import { startSleep } from '../lib/sleepTimer';
-import { getShownOnHome } from '../lib/shownOnHome';
 import { haptic } from '../lib/haptics';
 import { peekNext } from '../lib/radioQueue';
 import { fetchRelated } from '../lib/radioApi';
@@ -32,7 +31,7 @@ import { getToken } from '../lib/tokenStore';
 import { resolveDuration, pauseKind, stallShouldFinish, errorAction, PAUSE_FINISH_MS, STALL_FINISH_MS, TRANSITION_WATCHDOG_MS, DEBOUNCE_PAUSE_MS } from '../lib/playbackEnd';
 
 const AudioContext = createContext();
-const QUEUE_ACTIONS = ['jumpToUid', 'removeUids', 'moveUidsToQueue', 'reorderByUid', 'clearQueue', 'refreshRecommendations', 'removeCurrentSong', 'playFromHistoryAt', 'saveQueueAsPlaylist', 'toggleStopAfter', 'startSleepTimer', 'cancelSleepTimer', 'setAutoplay', 'continueWithRadio', 'startRadio', 'addToQueue', 'playNext', 'blockSong', 'allowRepeatsNow', 'playSomethingDifferent', 'dismissExhausted'];
+const QUEUE_ACTIONS = ['jumpToUid', 'removeUids', 'moveUidsToQueue', 'reorderByUid', 'clearQueue', 'refreshRecommendations', 'removeCurrentSong', 'playFromHistoryAt', 'saveQueueAsPlaylist', 'toggleStopAfter', 'startSleepTimer', 'cancelSleepTimer', 'setAutoplay', 'continueWithRadio', 'startRadio', 'addToQueue', 'playNext', 'blockSong', 'retryMore'];
 const QueueContext = createContext(null); // the queue panel's own, steadier view of the player (see useQueue)
 const AUTOPLAY_KEY = 'tamiltunes_autoplay';
 const FADE_IN_SECONDS = 0.6; // soft start / end of each track (HTML5 engine only)
@@ -1092,7 +1091,7 @@ export const AudioProvider = ({ children }) => {
     }
     if (r.status === 'waiting') {
       // radio queue ran dry: fetch more, then try again
-      await runRefill({ get: () => qsRef.current, update: updateQs, fetchRelated, avoid: getShownOnHome, onAdded: announceAdded });
+      await runRefill({ get: () => qsRef.current, update: updateQs, fetchRelated, onAdded: announceAdded });
       r = advance(qsRef.current, { reason });
     }
     if (r.status === 'playing') {
@@ -1230,11 +1229,10 @@ export const AudioProvider = ({ children }) => {
     if (r.status === 'playing') { updateQs(() => r.state); showToast('Removed from the queue.'); return startPlayback(r.song); }
     return goNext('skip');
   };
-  const refreshRecommendations = () => { updateQs((q) => ({ ...clearRadio(q), exhausted: false })); setRefillTick((n) => n + 1); };
+  const refreshRecommendations = () => { updateQs((q) => ({ ...clearRadio(q), exhaustedFor: null })); setRefillTick((n) => n + 1); };
   // "You've heard everything close to this": the listener's three choices (the fourth, a new radio from another song, is startRadio)
-  const allowRepeatsNow = () => { updateQs(allowRepeatsNowState); setRefillTick((n) => n + 1); };
-  const playSomethingDifferent = () => { updateQs(playSomethingDifferentState); setRefillTick((n) => n + 1); };
-  const dismissExhausted = () => updateQs(dismissExhaustedState);
+  // "Retry" on the banner ("Couldn't load more songs"): forget the back-off and ask again now
+  const retryMore = () => { updateQs(retryRefill); setRefillTick((n) => n + 1); };
   /** "Don't recommend this": the song and its versions are never suggested again; it leaves the queue (Undo puts it back and unblocks). */
   const blockSong = async (uid) => {
     const q = qsRef.current;
@@ -1294,17 +1292,17 @@ export const AudioProvider = ({ children }) => {
     latestActions.current = {
       jumpToUid, removeUids, moveUidsToQueue, reorderByUid, clearQueue, refreshRecommendations, removeCurrentSong, playFromHistoryAt,
       saveQueueAsPlaylist, toggleStopAfter, startSleepTimer, cancelSleepTimer, setAutoplay, continueWithRadio, startRadio, addToQueue, playNext,
-      blockSong, allowRepeatsNow, playSomethingDifferent, dismissExhausted,
+      blockSong, retryMore,
     };
   });
   const stableActions = useMemo(() => Object.fromEntries(QUEUE_ACTIONS.map((name) => [name, (...args) => latestActions.current[name]?.(...args)])), []);
   const queueValue = useMemo(() => ({
-    ...stableActions, queueSections, autoplay: qs.autoplay, offerRadio: qs.offerRadio, exhausted: qs.exhausted, currentSong, isPlaying, sleepTimer, showToast,
-  }), [stableActions, queueSections, qs.autoplay, qs.offerRadio, qs.exhausted, currentSong, isPlaying, sleepTimer, showToast]);
+    ...stableActions, queueSections, autoplay: qs.autoplay, offerRadio: qs.offerRadio, exhausted: isExhausted(qs), refillError: refillFailedBanner(qs), currentSong, isPlaying, sleepTimer, showToast,
+  }), [stableActions, queueSections, qs.autoplay, qs.offerRadio, qs.exhaustedFor, qs.refill.error, qs.refill.pending, qs.upcoming.length, qs.current?.id, currentSong, isPlaying, sleepTimer, showToast]);
 
   // ---- radio refill: keep the queue topped up so the music never stops ----
   useEffect(() => {
-    if (needsRefill(qs)) runRefill({ get: () => qsRef.current, update: updateQs, fetchRelated, avoid: getShownOnHome, onAdded: announceAdded });
+    if (needsRefill(qs)) runRefill({ get: () => qsRef.current, update: updateQs, fetchRelated, onAdded: announceAdded });
   }, [qs, refillTick, updateQs]);
 
   // after a failed refill the engine waits (1 s ... 30 s); wake up when the wait is over
