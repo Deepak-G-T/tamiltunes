@@ -59,6 +59,7 @@ model User {
   @@index([lastSeenAt], map: "users_last_seen_at_idx")
   videoReports VideoReport[]
   songBlocks UserSongBlock[]
+  taste UserTaste?
 }
 
 model Song {
@@ -396,4 +397,20 @@ model UserSongBlock {
   @@unique([userId, key])
   @@index([userId])
   @@map("user_song_blocks")
+}
+
+// What a person says they like (first-login picker, editable in Settings). PRIVATE: used only to seed their Daily Mix and shelf order until their own
+// listening takes over. Names come from a fixed list (services/taste/options.js), never free text.
+model UserTaste {
+  userId    String   @id @map("user_id")
+  artists   String[] @default([])
+  composers String[] @default([])
+  eras      String[] @default([])
+  skipped   Boolean  @default(false) // chose "Skip for now": do not ask again
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@map("user_taste")
 }

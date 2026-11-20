@@ -9,6 +9,7 @@ import {
 
 import { getQueue, getQueueMeta, putQueue, deleteQueue, queueSchema } from '../controllers/queueController.js';
 import { getWrapped } from '../controllers/wrappedController.js';
+import { getTaste, putTaste, deleteTaste, tasteSchema } from '../controllers/tasteController.js';
 import { listBlocks, addBlock, removeBlock, blockSchema } from '../controllers/blocksController.js';
 
 const router = Router();
@@ -26,6 +27,11 @@ router.delete('/blocks/:songId', queueWriteLimiter, removeBlock);
 
 // TamilTunes Wrapped: this person's year in listening (read only, private to them)
 router.get('/wrapped', getWrapped);
+
+// First-login picker: favourite artists, music directors and eras (private; seeds the Daily Mix until real listening takes over)
+router.get('/taste', getTaste);
+router.put('/taste', queueWriteLimiter, validateBody(tasteSchema), putTaste);
+router.delete('/taste', queueWriteLimiter, deleteTaste);
 
 router.post('/play-events', playEventLimiter, validateBody(playEventSchema), postPlayEvent);
 

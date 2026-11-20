@@ -8,6 +8,7 @@ import { musicService } from '../music/providerManager.js';
 import { CURATED_ARTISTS } from '../music/localAudioProvider.js';
 import { musicCache } from '../cacheService.js';
 import { getSignalsStore } from '../related/signalsStore.js';
+import { getTasteStore } from '../taste/store.js';
 import { getHomeSignals } from './signals.js';
 import { assembleHome, MIN_ITEMS, ROTATION_PLAYS } from './assemble.js';
 import { dayKey } from './seed.js';
@@ -85,6 +86,34 @@ async function resolveExclude(ids, pools) {
 }
 
 export const MAX_MIXES = 3;
+const SEEDS_WANTED = MAX_MIXES * 2; // each Daily Mix uses two seeds
+
+/**
+ * Who the Daily Mixes are built from: what the person really plays comes first; the first-login picks (artists and music directors, taken in turn) fill the
+ * rest until real listening takes over; a guest's browser hints come last.
+ * @returns {string[]}
+ */
+export function mixSeeds({ played = [], taste = null, hints = [] } = {}) {
+  const out = [...new Set((played || []).filter(Boolean))].slice(0, SEEDS_WANTED);
+  const add = (name) => { if (name && out.length < SEEDS_WANTED && !out.some((n) => n.toLowerCase() === String(name).toLowerCase())) out.push(name); };
+  const a = taste?.artists || []; const c = taste?.composers || [];
+  for (let i = 0; i < Math.max(a.length, c.length); i++) { add(a[i]); add(c[i]); }
+  for (const h of hints || []) add(h);
+  return out;
+}
+
+const ERA_SHELF = { '90s': 'nineties', '2000s': 'aughts', '2020s': 'new' }; // the shelves we have; the other eras have no shelf of their own
+
+/** Shelves for the eras the person picked move up, just before "Trending now". Nothing is added or removed. */
+export function eraPlan(plan, eras = []) {
+  const wanted = (eras || []).map((e) => ERA_SHELF[e]).filter(Boolean);
+  if (!wanted.length) return plan;
+  const moved = plan.filter((spec) => wanted.includes(spec.id));
+  const rest = plan.filter((spec) => !wanted.includes(spec.id));
+  const at = rest.findIndex((spec) => spec.id === 'trending');
+  if (at < 0 || !moved.length) return plan;
+  return [...rest.slice(0, at), ...moved, ...rest.slice(at)];
+}
 export const MAX_AVOID = 80;
 
 /**
@@ -121,6 +150,7 @@ export async function buildHome({ userId = null, exclude = [], tab = null, now =
   const seed = `${userId || 'guest'}:${day}${visit ? `:${visit}` : ''}`;
   const weekPlays = userId ? await signals.weekPlays(userId, now).catch(() => new Map()) : new Map();
 
+  const taste = userId ? await getTasteStore().get(userId).catch(() => null) : null; // first-login picks (private)
   let plan;
   let pools;
   if (tab === 'videos') {
@@ -140,7 +170,7 @@ export async function buildHome({ userId = null, exclude = [], tab = null, now =
       userId ? signals.topArtists(userId, MAX_MIXES * 2, now).catch(() => []) : [],
       signals.globalTrending(30, now).catch(() => []),
     ]);
-    const favourites = topArtists.length ? topArtists : hints; // a new account or a guest: the artists they play in this browser
+    const favourites = mixSeeds({ played: topArtists, taste, hints }); // real plays first, then their picks, then (guests) the artists they play in this browser
     const mixes = planMixes(favourites);
     const mixPools = await Promise.all(mixes.map(async (m) => playable((await Promise.all(m.artists.flatMap((a) => [search(`${a} tamil songs`), search(`${a} hits`)]))).flat()).filter((s) => !weekPlays.has(s.id))));
     const mixPool = playable((await Promise.all(favourites.slice(0, 3).map((a) => search(`${a} tamil songs`)))).flat()).filter((s) => !weekPlays.has(s.id));
@@ -172,6 +202,7 @@ export async function buildHome({ userId = null, exclude = [], tab = null, now =
     recent = (await getSignalsStore().playHistory(userId, { since: sinceMs, limit: 300 }).catch(() => [])).map((p) => p.song).filter(Boolean);
     blocked = await getBlocksStore().list(userId).catch(() => []);
   }
+  if (!tab) plan = eraPlan(plan, taste?.eras);
   const excluded = await resolveExclude(ex, pools);
   // songs shown last time count like songs played a lot this week: they sink, but stay if a shelf would be thin
   const penalty = new Map(weekPlays);
