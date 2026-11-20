@@ -60,6 +60,7 @@ async function run(browser) {
     if (p === '/home') return json({ success: true, seed: 's', hero: null, hidden: [], sections: [{ id: 'trending', title: 'Trending now', kind: 'songs', items: S }] });
     if (/^\/songs\/[^/]+\/related/.test(p)) return json({ success: true, items: R });
     if (p === '/me/speed-dial') return json({ success: true, items: [] });
+    if (p === '/profile/me') return json({ success: true, profile: { id: 'u1', name: 'Test User', username: 'testuser', bio: '', role: 'user', stats: { favorites: 0, playlists: 0, comments: 0, followers: 0, following: 0 }, isPublicProfile: true, showHistory: true, joinedAt: '2026-01-01T00:00:00.000Z' } });
     if (/^\/users\//.test(p)) return json({ success: false, message: 'User not found' }, 404); // a real server answers an unknown profile with 404
     return json({ success: true, items: [], songs: {} });
   });
@@ -204,6 +205,67 @@ async function run(browser) {
       check('merged manifest retains foregroundServiceType="mediaPlayback"', mergedXml.includes('foregroundServiceType="mediaPlayback"'));
     }
   }
+
+  // ---- in-app update (Profile > Check for updates)
+  const VJ = (over = {}) => ({ versionName: '1.0.5', versionCode: 10005, sha256: 'ab'.repeat(32), size: 8000000, changelog: ['- Fix the media notification', '- Video songs'], ...over });
+  const upd = (patch) => native((p) => { Object.assign((window.__native.update ||= { installed: { versionName: '1.0.0', versionCode: 4 }, versionJson: null, fetchError: null, downloadError: null, needPermission: false }), p); }, patch);
+  const calls = async (name) => (await log()).filter((x) => x.name === name);
+  await page.goto(`${BASE}/profile`);
+  await page.waitForSelector('[data-testid=app-update-card]', { timeout: 15000 });
+  check('Profile shows the installed version and a Check for updates button (app only)', await until(async () => /Version 1\.0\.0/.test(await page.locator('[data-testid=app-version]').innerText())) && (await page.locator('[data-testid=check-updates]').count()) === 1);
+  check('...and "Never checked" before the first check', /Never checked/.test(await page.locator('[data-testid=update-last-checked]').innerText()));
+  
+  check('the quiet startup check asked once, only for version.json, and showed nothing (it failed here: no release in the mock)', await (async () => { await page.waitForTimeout(800); const f = await calls('AppUpdater.fetchText'); return f.length === 1 && f[0].arg.url.endsWith('/releases/latest/download/version.json') && (await page.locator('[data-testid=update-sheet], [data-testid=update-check-error]').count()) === 0; })());
+  check('the startup also deletes a leftover downloaded APK', (await calls('AppUpdater.cleanup')).length >= 1);
+  await upd({ versionJson: VJ({ versionName: '1.0.0', versionCode: 4 }) });
+  await page.locator('[data-testid=check-updates]').click();
+  check('up to date: toast "You\'re on the latest version"', await until(async () => (await page.locator('text=latest version').count()) > 0));
+  check('...the check asked only for version.json inside our releases (no token, no other host)', (await calls('AppUpdater.fetchText')).some((x) => x.arg.url === 'https://github.com/Deepak-G-T/tamiltunes/releases/latest/download/version.json'));
+  check('...and "Last checked" now says just now', await until(async () => /just now/.test(await page.locator('[data-testid=update-last-checked]').innerText())));
+  check('no update sheet and no dot when up to date', (await page.locator('[data-testid=update-sheet]').count()) === 0 && (await page.locator('[data-testid=update-dot]').count()) === 0);
+
+  await upd({ versionJson: VJ({ sha256: 'zz' }) });
+  await page.locator('[data-testid=check-updates]').click();
+  check('a damaged version.json is refused with a clear message', await until(async () => /not valid/.test(await page.locator('[data-testid=update-check-error]').innerText().catch(() => ''))));
+  await upd({ fetchError: 'rate_limited' });
+  await page.locator('[data-testid=check-updates]').click();
+  check('GitHub rate limit: friendly message, no crash', await until(async () => /busy/.test(await page.locator('[data-testid=update-check-error]').innerText().catch(() => ''))));
+  await upd({ fetchError: 'offline' });
+  await page.locator('[data-testid=check-updates]').click();
+  check('no network: friendly message', await until(async () => /No internet/.test(await page.locator('[data-testid=update-check-error]').innerText().catch(() => ''))));
+
+  await upd({ fetchError: null, versionJson: VJ() });
+  await page.locator('[data-testid=check-updates]').click();
+  check('newer version: a sheet shows the new version and the changelog', await until(async () => (await page.locator('[data-testid=update-sheet]').count()) === 1 && /1\.0\.5/.test(await page.locator('[data-testid=update-sheet]').innerText()) && (await page.locator('[data-testid=update-changelog] li').count()) === 2));
+  await page.getByRole('button', { name: 'Later' }).click();
+  check('Later closes the sheet and deletes anything downloaded', await until(async () => (await page.locator('[data-testid=update-sheet]').count()) === 0) && (await calls('AppUpdater.cleanup')).length >= 1);
+  check('...the Profile tab shows an "Update available" dot', (await page.locator('[data-testid=update-dot]').count()) === 1);
+  check('...and the card offers "Version 1.0.5 is available"', (await page.locator('[data-testid=update-available]').count()) === 1);
+
+  await upd({ downloadError: 'hash_mismatch' });
+  await page.locator('[data-testid=update-available]').click();
+  await page.locator('[data-testid=update-now]').click();
+  check('hash mismatch: shows an error and never opens the installer', await until(async () => /damaged/.test(await page.locator('[data-testid=update-error]').innerText().catch(() => ''))) && (await calls('AppUpdater.install')).length === 0);
+  await upd({ downloadError: 'low_storage' });
+  await page.locator('[data-testid=update-now]').click();
+  check('low storage: friendly message', await until(async () => /free space/.test(await page.locator('[data-testid=update-error]').innerText().catch(() => ''))));
+
+  await upd({ downloadError: null, needPermission: true });
+  await page.locator('[data-testid=update-now]').click();
+  check('Update now: downloads the release APK with its hash (progress bar shown) from our releases only', await until(async () => (await calls('AppUpdater.download')).some((x) => x.arg.url === 'https://github.com/Deepak-G-T/tamiltunes/releases/latest/download/app-release.apk' && x.arg.sha256 === 'ab'.repeat(32) && x.arg.size === 8000000)));
+  check('...without "install apps" permission it opens that settings page and explains', await until(async () => (await calls('AppUpdater.openInstallSettings')).length === 1 && /Allow TamilTunes/.test(await page.locator('[data-testid=update-error]').innerText().catch(() => ''))) && (await calls('AppUpdater.install')).length === 0);
+  await page.locator('[data-testid=update-now]').click();
+  check('...after allowing it, Install now opens the installer without downloading again', await until(async () => (await calls('AppUpdater.install')).length === 1) && (await calls('AppUpdater.download')).length === 3);
+  await page.getByRole('button', { name: 'Later' }).click();
+
+  check('the update sheet shows a progress bar while downloading', await (async () => {
+    await upd({ needPermission: false });
+    await page.locator('[data-testid=update-available]').click();
+    await page.locator('[data-testid=update-now]').click();
+    return until(async () => (await page.locator('[data-testid=update-progress]').count()) === 1, 3000);
+  })());
+  await until(async () => (await calls('AppUpdater.install')).length === 2);
+  await page.getByRole('button', { name: 'Later' }).click();
 
   check("no 'is not implemented' errors in the page console", !consoleErrors.some((e) => e.includes('is not implemented')), consoleErrors.filter((e) => e.includes('is not implemented')).join(' | '));
   check('no page errors', errors.length === 0, errors.join(' | '));

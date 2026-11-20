@@ -52,18 +52,33 @@ describe('service worker: only public JSON, pictures and pages are stored', () =
 
 describe('Android app: nothing that saves files', () => {
   const manifest = read(path.join(root, 'android/app/src/main/AndroidManifest.xml'));
-  it('the only permissions are internet, network state and notifications', () => {
+  it('the only permissions are internet, network state, notifications, foreground service, wake lock and (for the in-app update) installing the new APK', () => {
     const perms = [...manifest.matchAll(/uses-permission android:name="([^"]+)"/g)].map((m) => m[1].replace('android.permission.', '')).sort();
-    expect(perms).toEqual(['ACCESS_NETWORK_STATE', 'FOREGROUND_SERVICE', 'FOREGROUND_SERVICE_MEDIA_PLAYBACK', 'INTERNET', 'POST_NOTIFICATIONS', 'WAKE_LOCK']);
+    expect(perms).toEqual(['ACCESS_NETWORK_STATE', 'FOREGROUND_SERVICE', 'FOREGROUND_SERVICE_MEDIA_PLAYBACK', 'INTERNET', 'POST_NOTIFICATIONS', 'REQUEST_INSTALL_PACKAGES', 'WAKE_LOCK']);
   });
   it('no file, download or HTTP plugin is installed', () => {
     const pkg = JSON.parse(read(path.join(root, 'package.json')));
     const deps = Object.keys({ ...pkg.dependencies, ...pkg.devDependencies });
     expect(deps.filter((d) => /filesystem|file-transfer|downloader|cordova-plugin-file|@capacitor\/http/i.test(d))).toEqual([]);
   });
-  it('the native code does not download or write files', () => {
+  const UPDATER = 'android/app/src/main/java/com/tamiltunes/app/AppUpdaterPlugin.java';
+  it('the native code does not download or write files, except the in-app updater (one file)', () => {
     const java = walk(path.join(root, 'android/app/src')).filter((f) => /\.(java|kt)$/.test(f));
-    expect(java.filter((f) => /DownloadManager|FileOutputStream|openFileOutput|getExternalFilesDir|MediaStore/.test(read(f))).map(rel)).toEqual([]);
+    expect(java.filter((f) => /DownloadManager|FileOutputStream|openFileOutput|getExternalFilesDir|MediaStore/.test(read(f))).map(rel)).toEqual([UPDATER]);
+  });
+  it('the updater only touches the private cache folder, only GitHub release addresses, and never audio or video', () => {
+    const u = read(path.join(root, UPDATER));
+    expect(u).toMatch(/getCacheDir\(\)/);
+    expect(u).not.toMatch(/getExternal|Environment\.|MediaStore|DownloadManager|openFileOutput|getFilesDir|Runtime\.getRuntime|ProcessBuilder/);
+    expect(u).not.toMatch(/audio|video|mp3|mp4|m4a|aac|saavn|youtube/i);
+    expect(u).toMatch(/startsWith\("\/" \+ REPO \+ "\/releases\/"\)/);
+    expect(u).toMatch(/setInstanceFollowRedirects\(false\)/); // redirects are followed by hand, every hop checked
+    expect(u).not.toMatch(/Authorization|Bearer|token/i); // no credential in the app
+  });
+  it('no JavaScript outside the updater talks to the updater plugin or downloads an APK', () => {
+    const files = walk(path.join(root, 'src')).filter((f) => /\.(js|jsx)$/.test(f) && !isTest(rel(f)));
+    const hits = files.filter((f) => /@tamiltunes\/app-updater/.test(read(f))).map(rel).sort();
+    expect(hits).toEqual(['src/lib/updater.js']);
   });
   it('the app is not backed up to the cloud', () => {
     expect(manifest).toMatch(/android:allowBackup="false"/);

@@ -8,6 +8,7 @@ public class MainActivity extends BridgeActivity {
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
+        registerPlugin(AppUpdaterPlugin.class); // our own plugin (in-app update); must be registered before super.onCreate
         super.onCreate(savedInstanceState);
         // Notification permission request is deferred until the user starts playing music,
         // with an in-app prompt and graceful denial handling.

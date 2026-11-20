@@ -52,4 +52,6 @@
     <uses-permission android:name="android.permission.WAKE_LOCK" />
     <!-- Android 13+: the music notification (lock-screen controls) needs this -->
     <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
+    <!-- In-app update (Profile > Check for updates): lets the person allow TamilTunes to open Android's installer for the new APK -->
+    <uses-permission android:name="android.permission.REQUEST_INSTALL_PACKAGES" />
 </manifest>

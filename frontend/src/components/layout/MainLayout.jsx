@@ -8,6 +8,7 @@ import PwaBar from '../common/PwaBar';
 import OfflineBanner from '../common/OfflineBanner';
 import NativeBridge from '../native/NativeBridge';
 import NativeMediaControls from '../native/NativeMediaControls';
+import UpdateChecker from '../native/UpdateChecker';
 import MusicPlayer from '../player/MusicPlayer';
 import MiniPlayer from '../player/MiniPlayer';
 import CreatePlaylistModal from '../modals/CreatePlaylistModal';
@@ -91,6 +92,7 @@ const MainLayout = () => {
 
         <NativeBridge />
         <NativeMediaControls />
+        <UpdateChecker />
 
         {/* Visible video surface when the YouTube engine is active */}
 

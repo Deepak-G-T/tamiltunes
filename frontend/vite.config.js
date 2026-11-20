@@ -8,10 +8,12 @@ import { fileURLToPath } from 'node:url'
 // `vite build --mode nativetest` is only for scripts/native-audit.mjs: the Capacitor plugins are swapped for recording mocks and the output goes
 // to dist-nativetest, so the real build is never touched.
 const nativeMocks = fileURLToPath(new URL('./scripts/native-mocks/index.js', import.meta.url))
+const appUpdaterReal = fileURLToPath(new URL('./src/lib/appUpdaterPlugin.js', import.meta.url))
+const appUpdaterMock = fileURLToPath(new URL('./scripts/native-mocks/appUpdater.js', import.meta.url))
 const NATIVE_PACKAGES = ['@capacitor/app', '@capacitor/preferences', '@capacitor/network', '@capacitor/share', '@capacitor/haptics', '@capacitor/status-bar', '@capacitor/splash-screen', 'capacitor-music-controls-plugin']
 
 export default defineConfig(({ mode }) => ({
-  ...(mode === 'nativetest' ? { build: { outDir: 'dist-nativetest', emptyOutDir: true }, resolve: { alias: Object.fromEntries(NATIVE_PACKAGES.map((p) => [p, nativeMocks])) } } : {}),
+  ...(mode === 'nativetest' ? { build: { outDir: 'dist-nativetest', emptyOutDir: true }, resolve: { alias: { ...Object.fromEntries(NATIVE_PACKAGES.map((p) => [p, nativeMocks])), '@tamiltunes/app-updater': appUpdaterMock } } } : { resolve: { alias: { '@tamiltunes/app-updater': appUpdaterReal } } }),
   plugins: [
     react(),
     tailwindcss(),

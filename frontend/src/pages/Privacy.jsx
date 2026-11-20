@@ -27,6 +27,9 @@ const Privacy = () => (
     <H>Music streams</H>
     <P>Audio is streamed from the music provider&apos;s servers, which receive your IP address like any website you visit. Songs are not downloaded or stored for offline use.</P>
 
+    <H>App updates (Android app only)</H>
+    <P>When you tap "Check for updates" in Profile, and about once every 12 hours while the app is open and no music is playing, the app asks GitHub for the newest TamilTunes release information. GitHub receives your IP address like any website you visit. If you choose to update, the new app file is downloaded from GitHub into the app&apos;s private storage, checked, handed to Android&apos;s installer and then deleted. Nothing about you is sent. The website and the installable web app never do this.</P>
+
     <H>Your choices</H>
     <L items={[
       'Make your profile private, hide your listening history, or delete your account in Settings.',
