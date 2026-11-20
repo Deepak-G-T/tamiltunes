@@ -25,7 +25,7 @@ describe('saving the queue', () => {
     expect(saved.currentIndex).toBe(1);
     expect(saved.positionSec).toBe(41);
     expect(saved.deviceId).toBe('dev1');
-    expect(JSON.stringify(saved)).not.toMatch(/title|streamUrl|artist/);
+    expect(JSON.stringify(saved)).not.toMatch(/"(title|streamUrl|artist)"/); // no song fields; "heard" holds only compact identity keys
   });
 
   it('saves nothing before anything has played', () => {

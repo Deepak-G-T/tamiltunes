@@ -7,6 +7,7 @@ import { useAuth } from '../../context/AuthContext';
 import { useAudio } from '../../context/AudioContext';
 import { isNativeApp } from '../../lib/platform';
 import VideoSettings from '../player/VideoSettings';
+import BlockedSongs from './BlockedSongs';
 import { sameText } from '../../lib/lastSeen';
 
 const Toggle = ({ label, hint, checked, onChange, disabled }) => {
@@ -105,6 +106,8 @@ const SettingsSheet = ({ profile, open, onClose, onChange }) => {
         )}
         <h3 className="pt-4 text-xs uppercase tracking-wider font-bold text-zinc-500">Video</h3>
         <VideoSettings />
+        <h3 className="mt-4 text-sm font-semibold text-white">Blocked songs</h3>
+        <BlockedSongs />
       </div>
       {error && <p role="alert" className="text-xs text-rose-400 mt-2">{error}</p>}
 

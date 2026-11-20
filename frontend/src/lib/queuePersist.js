@@ -1,6 +1,6 @@
 // Saving and restoring the play queue. Pure functions, no network or React: tested in queuePersist.test.js.
 // Only song ids are saved. Titles, covers and stream URLs are fetched again on restore, so stale or tampered data is never reused.
-import { createQueueState, cleanRadioDuplicates, newUid, MAX_HISTORY, MAX_QUEUE } from './radioQueue';
+import { createQueueState, cleanRadioDuplicates, collectHeard, newUid, MAX_HISTORY, MAX_QUEUE, MAX_HEARD } from './radioQueue';
 
 export const GUEST_QUEUE_KEY = 'tamiltunes_queue_v1';
 export const DEVICE_KEY = 'tamiltunes_device';
@@ -27,6 +27,8 @@ export function toSaved(state, { positionSec = 0, deviceId = null } = {}) {
     autoplay: Boolean(state.autoplay),
     mode: state.mode === 'context' ? 'context' : 'radio',
     sourceLabel: state.context?.label ? String(state.context.label).slice(0, 120) : null,
+    heard: collectHeard(state).filter((h) => typeof h.k === 'string' && h.k.length <= 300 && (!h.id || ID_OK.test(h.id))).slice(-MAX_HEARD),
+    allowRepeats: Boolean(state.allowRepeats),
     deviceId,
   };
 }
@@ -81,6 +83,8 @@ export function fromSaved(saved, songsById, { autoplay = true } = {}) {
       : null,
     shuffle: Boolean(saved.shuffle),
     repeat: ['off', 'all', 'one'].includes(saved.repeat) ? saved.repeat : 'off',
+    heard: (Array.isArray(saved.heard) ? saved.heard : []).filter((h) => h && typeof h.k === 'string').slice(-MAX_HEARD),
+    allowRepeats: Boolean(saved.allowRepeats),
   }));
   return { state, currentSong: current, positionSec, dropped };
 }

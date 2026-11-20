@@ -6,7 +6,7 @@ import {
 import { SortableContext, verticalListSortingStrategy, sortableKeyboardCoordinates } from '@dnd-kit/sortable';
 import { restrictToVerticalAxis, restrictToFirstScrollableAncestor } from '@dnd-kit/modifiers';
 import {
-  X, Trash2, ListPlus, ListStart, MoreHorizontal, RefreshCw, Radio, ListMusic, CheckSquare, Timer, Square, Play, ChevronsDown, Save, Loader2,
+  X, Ban, Trash2, ListPlus, ListStart, MoreHorizontal, RefreshCw, Radio, ListMusic, CheckSquare, Timer, Square, Play, ChevronsDown, Save, Loader2,
 } from 'lucide-react';
 import BottomSheet from '../../common/BottomSheet';
 import SafeImage from '../../common/SafeImage';
@@ -51,7 +51,7 @@ const TimeLeft = ({ current, upcoming }) => {
  */
 const QueueContent = ({ onClose, embedded = false }) => {
   const {
-    queueSections, autoplay, setAutoplay, currentSong, isPlaying, offerRadio, continueWithRadio, startRadio,
+    queueSections, autoplay, setAutoplay, currentSong, isPlaying, offerRadio, continueWithRadio, startRadio, exhausted, allowRepeatsNow, playSomethingDifferent, dismissExhausted, blockSong,
     jumpToUid, removeUids, moveUidsToQueue, reorderByUid, clearQueue, refreshRecommendations, removeCurrentSong,
     playFromHistoryAt, saveQueueAsPlaylist, toggleStopAfter, sleepTimer, startSleepTimer, cancelSleepTimer, showToast,
   } = useQueue(); // steady: does not re-render on every tick of the song clock
@@ -204,6 +204,7 @@ const QueueContent = ({ onClose, embedded = false }) => {
       { label: 'Play next', icon: ListStart, onSelect: () => { moveUidsToQueue([uid], 'next'); setLive(`${row.entry.song.title} will play next.`); } },
       ...(isSource ? [{ label: 'Move to my queue', icon: ListPlus, onSelect: () => moveUidsToQueue([uid], 'end') }] : []),
       { label: 'Select', icon: CheckSquare, onSelect: () => { setSelectMode(true); setSelected(new Set([uid])); } },
+      { label: "Don't recommend this", icon: Ban, onSelect: () => blockSong(uid) },
       { label: 'Remove from queue', icon: X, danger: true, onSelect: () => remove(uid) },
     ];
   };
@@ -275,6 +276,18 @@ const QueueContent = ({ onClose, embedded = false }) => {
                 <p dir="auto" className="text-sm text-zinc-300 truncate">{currentSong.artist || currentSong.singers}</p>
               </div>
               <Equalizer playing={isPlaying} className="mr-1" />
+            </div>
+          )}
+
+          {exhausted && (
+            <div className="flex-shrink-0 mx-4 mb-2 rounded-xl bg-white/5 p-3" role="status" data-testid="queue-exhausted">
+              <p className="text-sm font-semibold text-white">You've heard everything close to this</p>
+              <p className="mt-1 text-xs text-zinc-400">Nothing new was found, even after searching wider.</p>
+              <div className="mt-3 flex flex-wrap gap-2">
+                <button type="button" onClick={() => { dismissExhausted(); onClose?.(); navigate('/search'); }} className="press min-h-11 px-3 rounded-full bg-brand-500 text-black text-xs font-bold">Start a new radio from another song</button>
+                <button type="button" onClick={playSomethingDifferent} className="press min-h-11 px-3 rounded-full bg-white/10 hover:bg-white/15 text-white text-xs font-semibold">Play something different</button>
+                <button type="button" onClick={allowRepeatsNow} className="press min-h-11 px-3 rounded-full bg-white/10 hover:bg-white/15 text-white text-xs font-semibold">Allow repeats</button>
+              </div>
             </div>
           )}
 
