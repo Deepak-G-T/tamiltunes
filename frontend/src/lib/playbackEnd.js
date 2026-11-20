@@ -3,10 +3,12 @@
  * Why: a stream can end before the length the catalog or the file header promised (a cut file, a dropped connection near the end). Waiting only
  * for the audio element's 'ended' event then leaves the player paused at 5:13 / 5:28 and the next song never starts.
  */
-export const NEAR_END_SECONDS = 20;        // a stop this close to the end counts as "the song is finished"
+export const NEAR_END_SECONDS = 30;        // a stop this close to the end counts as "the song is finished"
 export const STALL_FINISH_MS = 5000;       // stuck buffering this long, near the end: finished
 export const PAUSE_FINISH_MS = 1500;       // paused by something other than the person, near the end, and it stays paused: finished
 export const TRANSITION_WATCHDOG_MS = 15000; // between two songs the player keeps saying "playing" for at most this long
+export const DEBOUNCE_PAUSE_MS = 8000;     // debounce native paused state across track handover / source change
+export const SYNTHETIC_NEXT_MS = 5000;     // native safety net: advance if web layer hasn't started within 5s
 export const NOTIFICATION_WAIT_MS = 3000;  // wait this long for the real length before showing the notification without it
 export const DURATION_TOLERANCE_SECONDS = 3;
 const MIN_PLAYED_SECONDS = 3;              // an error before this is a stream that never started (try the other addresses)

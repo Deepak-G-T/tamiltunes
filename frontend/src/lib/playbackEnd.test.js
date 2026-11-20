@@ -17,13 +17,15 @@ describe('one length per song', () => {
 });
 
 describe('near the end', () => {
-  it('counts the last 20 seconds of the REAL length (a catalog length that is too long does not matter)', () => {
+  it('counts the last 30 seconds of the REAL length (a catalog length that is too long does not matter)', () => {
     expect(remainingSeconds({ currentTime: 313, duration: 328 })).toBe(15);
     expect(isNearEnd({ currentTime: 313, duration: 328 })).toBe(true);
+    expect(isNearEnd({ currentTime: 300, duration: 328 })).toBe(true); // 28s remaining (< 30s)
+    expect(isNearEnd({ currentTime: 290, duration: 328 })).toBe(false); // 38s remaining (> 30s)
     expect(isNearEnd({ currentTime: 313, duration: 379 })).toBe(false); // the stale catalog length would say "far from the end"
     expect(isNearEnd({ currentTime: 0, duration: 10 })).toBe(false);
     expect(isNearEnd({ currentTime: 100, duration: NaN })).toBe(false);
-    expect(NEAR_END_SECONDS).toBe(20);
+    expect(NEAR_END_SECONDS).toBe(30);
   });
 });
 

@@ -156,16 +156,15 @@ describe('jumping and editing the queue', () => {
 });
 
 describe('radio refill', () => {
-  it('refills only when fewer than 3 songs remain, never while one is in flight', () => {
+  it('refills when 3 songs remain (fewer than 4 in upcoming), never while one is in flight', () => {
     expect(needsRefill(radio('a', 'b', 'c', 'd', 'e'))).toBe(false); // 4 queued
-    expect(needsRefill(radio('a', 'b', 'c', 'd'))).toBe(false); // 3 queued: exactly the threshold
-    const low = radio('a', 'b', 'c'); // 2 queued
+    const low = radio('a', 'b', 'c', 'd'); // 3 queued (refills when 3 songs remain)
     expect(low.upcoming.length).toBeLessThan(REFILL_THRESHOLD);
     expect(needsRefill(low)).toBe(true);
     const { state: inFlight } = startRefill(low);
     expect(needsRefill(inFlight)).toBe(false);
     // playing a song also uses one up
-    expect(needsRefill(advance(radio('a', 'b', 'c', 'd')).state)).toBe(true);
+    expect(needsRefill(advance(radio('a', 'b', 'c', 'd', 'e')).state)).toBe(true);
   });
 
   it('does not refill for playlists / albums, with autoplay off, or with nothing playing', () => {
