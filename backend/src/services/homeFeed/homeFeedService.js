@@ -2,6 +2,8 @@
  * Assembles the home page: candidate pools from the music provider and the database, then `assembleHome` (dedupe, caps,
  * seeded shuffle). The result is cached per person for a few minutes. Provider searches are cached for 10 minutes.
  */
+import { NO_REPEAT } from '../noRepeat/config.js';
+import { getBlocksStore } from '../noRepeat/blocksStore.js';
 import { musicService } from '../music/providerManager.js';
 import { CURATED_ARTISTS } from '../music/localAudioProvider.js';
 import { musicCache } from '../cacheService.js';
@@ -162,11 +164,19 @@ export async function buildHome({ userId = null, exclude = [], tab = null, now =
     ];
   }
 
+  // No-repeat rules for the page (docs/NO_REPEAT.md): songs played in the last day and blocked songs are kept out of the shelves
+  let recent = [];
+  let blocked = [];
+  if (userId) {
+    const sinceMs = new Date(now - NO_REPEAT.homeSkipPlayedHours * 3600e3);
+    recent = (await getSignalsStore().playHistory(userId, { since: sinceMs, limit: 300 }).catch(() => [])).map((p) => p.song).filter(Boolean);
+    blocked = await getBlocksStore().list(userId).catch(() => []);
+  }
   const excluded = await resolveExclude(ex, pools);
   // songs shown last time count like songs played a lot this week: they sink, but stay if a shelf would be thin
   const penalty = new Map(weekPlays);
   for (const id of av) penalty.set(id, Math.max(penalty.get(id) || 0, ROTATION_PLAYS));
-  const result = assembleHome(plan, { exclude: excluded, seed, weekPlays: penalty, hero: !tab });
+  const result = assembleHome(plan, { exclude: excluded, seed, weekPlays: penalty, hero: !tab, recent, blocked, exempt: NO_REPEAT.homeShelvesExempt.concat(['continue']) });
   const value = { seed, ...result };
   if (cache.size >= MAX_CACHE_ENTRIES) cache.delete(cache.keys().next().value);
   cache.set(cacheKey, { at: now, value });
