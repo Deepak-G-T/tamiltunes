@@ -1,4 +1,5 @@
 import ErrorBoundary from '../common/ErrorBoundary';
+import OnboardingGate from '../onboarding/OnboardingGate';
 import React, { useState, useEffect } from 'react';
 import { Outlet, useLocation } from 'react-router-dom';
 import { RefreshCw } from 'lucide-react';
@@ -93,6 +94,7 @@ const MainLayout = () => {
           </div>
         </main>
 
+        <OnboardingGate />
         <NativeBridge />
         <NativeMediaControls />
         <UpdateChecker />

@@ -190,3 +190,9 @@ Songs may carry an optional `videoId`. It comes from the curated map `backend/sr
 - Full-screen pages that use `position: fixed` MUST render through `createPortal(..., document.body)`: the page wrapper animates with a transform, which makes fixed children content-sized (this collapsed Wrapped to zero height).
 - Do not add download links or object URLs for the share picture (`noMediaStorage.test.js`): preview = data URL, share = Web Share with a file made at tap time.
 - UNTESTED: real year of data, system share sheet, real phone.
+
+## Onboarding (feature/onboarding)
+- First-login picker (singers, music directors, eras): `GET/PUT/DELETE /api/me/taste`, page `/welcome` (Settings > Choose your favourites = `?edit=1`), `OnboardingGate` redirects once per session when the server says `shouldOnboard`. Rules, privacy and what it changes: `docs/ONBOARDING.md`.
+- Names come from a FIXED list (`backend/src/services/taste/options.js`, English only); never accept free text. Migration `20261129000000_user_taste` (additive; Neon backup BEFORE merging). `npm run test:onboarding --prefix frontend`.
+- `aria-disabled` buttons count as disabled for Playwright's `click()`: use `{ force: true }` in an audit when a real finger can still tap them.
+- UNTESTED: a real new account, the Settings button, real phone, quality of the first Daily Mixes with the live catalogue.

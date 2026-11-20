@@ -29,6 +29,7 @@ const UserProfile = lazy(() => import('./pages/UserProfile'));
 const Install = lazy(() => import('./pages/Install'));
 const Privacy = lazy(() => import('./pages/Privacy'));
 const Wrapped = lazy(() => import('./pages/Wrapped'));
+const Welcome = lazy(() => import('./pages/Welcome'));
 
 // Lazy-loaded Admin Section (non-admins never download this code)
 const AdminRoute = lazy(() => import('./components/auth/AdminRoute'));
@@ -95,6 +96,7 @@ function App() {
                   <Route path="history" element={<History />} />
                   <Route path="profile" element={<Profile />} />
                   <Route path="wrapped" element={<Wrapped />} />
+                  <Route path="welcome" element={<Welcome />} />
                   <Route path="u/:username" element={<UserProfile />} />
                   <Route path="*" element={<Navigate to="/" replace />} />
                 </Route>
