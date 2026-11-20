@@ -50,6 +50,14 @@ async function setupMockApi(page, role = 'admin') {
       });
     }
 
+    // the normal app's own data (an admin also uses the app, not only the admin panel)
+    if (url.includes('/api/music/home')) {
+      return route.fulfill({ status: 200, json: { success: true, data: { trending: [], latest: [], gana: [], nineties: [], twoThousands: [], melodies: [], love: [], sad: [], folk: [], instrumental: [], popularAlbums: [], popularArtists: [] } } });
+    }
+    if (/\/api\/home(\?|$)/.test(url)) {
+      return route.fulfill({ status: 200, json: { success: true, seed: 's', hero: null, hidden: [], sections: [] } });
+    }
+
     if (url.includes('/api/admin/dashboard')) {
       return route.fulfill({
         status: 200,
@@ -176,6 +184,13 @@ async function run() {
         localStorage.setItem('tamiltunes_user', JSON.stringify({ id: 'mock_uid_1', email: 'admin@tamiltunes.live', role: 'admin', isActive: true }));
       });
       await setupMockApi(page, 'admin');
+      // an admin must also be able to use the normal app: the sidebar draws an extra admin-only link (a missing icon import there once blanked the whole page for admins)
+      const adminPageErrors = [];
+      page.on('pageerror', (e) => adminPageErrors.push(e.message));
+      await page.goto(`${BASE}/`);
+      await page.waitForSelector('aside a[href="/admin"]', { timeout: 15000 }).catch(async (e) => { throw new Error(`FAIL  no Admin Panel link in the sidebar. Page errors: ${adminPageErrors.join(' | ') || 'none'}. Page text: ${(await page.locator('body').innerText().catch(() => '')).slice(0, 200)}`); });
+      if (adminPageErrors.length) throw new Error(`FAIL  the app crashed for an admin: ${adminPageErrors.join(' | ')}`);
+      console.log('PASS  admin desktop: the normal app loads for an admin and the sidebar shows the Admin Panel link (no crash)');
       await page.goto(`${BASE}/admin`);
       await page.waitForSelector('text=System Dashboard');
       await page.waitForSelector('text=Total Users');
