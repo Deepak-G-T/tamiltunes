@@ -58,6 +58,7 @@ model User {
   @@map("users")
   @@index([lastSeenAt], map: "users_last_seen_at_idx")
   videoReports VideoReport[]
+  songBlocks UserSongBlock[]
 }
 
 model Song {
@@ -326,6 +327,8 @@ model QueueState {
   mode         String   @default("radio")
   sourceLabel  String?  @map("source_label")
   deviceId     String?  @map("device_id")
+  heard        Json     @default("[]") // no-repeat session memory: [{ k: variantKey, id }] (songs played, skipped or queued), shared by every device
+  allowRepeats Boolean  @default(false) @map("allow_repeats") // the listener agreed to repeats after "You've heard everything close to this"
   updatedAt    DateTime @default(now()) @updatedAt @map("updated_at")
 
   user User @relation(fields: [userId], references: [id], onDelete: Cascade)
@@ -373,4 +376,24 @@ model AppSetting {
   updatedAt DateTime @default(now()) @updatedAt @map("updated_at")
 
   @@map("app_settings")
+}
+
+/// "Don't recommend this": a song (and its versions, by variantKey) the listener never wants suggested again.
+model UserSongBlock {
+  id          String   @id @default(uuid())
+  userId      String   @map("user_id")
+  songId      String   @map("song_id")
+  key         String   // variantKey: the song and its versions
+  title       String
+  artist      String?
+  album       String?
+  durationSec Int?     @map("duration_sec")
+  image       String?
+  createdAt   DateTime @default(now()) @map("created_at")
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, key])
+  @@index([userId])
+  @@map("user_song_blocks")
 }

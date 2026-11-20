@@ -62,6 +62,13 @@ export function createMemorySignals() {
       /* the in-memory store keeps whatever it was given */
     },
 
+    /** The listener's plays, newest first, each with the song's metadata (for the no-repeat memory). */
+    async playHistory(userId, { since = null, limit = 2000 } = {}) {
+      const rows = memoryEvents.filter((e) => e.userId === userId && (!since || new Date(e.playedAt) >= new Date(since)))
+        .sort((a, b) => new Date(b.playedAt) - new Date(a.playedAt)).slice(0, limit);
+      return rows.map((e) => ({ song: { ...(db.songs.get(e.songId) || { title: e.songId, artist: '' }), id: e.songId }, playedAt: e.playedAt, completed: Boolean(e.completed), skippedAtSec: e.skippedAtSec ?? null }));
+    },
+
     async recordPlayEvent(event) {
       memoryEvents.push({ playedAt: new Date(), completed: false, skippedAtSec: null, source: null, ...event });
     },
@@ -111,6 +118,18 @@ export function createPrismaSignals(prisma) {
     },
 
     songsByIds: (ids) => (ids.length ? prisma.song.findMany({ where: { id: { in: ids } } }) : []),
+
+    /** The listener's plays, newest first, each with the song's metadata (for the no-repeat memory). */
+    async playHistory(userId, { since = null, limit = 2000 } = {}) {
+      const events = await prisma.playEvent.findMany({
+        where: { userId, ...(since ? { playedAt: { gte: since } } : {}) },
+        orderBy: { playedAt: 'desc' }, take: limit, select: { songId: true, playedAt: true, completed: true, skippedAtSec: true },
+      });
+      const ids = [...new Set(events.map((e) => e.songId))];
+      const songs = ids.length ? await prisma.song.findMany({ where: { id: { in: ids } } }) : [];
+      const byId = new Map(songs.map((s) => [s.id, s]));
+      return events.map((e) => ({ song: { ...(byId.get(e.songId) || { title: e.songId, artist: '' }), id: e.songId }, playedAt: e.playedAt, completed: e.completed, skippedAtSec: e.skippedAtSec }));
+    },
 
     /** Fill metadata on a song row that already exists (never creates rows). */
     async enrichSong(song) {
