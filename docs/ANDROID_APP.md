@@ -106,3 +106,17 @@ How it works: `lib/playbackEnd.js` (pure rules, tests `playbackEnd.test.js`) use
 - At a natural end the player keeps saying "playing" until the next song decides (15 s watchdog), so the Android notification and its foreground service are not told "paused" while the screen is locked.
 - The notification waits up to 3 s for the real length and is made again if the length changes.
 - `nativePlayback.test.js` guards that Capacitor's WebView does not require a tap to play audio and that one audio element is reused.
+
+### Safe areas and Now Playing (fix/now-playing-safe-area)
+- targetSdk 36 forces edge-to-edge: the WebView draws under the status bar and the gesture bar. Capacitor's `SystemBars` (`insetsHandling: "native"`) behaves two ways:
+  WebView 140+ with `viewport-fit=cover` (our `index.html`): `env(safe-area-inset-*)` holds the real insets; older WebView: the WebView itself is padded and `env()` is 0.
+  So `env()` is the only source we use. A second "native" value on top would double the gap on old WebViews.
+- `src/index.css` defines `--safe-top/-bottom/-left/-right` (env first). Use these, never raw `env(safe-area-*)`. `#root` pads by them, so normal pages are fine; anything
+  `position: fixed` escapes that padding and must add them itself (Now Playing, bottom sheets, the side drawer, the login gate do).
+- `--sim-safe-*` exists for the audits only (a browser has no status bar). `npm run test:player --prefix frontend` (104 checks) simulates a 28px status bar and a 24px gesture bar at
+  360x640, 390x844 and 412x915 and the Android font scale at 130%.
+- The capacitor config key is `initialViewportFitValueHint` (it was spelled `initialViewportFitHint` and ignored).
+- Songs carry no artist or album ids, so a tapped artist or album name opens the search for it.
+- Checks on the phone, all UNTESTED until reported: status bar no longer covers the chevron / queue button (Vivo), gesture bar spacing under the controls and the sheets,
+  swipe left/right on the cover, swipe down to close, Back closes Now Playing first, video mode layout (and its full-screen button), the sleep timer sheet, long titles scrolling,
+  font size set to the largest in Android settings.

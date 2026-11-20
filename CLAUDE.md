@@ -173,3 +173,8 @@ Songs may carry an optional `videoId`. It comes from the curated map `backend/sr
 - Migration `20261128000000_no_repeat` (additive; Neon backup BEFORE merging). Passed on a scratch Postgres 16 (migrate deploy, re-run, API suite, store round trips).
 - Blocked songs never return, even with allow repeats. Blocks take only a song id (the server looks the song up).
 - UNTESTED: live JioSaavn widening, the exhausted card and "Don't recommend this" in a browser/phone, guests (blocks need sign-in).
+
+## Safe areas and Now Playing (fix/now-playing-safe-area)
+- Use `var(--safe-top|bottom|left|right)` (defined once in `frontend/src/index.css`, env() first); never raw `env(safe-area-*)`, never add a native inset value on top (double gap on old WebViews). Anything `position: fixed` must add them itself (`#root` pads normal pages). `--sim-safe-*` is for audits only.
+- `npm run test:player --prefix frontend` (104 checks: 28px status bar, 24px gesture bar, 360x640 / 390x844 / 412x915, font 130%). Notes and the phone checklist: `docs/ANDROID_APP.md` (last section).
+- Songs carry no artist/album ids: tapped names in Now Playing open the search. "Up next" opens the queue. UNTESTED on a real phone (Vivo): status bar overlap fix, gesture bar spacing, swipes, Back button, video mode layout.

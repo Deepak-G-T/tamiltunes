@@ -513,9 +513,13 @@ async function runGestures(browser, width, height) {
     check(`[${tag}] transport controls fit inside the short screen`, ctl.y + ctl.h / 2 <= height, `controls bottom=${ctl.y + ctl.h / 2} of ${height}`);
   } else {
     check(`[${tag}] up-next card shows the following song`, (await upNext.count()) === 1 && /Plain Audio Song/.test(await upNext.innerText()), await upNext.innerText().catch(() => 'none'));
-    await upNext.click();
+    await upNext.click(); // tapping the card opens the queue (it no longer skips ahead)
     await page.waitForTimeout(500);
-    check(`[${tag}] tapping up-next plays that song`, (await titleOf()) === 'Plain Audio Song', `now=${await titleOf()}`);
+    check(`[${tag}] tapping up-next opens the queue`, await page.locator('[data-testid=fs-queue]').isVisible());
+    await page.getByRole('button', { name: 'Show now playing' }).click();
+    await page.getByRole('button', { name: 'Next track' }).click();
+    await page.waitForTimeout(500);
+    check(`[${tag}] the next song plays`, (await titleOf()) === 'Plain Audio Song', `now=${await titleOf()}`);
     check(`[${tag}] up-next is hidden on the last song`, (await page.locator('[data-testid=up-next]').count()) === 0);
   }
 

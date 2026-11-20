@@ -1,4 +1,5 @@
 import React, { useEffect, useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { createPortal } from 'react-dom';
 import {
   ListPlus,
@@ -13,13 +14,16 @@ import {
   Repeat1,
   ListMusic,
   Heart,
-  Disc,
   MessageCircle,
   MoreHorizontal,
   Maximize,
-  Settings2
+  Settings2,
+  Timer,
+  FileText
 } from 'lucide-react';
-import { useAudio } from '../../context/AudioContext';
+import { useAudio, useQueue } from '../../context/AudioContext';
+import BottomSheet from '../common/BottomSheet';
+import { SLEEP_OPTIONS, sleepLabel } from '../../lib/sleepTimer';
 import ProgressBar from './ProgressBar';
 import VolumeSlider from './VolumeSlider';
 import VideoSlot from './VideoSlot';
@@ -74,13 +78,22 @@ const FullScreenPlayer = ({ isOpen, onClose: onCloseProp, onToggleFavorite, isFa
     return currentSong?.album ? `Radio · ${currentSong.album}` : 'TamilTunes';
   })();
 
+  const navigate = useNavigate();
+  const { showToast, sleepTimer, startSleepTimer, cancelSleepTimer } = useQueue();
+  const [sleepOpen, setSleepOpen] = useState(false);
+  const [lyricsOpen, setLyricsOpen] = useState(false);
   const [commentsOpen, setCommentsOpen] = useState(false);
   const [view, setView] = useState('player'); // 'player' | 'queue' (the Queue tab inside Now Playing)
   const songActions = useSongActions();
   const [showVideoSettings, setShowVideoSettings] = useState(false);
   useEffect(() => { if (!isOpen) setView('player'); }, [isOpen]);
   // Every way of closing the player also closes the comments sheet
-  const onClose = () => { setCommentsOpen(false); onCloseProp(); };
+  const onClose = () => { setCommentsOpen(false); setSleepOpen(false); setLyricsOpen(false); onCloseProp(); };
+  // Songs carry no artist or album ids, so a name opens the search for it (artist and album cards are the first results)
+  const openSearch = (name) => { haptic(10); onClose(); navigate(`/search?q=${encodeURIComponent(name)}`); };
+  const artistNames = String(currentSong?.artist || currentSong?.singers || '').split(/\s*(?:,|&| and )\s*/).map((n) => n.trim()).filter(Boolean);
+  const squash = (t) => String(t || '').toLowerCase().replace(/[^\p{L}\p{N}]+/gu, ' ').trim();
+  const showAlbumChip = Boolean(currentSong?.album) && squash(currentSong.album) !== squash(currentSong.title);
 
   // Lock body scroll when full screen player is open on mobile
   useEffect(() => {
@@ -134,10 +147,11 @@ const FullScreenPlayer = ({ isOpen, onClose: onCloseProp, onToggleFavorite, isFa
   const content = (
     <div
       style={{ zIndex: 99999 }}
-      className="fixed inset-0 bg-black flex flex-col justify-between p-4 sm:p-8 select-none overflow-y-auto overflow-x-hidden animate-in fade-in duration-200"
+      data-testid="fs-root"
+      className="fixed inset-0 bg-black flex flex-col justify-between px-4 pb-4 pt-[calc(0.5rem+var(--safe-top))] sm:px-8 sm:pb-8 sm:pt-[calc(2rem+var(--safe-top))] select-none overflow-y-auto overflow-x-hidden slide-up"
     >
       {/* Cover-colour wash (follows the artwork) */}
-      <div aria-hidden="true" className="fixed inset-0 cover-wash-strong pointer-events-none" />
+      <div aria-hidden="true" data-testid="fs-background" className="fixed inset-0 cover-wash-strong pointer-events-none" />
 
       {/* Blurred ambient background effect */}
       <div
@@ -149,9 +163,9 @@ const FullScreenPlayer = ({ isOpen, onClose: onCloseProp, onToggleFavorite, isFa
         }}
       />
 
-      {/* Top Bar with Down Chevron to close */}
+      {/* Top bar: collapse, "Playing from" (centred, one line), more, queue. Every button is a 44px target. */}
       <div
-        className="relative z-10 flex items-center justify-between pb-2"
+        className="relative z-10 flex items-center gap-2 pb-1"
         onTouchStart={topSwipe.onTouchStart}
         onTouchEnd={topSwipe.onTouchEnd}
         onTouchCancel={topSwipe.onTouchCancel}
@@ -159,22 +173,22 @@ const FullScreenPlayer = ({ isOpen, onClose: onCloseProp, onToggleFavorite, isFa
         <button
           onClick={onClose}
           aria-label="Close now playing"
-          className="p-2.5 rounded-full bg-zinc-900/80 hover:bg-zinc-800 text-zinc-300 hover:text-white transition-all active:scale-90"
+          className="flex-shrink-0 w-12 h-12 inline-flex items-center justify-center rounded-full bg-zinc-900/80 hover:bg-zinc-800 text-zinc-300 hover:text-white transition-all active:scale-90"
         >
           <ChevronDown className="w-7 h-7" />
         </button>
 
-        <div className="text-center px-2 min-w-0">
-          <p className="text-[10px] sm:text-xs uppercase tracking-widest text-zinc-500 font-semibold">Playing from</p>
-          <MarqueeText text={sourceName} className="text-xs sm:text-sm uppercase tracking-widest text-zinc-300 font-semibold" />
+        <div data-testid="fs-source" className="text-center px-1 min-w-0 flex-1">
+          <p className="text-[10px] sm:text-xs uppercase tracking-widest text-zinc-400 font-semibold">Playing from</p>
+          <MarqueeText text={sourceName} className="text-xs sm:text-sm uppercase tracking-widest text-zinc-200 font-semibold" />
         </div>
 
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-2 flex-shrink-0">
           <button
             onClick={() => songActions.open(currentSong, { onAddToPlaylist })}
             aria-label="More actions for this song"
             aria-haspopup="menu"
-            className="p-2.5 rounded-full bg-zinc-900/80 hover:bg-zinc-800 text-zinc-300 hover:text-white transition-all active:scale-90"
+            className="w-11 h-11 inline-flex items-center justify-center rounded-full bg-zinc-900/80 hover:bg-zinc-800 text-zinc-300 hover:text-white transition-all active:scale-90"
           >
             <MoreHorizontal className="w-6 h-6" />
           </button>
@@ -182,7 +196,7 @@ const FullScreenPlayer = ({ isOpen, onClose: onCloseProp, onToggleFavorite, isFa
             onClick={() => setView((v) => (v === 'queue' ? 'player' : 'queue'))}
             aria-label={view === 'queue' ? 'Show now playing' : 'Open queue'}
             aria-pressed={view === 'queue'}
-            className={`p-2.5 rounded-full transition-all active:scale-90 ${view === 'queue' ? 'bg-brand-500 text-black' : 'bg-zinc-900/80 hover:bg-zinc-800 text-zinc-300 hover:text-white'}`}
+            className={`w-11 h-11 inline-flex items-center justify-center rounded-full transition-all active:scale-90 ${view === 'queue' ? 'bg-brand-500 text-black' : 'bg-zinc-900/80 hover:bg-zinc-800 text-zinc-300 hover:text-white'}`}
           >
             <ListMusic className="w-6 h-6" />
           </button>
@@ -190,7 +204,7 @@ const FullScreenPlayer = ({ isOpen, onClose: onCloseProp, onToggleFavorite, isFa
       </div>
 
       {view === 'queue' && (
-        <div data-testid="fs-queue" className="fixed inset-x-0 bottom-0 top-[4.75rem] z-20 bg-black/80 backdrop-blur-md">
+        <div data-testid="fs-queue" className="fixed inset-x-0 bottom-0 top-[calc(4.75rem+var(--safe-top))] z-20 bg-black/80 backdrop-blur-md">
           <div className="h-full max-w-2xl mx-auto">
             <QueueContent embedded />
           </div>
@@ -198,7 +212,7 @@ const FullScreenPlayer = ({ isOpen, onClose: onCloseProp, onToggleFavorite, isFa
       )}
 
       {/* Center Artwork & Metadata */}
-      <div className="relative z-10 flex flex-col items-center justify-center my-auto max-w-sm sm:max-w-md mx-auto w-full py-4">
+      <div className="relative z-10 flex flex-col items-center justify-center my-auto max-w-sm sm:max-w-md mx-auto w-full py-2">
         {/* Video surface (YouTube engine active) or album cover */}
         {activeEngine === 'youtube' && (
           <>
@@ -213,7 +227,7 @@ const FullScreenPlayer = ({ isOpen, onClose: onCloseProp, onToggleFavorite, isFa
         {activeEngine !== 'youtube' && (
         <div
           key={currentSong.id}
-          className="relative w-[min(70vw,20rem,34svh)] h-[min(70vw,20rem,34svh)] mb-5 art-in"
+          className="relative w-[min(62vw,20rem,28svh)] h-[min(62vw,20rem,28svh)] mb-3 art-in"
           data-testid="fs-artwork"
           style={{ touchAction: 'none' }}
           onTouchStart={artSwipe.onTouchStart}
@@ -224,9 +238,9 @@ const FullScreenPlayer = ({ isOpen, onClose: onCloseProp, onToggleFavorite, isFa
           <div
             aria-hidden="true"
             data-testid="vinyl"
-            className={`vinyl absolute top-1/2 -translate-y-1/2 right-[-16%] w-[92%] h-[92%] rounded-full shadow-[0_12px_32px_rgba(0,0,0,0.6)] ${isPlaying ? 'vinyl-spin' : ''}`}
+            className={`vinyl absolute top-1/2 -translate-y-1/2 right-[-12%] w-[90%] h-[90%] rounded-full shadow-[0_12px_32px_rgba(0,0,0,0.6)] ${isPlaying ? 'vinyl-spin' : ''}`}
           />
-          <div className="relative w-full h-full rounded-lg overflow-hidden shadow-[0_24px_64px_rgba(0,0,0,0.7)] group bg-surface-3">
+          <div data-testid="fs-cover" data-playing={isPlaying ? 'true' : 'false'} className={`relative w-full h-full rounded-lg overflow-hidden shadow-[0_24px_64px_rgba(0,0,0,0.7)] group bg-surface-3 transition-transform duration-500 ease-out ${isPlaying ? 'scale-100' : 'scale-[0.94]'}`}>
           <img
             src={currentSong.image || MUSIC_COVER_FALLBACK}
             alt={currentSong.title}
@@ -235,9 +249,7 @@ const FullScreenPlayer = ({ isOpen, onClose: onCloseProp, onToggleFavorite, isFa
               e.currentTarget.onerror = null;
               e.currentTarget.src = MUSIC_COVER_FALLBACK;
             }}
-            className={`w-full h-full object-cover transition-transform duration-500 ${
-              isPlaying ? 'scale-105' : 'scale-100'
-            }`}
+            className="w-full h-full object-cover"
           />
           {isBuffering && (
             <div className="absolute inset-0 bg-black/40 backdrop-blur-sm flex items-center justify-center">
@@ -252,8 +264,8 @@ const FullScreenPlayer = ({ isOpen, onClose: onCloseProp, onToggleFavorite, isFa
           <div className="flex items-center gap-2 mb-4">
             <VideoModeToggle />
             <button type="button" onClick={() => setShowVideoSettings((v) => !v)} aria-expanded={showVideoSettings} aria-label="Video settings" data-testid="video-settings-button"
-              className="press w-11 h-11 inline-flex items-center justify-center rounded-full text-zinc-400 hover:text-white hover:bg-white/10">
-              <Settings2 className="w-4 h-4" aria-hidden="true" />
+              className="press min-h-11 inline-flex items-center justify-center gap-1.5 px-3 rounded-full text-xs font-semibold text-zinc-300 hover:text-white hover:bg-white/10">
+              <Settings2 className="w-4 h-4" aria-hidden="true" /> Video settings
             </button>
           </div>
         )}
@@ -262,19 +274,26 @@ const FullScreenPlayer = ({ isOpen, onClose: onCloseProp, onToggleFavorite, isFa
         )}
         <ScreenLockNotice song={currentSong} engine={activeEngine} className="mb-4 px-1" />
 
-        {/* Title, Artist, & Favorite */}
-        <div className="w-full flex items-start justify-between mb-3 px-1">
-          <div className="min-w-0 flex-1 mr-3">
-            <h2 className="text-2xl sm:text-3xl font-extrabold text-white line-clamp-2 tracking-tight leading-tight">
-              {currentSong.title}
+        {/* Title, artists (tap = search for them), album chip, favourite */}
+        <div className="w-full flex items-start justify-between mb-2 px-1">
+          <div className="min-w-0 flex-1 mr-2">
+            <h2 className="text-2xl sm:text-3xl font-extrabold text-white tracking-tight leading-tight">
+              <MarqueeText text={currentSong.title} align="left" className="text-2xl sm:text-3xl font-extrabold tracking-tight leading-tight" />
             </h2>
-            <p className="text-sm font-medium text-zinc-300 line-clamp-2 mt-1">
-              {currentSong.artist || currentSong.singers}
+            <p data-testid="fs-artists" className="text-sm font-medium text-zinc-300 mt-1 flex flex-wrap items-center gap-x-1">
+              {artistNames.map((name, i) => (
+                <React.Fragment key={`${name}-${i}`}>
+                  <button type="button" onClick={() => openSearch(name)} aria-label={`Search for ${name}`}
+                    className="inline-flex items-center min-h-8 hover:text-white hover:underline underline-offset-2 text-left max-w-full truncate">{name}</button>
+                  {i < artistNames.length - 1 && <span aria-hidden="true">,</span>}
+                </React.Fragment>
+              ))}
             </p>
-            {currentSong.album && (
-              <span className="inline-flex max-w-full mt-2 px-2.5 py-0.5 rounded-full bg-brand-500/15 text-brand-300 text-xs font-semibold">
+            {showAlbumChip && (
+              <button type="button" onClick={() => openSearch(currentSong.album)} aria-label={`Open ${currentSong.album}`} data-testid="fs-album-chip"
+                className="inline-flex max-w-full mt-1.5 px-2.5 py-1 rounded-full bg-brand-500/15 hover:bg-brand-500/25 text-brand-300 text-xs font-semibold">
                 <span className="truncate">{currentSong.album}</span>
-              </span>
+              </button>
             )}
           </div>
           {onToggleFavorite && (
@@ -282,14 +301,16 @@ const FullScreenPlayer = ({ isOpen, onClose: onCloseProp, onToggleFavorite, isFa
               onClick={() => {
                 haptic(12);
                 onToggleFavorite(currentSong);
+                showToast(isFavorite ? 'Removed from your favourites.' : 'Added to your favourites.');
               }}
               aria-label={isFavorite ? 'Remove from favourites' : 'Add to favourites'}
               aria-pressed={!!isFavorite}
-              className="p-3 -mt-1 rounded-full hover:bg-white/10 active:scale-90 transition-transform"
+              data-testid="fs-heart"
+              className="w-12 h-12 flex-shrink-0 inline-flex items-center justify-center rounded-full hover:bg-white/10 active:scale-90 transition-transform"
             >
               <Heart
                 key={isFavorite ? 'on' : 'off'}
-                className={`w-7 h-7 transition-colors ${
+                className={`w-8 h-8 transition-colors ${
                   isFavorite ? 'fill-brand-500 text-brand-500 heart-pop' : 'text-zinc-300 hover:text-white'
                 }`}
               />
@@ -306,9 +327,9 @@ const FullScreenPlayer = ({ isOpen, onClose: onCloseProp, onToggleFavorite, isFa
       </div>
 
       {/* Bottom Controls */}
-      <div className="relative z-10 max-w-sm sm:max-w-md mx-auto w-full pb-[max(0.5rem,env(safe-area-inset-bottom))]">
+      <div data-testid="fs-bottom" className="relative z-10 max-w-sm sm:max-w-md mx-auto w-full pb-[max(0.5rem,var(--safe-bottom))]">
         {/* Scrubber */}
-        <div className="mb-5">
+        <div className="mb-2">
           <ProgressBar
             currentTime={currentTime}
             duration={duration}
@@ -318,15 +339,17 @@ const FullScreenPlayer = ({ isOpen, onClose: onCloseProp, onToggleFavorite, isFa
         </div>
 
         {/* Transport controls */}
-        <div className="flex items-center justify-between mb-5">
+        <div className="flex items-center justify-between mb-3">
           <button
             onClick={toggleShuffle}
             aria-label={`Shuffle ${isShuffle ? 'On' : 'Off'}`}
-            className={`p-2.5 transition-colors active:scale-90 focus-visible:ring-2 focus-visible:ring-brand-500 focus-visible:outline-none ${
-              isShuffle ? 'text-brand-400' : 'text-zinc-500 hover:text-white'
+            aria-pressed={isShuffle}
+            className={`relative w-11 h-11 inline-flex items-center justify-center transition-colors active:scale-90 focus-visible:ring-2 focus-visible:ring-brand-500 focus-visible:outline-none ${
+              isShuffle ? 'text-brand-400' : 'text-zinc-400 hover:text-white'
             }`}
           >
             <Shuffle className="w-5 h-5" />
+            {isShuffle && <span aria-hidden="true" data-testid="shuffle-dot" className="absolute bottom-1 w-1 h-1 rounded-full bg-brand-400" />}
           </button>
 
           <button
@@ -335,7 +358,7 @@ const FullScreenPlayer = ({ isOpen, onClose: onCloseProp, onToggleFavorite, isFa
               previousTrack();
             }}
             aria-label="Previous track"
-            className="p-2.5 text-zinc-300 hover:text-white active:scale-90 focus-visible:ring-2 focus-visible:ring-brand-500 focus-visible:outline-none transition-all"
+            className="w-12 h-12 inline-flex items-center justify-center text-zinc-300 hover:text-white active:scale-90 focus-visible:ring-2 focus-visible:ring-brand-500 focus-visible:outline-none transition-all"
           >
             <SkipBack className="w-7 h-7" />
           </button>
@@ -347,8 +370,7 @@ const FullScreenPlayer = ({ isOpen, onClose: onCloseProp, onToggleFavorite, isFa
             }}
             aria-label={isPlaying ? 'Pause' : 'Play'}
             data-testid="fs-play"
-            aria-label={isPlaying ? 'Pause' : 'Play'}
-            className="w-16 h-16 rounded-full bg-white hover:bg-zinc-100 text-black flex items-center justify-center shadow-lg hover:scale-105 active:scale-95 focus-visible:ring-2 focus-visible:ring-white focus-visible:outline-none transition-all"
+            className="w-16 h-16 flex-shrink-0 rounded-full bg-white hover:bg-zinc-100 text-black flex items-center justify-center shadow-lg hover:scale-105 active:scale-95 focus-visible:ring-2 focus-visible:ring-white focus-visible:outline-none transition-all"
           >
             {isPlaying ? <Pause className="w-7 h-7" /> : <Play className="w-7 h-7 ml-1" />}
           </button>
@@ -359,7 +381,7 @@ const FullScreenPlayer = ({ isOpen, onClose: onCloseProp, onToggleFavorite, isFa
               nextTrack();
             }}
             aria-label="Next track"
-            className="p-2.5 text-zinc-300 hover:text-white active:scale-90 focus-visible:ring-2 focus-visible:ring-brand-500 focus-visible:outline-none transition-all"
+            className="w-12 h-12 inline-flex items-center justify-center text-zinc-300 hover:text-white active:scale-90 focus-visible:ring-2 focus-visible:ring-brand-500 focus-visible:outline-none transition-all"
           >
             <SkipForward className="w-7 h-7" />
           </button>
@@ -367,17 +389,19 @@ const FullScreenPlayer = ({ isOpen, onClose: onCloseProp, onToggleFavorite, isFa
           <button
             onClick={toggleRepeat}
             aria-label={`Repeat: ${repeatMode}`}
-            className={`p-2.5 transition-colors active:scale-90 focus-visible:ring-2 focus-visible:ring-brand-500 focus-visible:outline-none ${
-              repeatMode !== 'off' ? 'text-brand-400' : 'text-zinc-500 hover:text-white'
+            aria-pressed={repeatMode !== 'off'}
+            className={`relative w-11 h-11 inline-flex items-center justify-center transition-colors active:scale-90 focus-visible:ring-2 focus-visible:ring-brand-500 focus-visible:outline-none ${
+              repeatMode !== 'off' ? 'text-brand-400' : 'text-zinc-400 hover:text-white'
             }`}
           >
             {repeatMode === 'one' ? <Repeat1 className="w-5 h-5" /> : <Repeat className="w-5 h-5" />}
+            {repeatMode !== 'off' && <span aria-hidden="true" data-testid="repeat-dot" className="absolute bottom-1 w-1 h-1 rounded-full bg-brand-400" />}
           </button>
         </div>
 
         {/* Quick actions */}
         {(
-          <div className="flex items-center justify-center gap-8 mb-3 text-zinc-300">
+          <div className="flex items-center justify-center gap-5 sm:gap-8 mb-2 text-zinc-300">
             <button
               onClick={() => {
                 haptic(10);
@@ -385,10 +409,10 @@ const FullScreenPlayer = ({ isOpen, onClose: onCloseProp, onToggleFavorite, isFa
               }}
               aria-label="Open comments"
               data-testid="open-comments"
-              className="flex flex-col items-center gap-1 text-[11px] hover:text-white active:scale-90 transition-transform"
+              className="flex flex-col items-center justify-center gap-1 min-w-11 min-h-11 text-[11px] hover:text-white active:scale-90 transition-transform"
             >
               <MessageCircle className="w-6 h-6" />
-              <span className="[@media(max-height:700px)]:hidden">Comments</span>
+              <span className="[@media(max-height:900px)]:hidden">Comments</span>
             </button>
             {onAddToPlaylist && (
               <button
@@ -401,7 +425,27 @@ const FullScreenPlayer = ({ isOpen, onClose: onCloseProp, onToggleFavorite, isFa
                 className="flex flex-col items-center gap-1 text-[11px] hover:text-white active:scale-90 transition-transform"
               >
                 <ListPlus className="w-6 h-6" />
-                <span className="[@media(max-height:700px)]:hidden">Playlist</span>
+                <span className="[@media(max-height:900px)]:hidden">Playlist</span>
+              </button>
+            )}
+            <button
+              onClick={() => { haptic(10); setSleepOpen(true); }}
+              aria-label={sleepTimer ? `Sleep timer: ${sleepLabel(sleepTimer)}` : 'Sleep timer'}
+              data-testid="open-sleep"
+              className={`flex flex-col items-center gap-1 text-[11px] hover:text-white active:scale-90 transition-transform ${sleepTimer ? 'text-brand-300' : ''}`}
+            >
+              <Timer className="w-6 h-6" />
+              <span className="[@media(max-height:900px)]:hidden">{sleepTimer ? sleepLabel(sleepTimer) : 'Sleep'}</span>
+            </button>
+            {currentSong.lyrics && (
+              <button
+                onClick={() => { haptic(10); setLyricsOpen(true); }}
+                aria-label="Lyrics"
+                data-testid="open-lyrics"
+                className="flex flex-col items-center gap-1 text-[11px] hover:text-white active:scale-90 transition-transform"
+              >
+                <FileText className="w-6 h-6" />
+                <span className="[@media(max-height:900px)]:hidden">Lyrics</span>
               </button>
             )}
             {canShare && (
@@ -411,7 +455,7 @@ const FullScreenPlayer = ({ isOpen, onClose: onCloseProp, onToggleFavorite, isFa
                 className="flex flex-col items-center gap-1 text-[11px] hover:text-white active:scale-90 transition-transform"
               >
                 <Share2 className="w-6 h-6" />
-                <span className="[@media(max-height:700px)]:hidden">Share</span>
+                <span className="[@media(max-height:900px)]:hidden">Share</span>
               </button>
             )}
           </div>
@@ -422,11 +466,11 @@ const FullScreenPlayer = ({ isOpen, onClose: onCloseProp, onToggleFavorite, isFa
           <button
             onClick={() => {
               haptic(10);
-              nextTrack();
+              setView('queue');
             }}
-            aria-label={`Up next: ${upNext.title}`}
+            aria-label={`Up next: ${upNext.title}. Open the queue`}
             data-testid="up-next"
-            className="w-full flex items-center gap-3 p-2 mb-3 rounded-lg bg-white/10 hover:bg-white/15 active:scale-[0.98] transition text-left [@media(max-height:700px)]:hidden"
+            className="w-full flex items-center gap-3 p-1.5 mb-2 rounded-lg bg-white/10 hover:bg-white/15 active:scale-[0.98] transition text-left [@media(max-height:700px)]:hidden"
           >
             <img
               src={upNext.image || MUSIC_COVER_FALLBACK}
@@ -442,8 +486,9 @@ const FullScreenPlayer = ({ isOpen, onClose: onCloseProp, onToggleFavorite, isFa
               <span className="block text-[10px] uppercase tracking-wider font-bold text-accent-300">Up next</span>
               <span className="block text-sm font-semibold text-white truncate">{upNext.title}</span>
               <span className="block text-xs text-zinc-400 truncate">{upNext.artist || upNext.singers}</span>
+              {upNext.why && <span data-testid="up-next-why" className="inline-block mt-0.5 px-1.5 py-px rounded-full bg-white/10 text-[10px] font-semibold text-zinc-300">{upNext.why}</span>}
             </span>
-            <SkipForward className="w-5 h-5 text-zinc-400 flex-shrink-0" />
+            <ListMusic className="w-5 h-5 text-zinc-400 flex-shrink-0" aria-hidden="true" />
           </button>
         )}
 
@@ -463,6 +508,25 @@ const FullScreenPlayer = ({ isOpen, onClose: onCloseProp, onToggleFavorite, isFa
   const withComments = (
     <>
       {content}
+      <BottomSheet open={sleepOpen} onClose={() => setSleepOpen(false)} title="Sleep timer" testId="sleep-sheet">
+        <ul role="list" className="py-1">
+          {SLEEP_OPTIONS.map((o) => (
+            <li key={o.id}>
+              <button type="button" onClick={() => { startSleepTimer(o.id); setSleepOpen(false); showToast(`Sleep timer: ${o.label}.`); }}
+                aria-pressed={sleepTimer?.id === o.id}
+                className={`w-full min-h-11 px-3 text-left text-sm rounded-lg hover:bg-white/10 ${sleepTimer?.id === o.id ? 'text-brand-300 font-semibold' : 'text-white'}`}>{o.label}</button>
+            </li>
+          ))}
+          {sleepTimer && (
+            <li><button type="button" onClick={() => { cancelSleepTimer(); setSleepOpen(false); showToast('Sleep timer is off.'); }} className="w-full min-h-11 px-3 text-left text-sm rounded-lg hover:bg-white/10 text-zinc-300">Turn off the timer</button></li>
+          )}
+        </ul>
+      </BottomSheet>
+      {currentSong.lyrics && (
+        <BottomSheet open={lyricsOpen} onClose={() => setLyricsOpen(false)} title="Lyrics" testId="lyrics-sheet">
+          <p dir="auto" className="whitespace-pre-line text-sm text-zinc-200 leading-relaxed py-2">{currentSong.lyrics}</p>
+        </BottomSheet>
+      )}
       <CommentsPanel
         open={commentsOpen}
         onClose={() => setCommentsOpen(false)}

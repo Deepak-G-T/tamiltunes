@@ -24,7 +24,7 @@
     },
     "SystemBars": {
       "insetsHandling": "native",
-      "initialViewportFitHint": "cover",
+      "initialViewportFitValueHint": "cover",
       "style": "DARK"
     },
     "SocialLogin": {

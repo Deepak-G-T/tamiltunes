@@ -24,7 +24,7 @@ const MobileNav = () => {
     }`;
 
   return (
-    <nav className="md:hidden fixed bottom-0 left-0 right-0 h-[var(--nav-h)] pb-[env(safe-area-inset-bottom,0px)] bg-gradient-to-t from-black via-black/95 to-black/80 backdrop-blur-lg z-40 flex items-center justify-around px-2">
+    <nav className="md:hidden fixed bottom-0 left-0 right-0 h-[var(--nav-h)] pb-[var(--safe-bottom)] bg-gradient-to-t from-black via-black/95 to-black/80 backdrop-blur-lg z-40 flex items-center justify-around px-2">
       {ITEMS.map(({ to, end, label, Icon }) => (
         <NavLink key={to} to={to} end={end} className={linkClass} onClick={() => haptic(8)}>
           {({ isActive }) => (
