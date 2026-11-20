@@ -1,29 +1,22 @@
 /**
- * Every window and limit of the NO-REPEAT rules, in one place (docs/NO_REPEAT.md). Change numbers here; the code and the tests read from this file.
- * "Same song" always means the same canonical song: a re-upload, a compilation copy, a spelling variant ("Maelae"/"Melae") or a version of it
- * (unplugged, remix ...) counts as the song itself.
+ * The no-repeat settings, in one place (docs/NO_REPEAT.md). Change numbers here; the code and the tests read from this file.
+ *
+ * THE RULE: the same song must not appear twice inside the queue. That is all that is forbidden.
+ * "Same song" = the same canonical song: a re-upload, a compilation copy or a spelling variant ("Maelae"/"Melae") counts as the song itself;
+ * a version of the CURRENT song (unplugged, remix ...) is skipped too. Nothing about listening history is a hard rule: a song played yesterday may come back.
  */
 export const NO_REPEAT = {
-  // ---- memory: what "already heard" means
-  rollingHistory: 200,               // the last N played songs of the account (play_events), compared by canonical song
-  sessionMemoryMax: 600,             // songs remembered per listening session (played, skipped or queued), saved with the queue
-  // ---- cool-down: a song cannot be auto-added again for ...
-  cooldownDaysAfterFullListen: 7,    // ... days after it was played to the end
-  cooldownDaysAfterEarlySkip: 30,    // ... days after an early skip
-  earlySkipSeconds: 30,              // a skip before this many seconds is an "early skip" (same meaning as the radio's USER_WINDOWS)
-  likedFamiliarAfterHours: 24,       // a liked song may return in "Taste Radio" (the radio started from liked / most-played songs) after this long
+  // ---- the one soft preference
+  recentAvoid: 20,        // prefer songs that are not among the last N played ...
+  softMinPool: 15,        // ... but only while at least this many songs remain without them. A smaller pool drops this preference first.
+  maxRecent: 50,          // most recently-played ids the app may send with a request (the first `recentAvoid` are used)
   // ---- when the pool runs dry
-  minFreshCandidates: 10,            // fewer than this many fresh songs: widen the search instead of reusing old songs
+  minCandidates: 15,      // fewer candidates than this after the hard rules: widen the search instead of stopping
   widenSteps: ['composer', 'era', 'language', 'trending'], // in this order: same music director, same era, same language, trending in the language
-  // ---- Home page
-  homeSkipPlayedHours: 24,           // shelves skip songs played in the last N hours (except "Jump back in" and "Liked songs")
+  // ---- Home page (its own rules: one song once across the shelves; shelves skip what was played in the last day)
+  homeSkipPlayedHours: 24,
   homeShelvesExempt: ['jumpBackIn', 'speedDial', 'liked'],
   // ---- limits
-  maxBlocks: 1000,                   // "Don't recommend this" songs per account
-  maxExclude: 200,                   // song ids the client may send as "already in my queue"
+  maxBlocks: 1000,        // "Don't recommend this" songs per account (the only thing a listener chose to keep out)
+  maxExclude: 200,        // song ids the app may send as "already in my queue"
 };
-
-const DAY = 86400e3;
-const HOUR = 3600e3;
-export const cooldownMs = (kind, cfg = NO_REPEAT) => (kind === 'skip' ? cfg.cooldownDaysAfterEarlySkip * DAY : cfg.cooldownDaysAfterFullListen * DAY);
-export const likedFamiliarMs = (cfg = NO_REPEAT) => cfg.likedFamiliarAfterHours * HOUR;

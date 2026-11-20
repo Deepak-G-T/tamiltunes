@@ -6,7 +6,7 @@ import { diversify } from './diversify.js';
 import { createIdentitySet, sameVariant, titleCore, variantCore, compareVersions, clusterSongs } from './identity.js';
 import { NO_REPEAT } from '../noRepeat/config.js';
 import { createMemory } from '../noRepeat/memory.js';
-import { filterCandidates } from '../noRepeat/filter.js';
+import { filterCandidates, softAvoidRecent } from '../noRepeat/filter.js';
 import { widenCandidates } from '../noRepeat/widen.js';
 
 const SHELF_KEYS = ['trending', 'latest', 'gana', 'nineties', 'twoThousands', 'melodies', 'love', 'sad', 'folk', 'instrumental'];
@@ -117,13 +117,14 @@ export function createRelatedService({ manager, signals, cache = new LruCacheSer
   }
 
   /**
-   * The radio batch for one seed song, under the NO-REPEAT rules (docs/NO_REPEAT.md):
-   * filter first (queue, memory, cool-down, blocks, variants), widen the search when fewer than `minFreshCandidates` remain, then rank and vary.
+   * The radio batch for one seed song (the playing song), under the NO-REPEAT rule (docs/NO_REPEAT.md): the same song never appears twice in the queue.
+   * Hard rules first (not the playing song or its versions, not already queued, not blocked), widen the search when fewer than `minCandidates` remain,
+   * then ONE soft preference (skip the last 20 played while at least 15 songs remain), then rank and vary. Play history is never a hard rule.
    * @param {string} seedId
-   * @param {{ limit?: number, exclude?: string[], userId?: string|null, heard?: {k?:string,id?:string}[], allowRepeats?: boolean, wide?: boolean, context?: 'radio'|'taste'|'liked' }} [opts]
+   * @param {{ limit?: number, exclude?: string[], recent?: string[], userId?: string|null, wide?: boolean }} [opts]  exclude = ids already in the queue; recent = last played ids, newest first
    * @returns {Promise<{ items: object[], meta: object }>}
    */
-  async function getRelated(seedId, { limit = LIMITS.defaultLimit, exclude = [], userId = null, heard = [], allowRepeats = false, wide = false, context = 'radio' } = {}) {
+  async function getRelated(seedId, { limit = LIMITS.defaultLimit, exclude = [], recent = [], userId = null, wide = false } = {}) {
     const n = Math.max(1, Math.min(LIMITS.maxLimit, Number(limit) || LIMITS.defaultLimit));
     const pool = await buildPool(seedId);
     const t = LIMITS.sourceTimeoutMs;
@@ -134,30 +135,32 @@ export function createRelatedService({ manager, signals, cache = new LruCacheSer
       user = await withTimeout(signals.userSignals(userId, now()), t, { liked: new Set(), recent: new Set(), skipped: new Set() });
       cache.set(userCacheKey, user, LIMITS.signalCacheSeconds);
     }
-    const memory = loadMemory ? await withTimeout(loadMemory({ userId, extraHeard: heard, now: now() }), t, null) : null;
-    const mem = memory || createMemory({ sessionKeys: heard.map((h) => h.k).filter(Boolean), sessionIds: heard.map((h) => h.id).filter(Boolean), now: now(), cfg: noRepeat });
+    const memory = (loadMemory ? await withTimeout(loadMemory({ userId }), t, null) : null) || createMemory();
 
-    // a) what is already queued or playing: the seed, and every song the app says is in its queue (looked up so look-alikes are caught too)
+    // what is already queued or playing: the seed, and every song the app says is in its queue (looked up so look-alikes are caught too)
     const excludedIds = new Set([seedId, ...exclude]);
     const known = new Map([[pool.seed.id, pool.seed], ...pool.candidates.map((s) => [s.id, s])]);
-    const unknownIds = [...excludedIds].filter((id) => !known.has(id));
+    const recentIds = [...new Set(recent)].slice(0, noRepeat.recentAvoid);
+    const unknownIds = [...new Set([...excludedIds, ...recentIds])].filter((id) => !known.has(id));
     const extra = unknownIds.length ? await withTimeout(signals.songsByIds(unknownIds), t, []) : [];
-    const queueSongs = [pool.seed, ...pool.candidates.filter((s) => excludedIds.has(s.id)), ...extra];
+    const byIdKnown = new Map([...known, ...extra.map((s) => [s.id, s])]);
+    const queueSongs = [...excludedIds].map((id) => byIdKnown.get(id)).filter(Boolean);
+    const recentSongs = recentIds.map((id) => byIdKnown.get(id)).filter(Boolean);
 
     const byId = new Map(pool.candidates.filter((s) => !excludedIds.has(s.id)).map((s) => [s.id, s]));
-    let candidates = wide ? [] : [...byId.values()];
-    const run = (list, opts = {}) => filterCandidates(list, { queueSongs, memory: mem, allowRepeats: false, context, ...opts });
+    const candidates = wide ? [] : [...byId.values()];
+    const run = (list) => filterCandidates(list, { current: pool.seed, queueSongs, memory });
     let { fresh, dropped } = run(candidates);
 
-    // widen the search step by step instead of reusing old songs
+    // widen the search step by step when too few remain (never by reusing the queue)
     const widened = [];
     const ladder = wide ? ['language', 'trending'] : noRepeat.widenSteps;
-    if (fresh.length < noRepeat.minFreshCandidates) {
+    if (fresh.length < noRepeat.minCandidates) {
       // widened results are cached like the pool, so a second request costs no provider calls
       let feed = cache.get('widen_feed');
       if (!feed) { feed = (await withTimeout(manager.getHomeFeed(), t, null)) || {}; cache.set('widen_feed', feed, LIMITS.poolCacheSeconds); }
       for (const step of ladder) {
-        if (fresh.length >= noRepeat.minFreshCandidates) break;
+        if (fresh.length >= noRepeat.minCandidates) break;
         const ck = `widen_${seedId}_${step}`;
         let more = cache.get(ck);
         if (!more) { more = await widenCandidates(step, { seed: pool.seed, manager, feed, withTimeout, timeoutMs: t }); cache.set(ck, more, LIMITS.poolCacheSeconds); }
@@ -167,29 +170,15 @@ export function createRelatedService({ manager, signals, cache = new LruCacheSer
       }
     }
 
+    // the one soft preference: not the last 20 played, unless that would leave a small pool
+    const soft = softAvoidRecent(fresh, recentSongs, { minPool: noRepeat.softMinPool });
+
     const ctx = { ...pool, liked: user?.liked, recent: user?.recent, skipped: user?.skipped };
-    const ranked = rankCandidates(pool.seed, fresh, ctx).filter((r) => r.score >= 0); // penalised or wrong-language songs never enter a radio batch
+    // wrong-language songs never enter a radio batch; recently played / skipped songs only rank lower (they are never dropped for that)
+    const ranked = rankCandidates(pool.seed, soft.pool, ctx).filter((r) => !(r.reasons.differentLanguage < 0));
     const picked = diversify(ranked, { limit: n, maxRun: VARIETY.maxRun, discoveryRatio: VARIETY.discoveryRatio });
     const canon = clusterSongs([pool.seed, ...candidates]).canonicalOf;
-    let items = picked.map((r) => ({ ...r.song, canonicalId: canon.get(r.song.id) || r.song.id, why: r.discovery ? 'Something different' : whyLabel(r.reasons), radioScore: r.score }));
-
-    // "Allow repeats" (the listener agreed): songs they have not heard come first, then the least recently played ones. Blocked songs never return.
-    let repeats = 0;
-    if (allowRepeats && items.length < n) {
-      const have = createIdentitySet([...queueSongs, ...items]);
-      const loose = filterCandidates(candidates, { queueSongs, memory: mem, allowRepeats: true, context }).fresh.filter((s) => !have.hasVariant(s));
-      const older = mem.leastRecentlyPlayed().filter((s) => s?.id && !excludedIds.has(s.id));
-      const pick = [];
-      const seenRep = createIdentitySet([...queueSongs, ...items]);
-      for (const s of [...loose.sort((a, b) => mem.lastPlayedAt(a) - mem.lastPlayedAt(b)), ...older]) {
-        if (pick.length >= n - items.length) break;
-        if (mem.isBlocked(s) || seenRep.hasVariant(s)) continue;
-        seenRep.add(s);
-        pick.push(s);
-      }
-      repeats = pick.length;
-      items = [...items, ...pick.map((s) => ({ ...s, canonicalId: canon.get(s.id) || s.id, why: 'Played before', repeat: true }))];
-    }
+    const items = picked.map((r) => ({ ...r.song, canonicalId: canon.get(r.song.id) || r.song.id, why: r.discovery ? 'Something different' : whyLabel(r.reasons), radioScore: r.score }));
 
     return {
       items,
@@ -201,11 +190,11 @@ export function createRelatedService({ manager, signals, cache = new LruCacheSer
         candidates: pool.candidates.length,
         sources: pool.sources,
         personalised: Boolean(userId),
-        fresh: fresh.length, // songs that passed every no-repeat rule
+        fresh: fresh.length, // songs that passed the hard rules
+        softApplied: soft.applied, // true when the last-played songs were left out
         widened, // the steps that were needed to find enough ('composer', 'era', 'language', 'trending')
-        exhausted: items.length === 0, // nothing fresh is left anywhere close to this song: the app offers the choices
-        repeats, // how many of the items are repeats (only with allowRepeats)
-        dropped, // why candidates were left out: queue / heard / cooling / blocked / hidden / variantOfQueued
+        exhausted: items.length === 0, // nothing is left that is not already in the queue, even after widening: the app says "Out of new songs"
+        dropped, // why candidates were left out: inQueue / variantOfCurrent / blocked / hidden / duplicateInBatch
       },
     };
   }

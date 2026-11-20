@@ -34,8 +34,8 @@ export const VARIETY = {
 
 export const LIMITS = {
   defaultLimit: 20,
-  maxLimit: 50,
-  candidatePool: 120, // most candidates kept per seed song
+  maxLimit: 60, // the app asks for 50 at a time
+  candidatePool: 200, // most candidates kept per seed song
   poolCacheSeconds: 300, // candidate pool per seed song
   signalCacheSeconds: 60, // per-user like/recent/skip lookups
   sourceTimeoutMs: 6000, // a slow provider call never blocks the whole response

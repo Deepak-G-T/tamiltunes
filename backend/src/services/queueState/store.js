@@ -3,8 +3,8 @@
  *   get(userId) -> row | null
  *   put(userId, state) -> row        replaces the whole row (last write wins)
  *   remove(userId)
- * A row: { items:[{id,o}], currentIndex, positionSec, shuffle, repeat, autoplay, mode, sourceLabel, deviceId, updatedAt, heard:[{k,id}], allowRepeats }
- * `heard` is the session memory of the no-repeat rules (songs played, skipped or queued; k = variantKey), shared by every device of the account.
+ * A row: { items:[{id,o}], currentIndex, positionSec, shuffle, repeat, autoplay, mode, sourceLabel, deviceId, updatedAt }
+ * (The DB columns queue_state.heard / allow_repeats from the first no-repeat version are unused now; they are left in place, nothing reads or writes them.)
  */
 import { usingPostgres, getPrismaClient } from '../../prisma/client.js';
 
@@ -24,7 +24,6 @@ const memoryStore = {
 const toRow = (r) => (r ? {
   items: r.items, currentIndex: r.currentIndex, positionSec: r.positionSec, shuffle: r.shuffle, repeat: r.repeat,
   autoplay: r.autoplay, mode: r.mode, sourceLabel: r.sourceLabel, deviceId: r.deviceId, updatedAt: r.updatedAt,
-  heard: Array.isArray(r.heard) ? r.heard : [], allowRepeats: Boolean(r.allowRepeats),
 } : null);
 
 const createPrismaStore = (prisma) => ({

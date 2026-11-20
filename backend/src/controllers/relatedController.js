@@ -6,16 +6,13 @@ import { getSignalsStore } from '../services/related/signalsStore.js';
 import { LIMITS } from '../services/related/weights.js';
 import { loadMemory } from '../services/noRepeat/memory.js';
 import { getBlocksStore } from '../services/noRepeat/blocksStore.js';
-import { getQueueStore } from '../services/queueState/store.js';
 import { NO_REPEAT } from '../services/noRepeat/config.js';
 
 const querySchema = z.object({
   limit: z.coerce.number().int().min(1).max(LIMITS.maxLimit).default(LIMITS.defaultLimit),
-  exclude: z.string().max(8000).optional(),
-  // no-repeat controls (docs/NO_REPEAT.md): allowRepeats = the listener agreed to repeats; wide = "play something different"; context = where the radio came from
-  allowRepeats: z.enum(['0', '1', 'true', 'false']).optional(),
-  wide: z.enum(['0', '1', 'true', 'false']).optional(),
-  context: z.enum(['radio', 'taste', 'liked']).default('radio'),
+  exclude: z.string().max(8000).optional(), // ids already in the queue (the playing song, what is next)
+  recent: z.string().max(3000).optional(),  // the last songs played, newest first: the one soft preference (docs/NO_REPEAT.md)
+  wide: z.enum(['0', '1', 'true', 'false']).optional(), // search wider (same language, trending) even when enough songs remain
 });
 const flag = (v) => v === '1' || v === 'true';
 
@@ -32,23 +29,24 @@ const signals = {
 const service = createRelatedService({
   manager: musicService,
   signals,
-  // what this listener has already heard (saved session memory, last 200 plays, cool-downs, blocks): read per request from whichever database is live
-  loadMemory: (opts) => loadMemory({ ...opts, signals: getSignalsStore(), queueStore: getQueueStore(), blocksStore: getBlocksStore() }),
+  // the only listener memory: songs they chose "Don't recommend this" for, read per request from whichever database is live
+  loadMemory: (opts) => loadMemory({ ...opts, blocksStore: getBlocksStore() }),
 });
 
 export const getRelatedSongs = async (req, res, next) => {
   try {
     const q = querySchema.safeParse(req.query);
     if (!q.success) return res.status(400).json({ success: false, message: 'Invalid query' });
-    const exclude = (q.data.exclude || '').split(',').map((s) => s.trim()).filter((s) => s && s.length <= 100).slice(0, NO_REPEAT.maxExclude);
+    const ids = (text, max) => (text || '').split(',').map((s) => s.trim()).filter((s) => s && s.length <= 100).slice(0, max);
+    const exclude = ids(q.data.exclude, NO_REPEAT.maxExclude);
+    const recent = ids(q.data.recent, NO_REPEAT.maxRecent);
 
     const { items, meta } = await service.getRelated(req.params.id, {
-      limit: q.data.limit, exclude, userId: req.user?.id ?? null,
-      allowRepeats: flag(q.data.allowRepeats), wide: flag(q.data.wide), context: q.data.context,
+      limit: q.data.limit, exclude, recent, userId: req.user?.id ?? null, wide: flag(q.data.wide),
     });
     // videoId from the curated map / cache only (no network), like search and home
     const withVideo = videoLookup.attach(items.map(({ why, radioScore, ...song }) => song));
-    const merged = withVideo.map((song, i) => ({ ...song, why: items[i].why, ...(items[i].repeat ? { repeat: true } : {}) }));
+    const merged = withVideo.map((song, i) => ({ ...song, why: items[i].why }));
     res.json({ success: true, items: merged, meta });
   } catch (err) {
     if (err.statusCode === 404) return res.status(404).json({ success: false, message: 'Song not found' });
