@@ -216,6 +216,8 @@ const NativeMediaControls = () => {
       if (!act) return;
       if (act.type === 'play') a.resume();
       else if (act.type === 'pause') a.pause();
+      else if (act.type === 'duck') a.duck?.(0.3);
+      else if (act.type === 'unduck') a.unduck?.();
       else if (act.type === 'next') a.nextTrack();
       else if (act.type === 'previous') a.previousTrack();
       else if (act.type === 'seek') a.seek(act.position);

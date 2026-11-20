@@ -27,6 +27,8 @@ export function actionForEvent(event) {
     case 'music-controls-play': return { type: 'play' };
     case 'music-controls-pause':
     case 'music-controls-headset-unplugged': return { type: 'pause' }; // pull the headphones out: stop the music
+    case 'music-controls-duck': return { type: 'duck' };
+    case 'music-controls-unduck': return { type: 'unduck' };
     case 'music-controls-next': return { type: 'next' };
     case 'music-controls-previous': return { type: 'previous' };
     case 'music-controls-seek-to': return Number.isFinite(Number(event.position)) ? { type: 'seek', position: Math.max(0, Number(event.position)) } : null;

@@ -1038,6 +1038,16 @@ export const AudioProvider = ({ children }) => {
     }
   };
 
+  const duck = useCallback((ratio = 0.3) => {
+    if (audioRef.current && !isMuted) audioRef.current.volume = Math.max(0, Math.min(1, volumeRef.current * ratio));
+    if (ytPlayerRef.current && !isMuted) ytPlayerRef.current.setVolume(Math.max(0, Math.min(1, volumeRef.current * ratio)));
+  }, [isMuted]);
+
+  const unduck = useCallback(() => {
+    if (audioRef.current && !isMuted) audioRef.current.volume = volumeRef.current;
+    if (ytPlayerRef.current && !isMuted) ytPlayerRef.current.setVolume(volumeRef.current);
+  }, [isMuted]);
+
   // ---- queue controls (all state changes go through the engine) ----
 
   /** Play a song. With a list of 2+ songs it follows that list (playlist / album / shelf); otherwise it starts a radio. */
@@ -1508,7 +1518,9 @@ export const AudioProvider = ({ children }) => {
         registerVideoSlot,
         unavailableVersion,
         isUserPaused: () => userPausedRef.current,
-        isTransitioning: () => isTransitioningRef.current
+        isTransitioning: () => isTransitioningRef.current,
+        duck,
+        unduck
       }}
     >
       {/* YouTube IFrame Engine (visible floating player, min 200x200) */}
