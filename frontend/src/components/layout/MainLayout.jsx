@@ -1,3 +1,4 @@
+import ErrorBoundary from '../common/ErrorBoundary';
 import React, { useState, useEffect } from 'react';
 import { Outlet, useLocation } from 'react-router-dom';
 import { RefreshCw } from 'lucide-react';
@@ -83,10 +84,12 @@ const MainLayout = () => {
         {/* Dynamic page content container */}
         <main className="relative flex-1 overflow-y-auto px-4 md:px-6 py-4 pb-36 md:pb-6">
           <div key={location.pathname} className="page-in">
-            <Outlet context={{
-              onOpenAddToPlaylist: (song) => setAddToPlaylistSong(song),
-              onOpenCreatePlaylist: () => setCreatePlaylistOpen(true)
-            }} />
+            <ErrorBoundary scope="page">
+              <Outlet context={{
+                onOpenAddToPlaylist: (song) => setAddToPlaylistSong(song),
+                onOpenCreatePlaylist: () => setCreatePlaylistOpen(true)
+              }} />
+            </ErrorBoundary>
           </div>
         </main>
 
