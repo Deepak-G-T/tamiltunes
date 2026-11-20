@@ -49,9 +49,9 @@ describe('a song whose stream stops early must still advance', () => {
 });
 
 describe('errors', () => {
-  it('an error near the end advances', () => {
-    expect(errorAction({ currentTime: 313, duration: 328, midSongErrors: 0 })).toBe('finish');
-    expect(errorAction({ currentTime: 313, duration: 328, midSongErrors: 1 })).toBe('finish');
+  it('an error near the end retries once from the same second, then finishes (advances smoothly)', () => {
+    expect(errorAction({ currentTime: 303, duration: 328, midSongErrors: 0 })).toBe('retry');
+    expect(errorAction({ currentTime: 303, duration: 328, midSongErrors: 1 })).toBe('finish');
   });
   it('an error in the middle retries once from the same second, then skips', () => {
     expect(errorAction({ currentTime: 100, duration: 328, midSongErrors: 0 })).toBe('retry');

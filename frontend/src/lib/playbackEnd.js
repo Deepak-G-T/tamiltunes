@@ -51,6 +51,7 @@ export const stallShouldFinish = ({ stalledForMs, currentTime, duration }) => st
  */
 export function errorAction({ currentTime, duration, midSongErrors = 0 } = {}) {
   if (!(currentTime > MIN_PLAYED_SECONDS)) return 'candidates';
+  if (midSongErrors < 1) return 'retry';
   if (isNearEnd({ currentTime, duration })) return 'finish';
-  return midSongErrors < 1 ? 'retry' : 'skip';
+  return 'skip';
 }
