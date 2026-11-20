@@ -1,6 +1,13 @@
+import { reportError } from '../monitoring.js';
+
 export const errorHandler = (err, req, res, next) => {
   const isProduction = process.env.NODE_ENV === 'production';
   const statusCode = err.statusCode || err.status || (err.name === 'ZodError' ? 400 : 500);
+
+  if (statusCode >= 500) {
+    // route PATTERN (/songs/:id/related), never the real URL: it can hold ids and search words
+    reportError(err, { method: req.method, route: `${req.baseUrl || ''}${req.route?.path || ''}` || 'unknown', status: String(statusCode) });
+  }
 
   if (!isProduction) {
     if (statusCode >= 500) {

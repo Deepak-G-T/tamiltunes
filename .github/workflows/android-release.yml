@@ -60,6 +60,7 @@ jobs:
       - name: Build the web app and copy it into the Android project
         env:
           VITE_GOOGLE_CLIENT_ID: ${{ vars.VITE_GOOGLE_CLIENT_ID }}   # public Web client id (GitHub variable), see docs/GOOGLE_SIGNIN.md
+          VITE_SENTRY_DSN: ${{ vars.VITE_SENTRY_DSN }}   # optional: error reports from the app (docs/MONITORING.md); empty = off
         run: npm run build:android
 
       - uses: gradle/actions/setup-gradle@v4

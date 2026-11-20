@@ -1,3 +1,4 @@
+import { initMonitoring } from './monitoring.js';
 import { songVideoRoutes, adminVideoRoutes } from './routes/songVideoRoutes.js';
 import express from 'express';
 import cors from 'cors';
@@ -29,6 +30,7 @@ import adminRoutes from './routes/adminRoutes.js';
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
+initMonitoring(); // error reporting: on only when SENTRY_DSN is set
 const app = express();
 
 // Behind Render/Vercel proxies: needed so rate limiting sees the real client IP

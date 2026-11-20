@@ -178,3 +178,9 @@ Songs may carry an optional `videoId`. It comes from the curated map `backend/sr
 - Use `var(--safe-top|bottom|left|right)` (defined once in `frontend/src/index.css`, env() first); never raw `env(safe-area-*)`, never add a native inset value on top (double gap on old WebViews). Anything `position: fixed` must add them itself (`#root` pads normal pages). `--sim-safe-*` is for audits only.
 - `npm run test:player --prefix frontend` (104 checks: 28px status bar, 24px gesture bar, 360x640 / 390x844 / 412x915, font 130%). Notes and the phone checklist: `docs/ANDROID_APP.md` (last section).
 - Songs carry no artist/album ids: tapped names in Now Playing open the search. "Up next" opens the queue. UNTESTED on a real phone (Vivo): status bar overlap fix, gesture bar spacing, swipes, Back button, video mode layout.
+
+## Error monitoring (feature/error-monitoring)
+- Sentry, off until a DSN is set: Render `SENTRY_DSN` (API), Vercel + GitHub variable `VITE_SENTRY_DSN` (website and the app's WebView). Setup, privacy rules and limits: `docs/MONITORING.md`.
+- Privacy: only stack traces, route patterns, platform. Never user, email, headers, cookies, bodies, query strings. Do not add `setUser`, request data or Replay without the owner's say-so. Tests guard the scrubbing.
+- `ErrorBoundary` wraps every page and the app: a render crash shows "Something went wrong" instead of a black screen.
+- UNTESTED: a real event arriving in Sentry (needs the owner's DSNs), native Java/Kotlin crashes (not covered).

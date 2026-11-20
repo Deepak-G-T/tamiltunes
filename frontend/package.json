@@ -41,6 +41,7 @@
     "@dnd-kit/modifiers": "^9.0.0",
     "@dnd-kit/sortable": "^10.0.0",
     "@dnd-kit/utilities": "^3.2.2",
+    "@sentry/react": "^11.16.0",
     "@tailwindcss/vite": "^4.3.5",
     "axios": "^1.21.1",
     "capacitor-music-controls-plugin": "^8.0.0",
