@@ -10,8 +10,9 @@ export const adminApi = {
   blockUser: (id) => api.post(`/admin/users/${id}/block`).then((r) => r.data),
   unblockUser: (id) => api.post(`/admin/users/${id}/unblock`).then((r) => r.data),
   forceLogoutUser: (id) => api.post(`/admin/users/${id}/force-logout`).then((r) => r.data),
-  generateResetLink: (id) => api.post(`/admin/users/${id}/reset-link`).then((r) => r.data),
-  changeUserRole: (id, { role, password }) => api.post(`/admin/users/${id}/role`, { role, password }).then((r) => r.data),
+  changeUserRole: (id, { role, confirm }) => api.post(`/admin/users/${id}/role`, { role, confirm }).then((r) => r.data),
+  // removes the account and everything of theirs; the typed email must match
+  deleteUser: (id, confirmEmail) => api.delete(`/admin/users/${id}`, { data: { confirmEmail } }).then((r) => r.data),
 
   // Songs
   getSongs: (params) => api.get('/admin/songs', { params }).then((r) => r.data),
@@ -19,7 +20,7 @@ export const adminApi = {
   toggleHideSong: (id) => api.post(`/admin/songs/${id}/hide`).then((r) => r.data),
   deleteSong: (id) => api.delete(`/admin/songs/${id}`).then((r) => r.data),
   getDuplicates: () => api.get('/admin/songs/duplicates').then((r) => r.data),
-  mergeSongs: ({ sourceSongId, targetSongId, password }) => api.post('/admin/songs/merge', { sourceSongId, targetSongId, password }).then((r) => r.data),
+  mergeSongs: ({ sourceSongId, targetSongId, confirm }) => api.post('/admin/songs/merge', { sourceSongId, targetSongId, confirm }).then((r) => r.data),
 
   // Home Content
   getHomeContent: () => api.get('/admin/home-content').then((r) => r.data),
@@ -39,11 +40,6 @@ export const adminApi = {
 
   // Audit Logs
   getAuditLogs: (params) => api.get('/admin/audit-logs', { params }).then((r) => r.data),
-
-  // 2FA
-  setup2FA: () => api.post('/admin/2fa/setup').then((r) => r.data),
-  verify2FA: ({ token, recoveryCodes }) => api.post('/admin/2fa/verify', { token, recoveryCodes }).then((r) => r.data),
-  disable2FA: ({ password }) => api.post('/admin/2fa/disable', { password }).then((r) => r.data),
 };
 
 export default adminApi;

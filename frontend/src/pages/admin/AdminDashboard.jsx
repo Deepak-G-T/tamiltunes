@@ -123,9 +123,9 @@ const AdminDashboard = () => {
           color="text-emerald-400"
         />
         <StatCard
-          title="Active Users"
-          value={data?.activeUsers?.toLocaleString() || '0'}
-          subtext="Healthy account status"
+          title="Online now"
+          value={(data?.onlineNow ?? 0).toLocaleString()}
+          subtext={`${data?.activeUsers?.toLocaleString() || 0} accounts in good standing`}
           icon={Activity}
           color="text-blue-400"
         />

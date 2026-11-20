@@ -7,6 +7,7 @@ import { useAuth } from '../../context/AuthContext';
 import { useAudio } from '../../context/AudioContext';
 import { isNativeApp } from '../../lib/platform';
 import VideoSettings from '../player/VideoSettings';
+import { sameText } from '../../lib/lastSeen';
 
 const Toggle = ({ label, hint, checked, onChange, disabled }) => {
   const id = useId();
@@ -29,7 +30,7 @@ const Toggle = ({ label, hint, checked, onChange, disabled }) => {
  * @param {{ profile: object, open: boolean, onClose: () => void, onChange: (patch: object) => void }} props
  */
 const SettingsSheet = ({ profile, open, onClose, onChange }) => {
-  const { logout } = useAuth();
+  const { logout, user } = useAuth();
   const { autoplay, setAutoplay } = useAudio();
   const navigate = useNavigate();
   const [error, setError] = useState('');
@@ -66,11 +67,11 @@ const SettingsSheet = ({ profile, open, onClose, onChange }) => {
 
   const destroy = async (e) => {
     e.preventDefault();
-    if (!confirmed || !password) return;
+    if (!confirmed || !sameText(password, user?.email)) return;
     setBusy(true);
     setError('');
     try {
-      await profileApi.deleteAccount(password);
+      await profileApi.deleteAccount(password.trim());
       onClose();
       logout();
       navigate('/');
@@ -121,8 +122,8 @@ const SettingsSheet = ({ profile, open, onClose, onChange }) => {
             <p className="text-sm text-white font-semibold">Delete your account?</p>
             <p className="text-xs text-zinc-300 leading-relaxed">This permanently removes your profile, playlists, liked songs, history, comments and follows. It cannot be undone.</p>
             <div>
-              <label htmlFor={pid} className="block text-xs font-semibold text-zinc-300 mb-1">Confirm with your password</label>
-              <input id={pid} type="password" autoComplete="current-password" value={password} onChange={(e) => setPassword(e.target.value)}
+              <label htmlFor={pid} className="block text-xs font-semibold text-zinc-300 mb-1">Type your email address to confirm</label>
+              <input id={pid} type="email" autoComplete="off" autoCapitalize="off" autoCorrect="off" spellCheck={false} placeholder={user?.email || ''} value={password} onChange={(e) => setPassword(e.target.value)}
                 className="w-full rounded-xl bg-surface-3 border border-white/10 focus:border-rose-400 focus:outline-none px-3 py-2 text-[15px] text-white" />
             </div>
             <label className="flex items-start gap-2 text-xs text-zinc-300">
@@ -131,7 +132,7 @@ const SettingsSheet = ({ profile, open, onClose, onChange }) => {
             </label>
             <div className="flex gap-2">
               <button type="button" onClick={() => { setDeleting(false); setPassword(''); setConfirmed(false); }} className="press flex-1 py-2 rounded-full bg-white/10 text-white text-sm font-semibold">Cancel</button>
-              <button type="submit" disabled={!confirmed || !password || busy} className="press flex-1 py-2 rounded-full bg-rose-500 text-white text-sm font-bold disabled:opacity-40 inline-flex items-center justify-center gap-2">
+              <button type="submit" disabled={!confirmed || !sameText(password, user?.email) || busy} className="press flex-1 py-2 rounded-full bg-rose-500 text-white text-sm font-bold disabled:opacity-40 inline-flex items-center justify-center gap-2">
                 {busy && <Loader2 className="w-4 h-4 animate-spin" />} Delete forever
               </button>
             </div>

@@ -35,7 +35,7 @@ const AdminSongs = () => {
   const [mergeModalGroup, setMergeModalGroup] = useState(null);
   const [sourceId, setSourceId] = useState('');
   const [targetId, setTargetId] = useState('');
-  const [adminPassword, setAdminPassword] = useState('');
+  const [confirmText, setConfirmText] = useState('');
   const [mergeError, setMergeError] = useState('');
   const [actionLoading, setActionLoading] = useState(false);
 
@@ -143,8 +143,8 @@ const AdminSongs = () => {
       setMergeError('Please select two distinct songs to merge');
       return;
     }
-    if (!adminPassword) {
-      setMergeError('Enter your admin password to confirm');
+    if (confirmText !== 'CONFIRM') {
+      setMergeError('Type CONFIRM (capitals) to continue');
       return;
     }
     try {
@@ -153,11 +153,11 @@ const AdminSongs = () => {
       await adminApi.mergeSongs({
         sourceSongId: sourceId,
         targetSongId: targetId,
-        password: adminPassword
+        confirm: 'CONFIRM'
       });
       showToast('Songs successfully merged');
       setMergeModalGroup(null);
-      setAdminPassword('');
+      setConfirmText('');
       fetchDuplicates();
     } catch (err) {
       setMergeError(err.response?.data?.message || 'Failed to merge songs');
@@ -441,7 +441,7 @@ const AdminSongs = () => {
                         setMergeModalGroup(group);
                         setSourceId(group.songs[1]?.id || '');
                         setTargetId(group.songs[0]?.id || '');
-                        setAdminPassword('');
+                        setConfirmText('');
                         setMergeError('');
                       }}
                       className="px-3.5 py-1.5 rounded-xl bg-brand-500 hover:bg-brand-400 text-black text-xs font-bold flex items-center gap-1.5"
@@ -612,13 +612,13 @@ const AdminSongs = () => {
 
               <div>
                 <label className="text-xs font-semibold text-zinc-400 mb-1 block">
-                  Re-enter Admin Password to Confirm
+                  Type CONFIRM to continue
                 </label>
                 <input
-                  type="password"
-                  value={adminPassword}
-                  onChange={(e) => setAdminPassword(e.target.value)}
-                  placeholder="Your admin password"
+                  type="text"
+                  value={confirmText}
+                  onChange={(e) => setConfirmText(e.target.value)}
+                  placeholder="CONFIRM"
                   className="w-full px-3.5 py-2.5 rounded-xl bg-zinc-900 border border-zinc-800 text-white text-xs focus:outline-none focus:border-brand-500"
                 />
                 {mergeError && (

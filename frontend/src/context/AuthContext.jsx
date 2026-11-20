@@ -3,6 +3,7 @@ import api from '../services/api';
 import { migrateGuestPlays } from '../lib/guestPlays';
 import { speedDialApi } from '../lib/speedDialApi';
 import { getToken, setToken as saveToken, clearToken } from '../lib/tokenStore';
+import { nativeGoogleSignOut } from '../lib/googleAuth';
 
 const AuthContext = createContext();
 
@@ -39,7 +40,7 @@ export const AuthProvider = ({ children }) => {
     fetchMe();
   }, []);
 
-  // Both sign in and sign up start the same kind of session
+  // Signing in starts a session
   const startSession = (data) => {
     saveToken(data.token); // website: localStorage, Android app: private storage (lib/tokenStore.js)
     localStorage.setItem('tamiltunes_user', JSON.stringify(data.user));
@@ -53,57 +54,22 @@ export const AuthProvider = ({ children }) => {
     code: err.response?.data?.code
   });
 
-  const login = async (email, password) => {
+  // Google is the only way to sign in: the browser button or the Android app gives an ID token, the server checks it and answers with our session
+  const loginWithGoogle = async (idToken) => {
     try {
-      const { data } = await api.post('/auth/login', { email, password });
+      const { data } = await api.post('/auth/google', { idToken });
       if (data.success && data.token) {
         startSession(data);
         return { success: true, user: data.user };
       }
-      return { success: false, error: data.message || 'Login failed' };
+      return { success: false, error: data.message || 'Google sign-in failed' };
     } catch (err) {
-      return failure(err, 'Invalid credentials');
-    }
-  };
-
-  const signup = async (name, email, password) => {
-    try {
-      const { data } = await api.post('/auth/register', { name, email, password });
-      if (data.success && data.token) {
-        startSession(data);
-        return { success: true, user: data.user };
-      }
-      return { success: false, error: data.message || 'Signup failed' };
-    } catch (err) {
-      return failure(err, 'Registration failed');
-    }
-  };
-
-  // The server answers the same for every email, so success only means "the request was sent"
-  const requestPasswordReset = async (email) => {
-    try {
-      await api.post('/auth/forgot-password', { email });
-      return { success: true };
-    } catch (err) {
-      return failure(err, 'Something went wrong. Please try again.');
-    }
-  };
-
-  // A good link sets the new password and signs the person in
-  const resetPassword = async (resetToken, password) => {
-    try {
-      const { data } = await api.post('/auth/reset-password', { token: resetToken, password });
-      if (data.success && data.token) {
-        startSession(data);
-        return { success: true, user: data.user };
-      }
-      return { success: false, error: data.message || 'Could not reset the password' };
-    } catch (err) {
-      return failure(err, 'Could not reset the password');
+      return failure(err, 'Google sign-in failed');
     }
   };
 
   const logout = () => {
+    nativeGoogleSignOut(); // the Android app forgets the Google account so the next sign-in asks which one
     clearToken();
     localStorage.removeItem('tamiltunes_user');
     setToken(null);
@@ -117,10 +83,7 @@ export const AuthProvider = ({ children }) => {
         token,
         isAuthenticated: !!user,
         isLoading,
-        login,
-        signup,
-        requestPasswordReset,
-        resetPassword,
+        loginWithGoogle,
         logout,
         setUser
       }}

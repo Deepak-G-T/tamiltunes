@@ -58,6 +58,8 @@ jobs:
       - run: npm ci
       - run: npm test
       - name: Build the web app and copy it into the Android project
+        env:
+          VITE_GOOGLE_CLIENT_ID: ${{ vars.VITE_GOOGLE_CLIENT_ID }}   # public Web client id (GitHub variable), see docs/GOOGLE_SIGNIN.md
         run: npm run build:android
 
       - uses: gradle/actions/setup-gradle@v4

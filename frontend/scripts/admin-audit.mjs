@@ -58,6 +58,7 @@ async function setupMockApi(page, role = 'admin') {
           signups7d: 84,
           signups30d: 310,
           activeUsers: 1290,
+          onlineNow: 7,
           totalPlays: 48920,
           totalSongs: 3200,
           totalPlaylists: 450,
@@ -83,9 +84,9 @@ async function setupMockApi(page, role = 'admin') {
         status: 200,
         json: {
           users: [
-            { id: '1', name: 'TamilTunes Admin', email: 'admin@tamiltunes.live', role: 'admin', isActive: true, createdAt: new Date().toISOString() },
-            { id: '2', name: 'Regular User', email: 'listener@example.com', role: 'user', isActive: true, createdAt: new Date().toISOString() },
-            { id: '3', name: 'Blocked Account', email: 'spammer@example.com', role: 'user', isActive: false, createdAt: new Date().toISOString() }
+            { id: 'mock_uid_1', name: 'TamilTunes Admin', email: 'admin@tamiltunes.live', role: 'admin', isActive: true, signsInWithGoogle: true, online: true, lastSeenAt: new Date().toISOString(), lastLoginAt: new Date().toISOString(), createdAt: new Date().toISOString() },
+            { id: '2', name: 'Regular User', email: 'listener@example.com', role: 'user', isActive: true, signsInWithGoogle: true, online: true, lastSeenAt: new Date().toISOString(), lastLoginAt: new Date(Date.now() - 3600000).toISOString(), createdAt: new Date().toISOString() },
+            { id: '3', name: 'Blocked Account', email: 'spammer@example.com', role: 'user', isActive: false, signsInWithGoogle: false, online: false, lastSeenAt: new Date(Date.now() - 2 * 86400000).toISOString(), lastLoginAt: null, createdAt: new Date().toISOString() }
           ],
           total: 3,
           page: 1,
@@ -138,7 +139,7 @@ async function setupMockApi(page, role = 'admin') {
 async function run() {
   console.log('Starting preview server...');
   const server = await startServer();
-  const browser = await chromium.launch({ headless: true });
+  const browser = await chromium.launch({ headless: true, ...(process.env.CHROMIUM_PATH ? { executablePath: process.env.CHROMIUM_PATH } : {}) });
 
   try {
     // 1. Logged-out visit to /admin redirects to /login?redirect=%2Fadmin
@@ -178,6 +179,7 @@ async function run() {
       await page.goto(`${BASE}/admin`);
       await page.waitForSelector('text=System Dashboard');
       await page.waitForSelector('text=Total Users');
+      await page.waitForSelector('text=Online now');
       console.log('PASS  admin desktop 1280px sees System Dashboard & KPIs');
       await page.screenshot({ path: path.join(outDir, 'admin-dashboard-1280.png') });
 
@@ -187,6 +189,41 @@ async function run() {
       await page.locator('table').getByText('listener@example.com').waitFor();
       console.log('PASS  admin desktop 1280px sees Users Management table');
       await page.screenshot({ path: path.join(outDir, 'admin-users-1280.png') });
+
+      // who is online, terminate / block / remove, no password prompts
+      const ok = (cond, name) => { if (!cond) throw new Error(`FAIL  ${name}`); console.log(`PASS  ${name}`); };
+      const seenRequests = [];
+      page.on('request', (r) => { if (r.url().includes('/api/admin/users') && r.method() !== 'GET') seenRequests.push({ method: r.method(), url: r.url(), body: r.postData() }); });
+      ok((await page.locator('table [data-testid=online-dot]').count()) === 2 && (await page.locator('table [data-testid=offline-dot]').count()) === 1, 'admin desktop: the list shows who is online now (green dot) and who is not');
+      ok(/Online now/.test(await page.locator('table [data-testid=user-last-seen]').first().innerText()) && /2 days ago/.test(await page.locator('table [data-testid=user-last-seen]').nth(2).innerText()), 'admin desktop: each person shows online now / last seen');
+      const onlineReq = page.waitForRequest((r) => r.url().includes('/api/admin/users') && r.url().includes('online=1'));
+      await page.getByTestId('online-only').check();
+      await onlineReq;
+      ok(true, 'admin desktop: the "Online now" filter asks the server for online people only');
+      await page.getByTestId('online-only').uncheck();
+      ok((await page.getByText('Reset Link').count()) === 0 && (await page.locator('aside a[href="/admin/security"]').count()) === 0, 'admin desktop: no password-reset link and no 2FA page (Google only)');
+      ok((await page.locator('table tr', { hasText: 'TamilTunes Admin' }).getByTestId('user-remove').count()) === 0 && (await page.locator('table tr', { hasText: 'TamilTunes Admin' }).getByText('This is you').count()) === 1, 'admin desktop: an admin cannot remove or block themselves');
+      const row = page.locator('table tr', { hasText: 'listener@example.com' });
+      await row.getByTestId('user-terminate').click();
+      await page.waitForSelector('text=signed out everywhere');
+      ok(seenRequests.some((r) => r.method === 'POST' && r.url.endsWith('/api/admin/users/2/force-logout')), 'admin desktop: Terminate session signs the person out everywhere');
+      await row.getByTestId('user-role').click();
+      ok((await page.locator('[data-testid=role-modal] input[type=password]').count()) === 0, 'admin desktop: changing a role asks to type CONFIRM, not for a password');
+      await page.getByTestId('confirm-input').fill('confirm');
+      await page.locator('[data-testid=role-modal] button[type=submit]').click();
+      ok(/CONFIRM/.test(await page.locator('[data-testid=role-modal] [role=alert]').innerText()) && !seenRequests.some((r) => r.url.endsWith('/role')), 'admin desktop: a wrong confirmation sends nothing');
+      await page.getByTestId('confirm-input').fill('CONFIRM');
+      await page.locator('[data-testid=role-modal] button[type=submit]').click();
+      await page.waitForSelector('[data-testid=role-modal]', { state: 'detached' });
+      ok(seenRequests.some((r) => r.url.endsWith('/users/2/role') && JSON.parse(r.body).confirm === 'CONFIRM' && !r.body.includes('password')), 'admin desktop: the role change sends the CONFIRM word, never a password');
+      await row.getByTestId('user-remove').click();
+      await page.getByTestId('remove-input').fill('someone.else@example.com');
+      await page.getByTestId('remove-confirm').click();
+      ok(/exactly/.test(await page.locator('[data-testid=remove-modal] [role=alert]').innerText()) && !seenRequests.some((r) => r.method === 'DELETE'), 'admin desktop: Remove account needs the exact email, a wrong one sends nothing');
+      await page.getByTestId('remove-input').fill('Listener@Example.com');
+      await page.getByTestId('remove-confirm').click();
+      await page.waitForSelector('[data-testid=remove-modal]', { state: 'detached' });
+      ok(seenRequests.some((r) => r.method === 'DELETE' && r.url.endsWith('/api/admin/users/2') && JSON.parse(r.body).confirmEmail === 'Listener@Example.com'), 'admin desktop: the typed email removes the account');
 
       // Navigate to Songs
       await page.locator('aside a[href="/admin/songs"]').click();

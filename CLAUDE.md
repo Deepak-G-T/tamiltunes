@@ -114,7 +114,9 @@ Songs may carry an optional `videoId`. It comes from the curated map `backend/sr
 - Queue feel: Undo messages for every queue change, row motion (`hooks/useFlip.js`), `useQueue` context (panel is not redrawn on the song clock),
   autoplay variety and "Added N similar songs" (notes in `docs/QUEUE_V2.md`). UNTESTED: real-phone haptics, swipe reveal and drag feel.
 
-## Auth (fix/auth-login)
+## Auth (fix/auth-login), now Google-only (feature/google-signin)
+- **Google is the only way to sign in** (docs/GOOGLE_SIGNIN.md): `POST /api/auth/google` checks the Google ID token itself (`services/auth/googleToken.js`, audience = `GOOGLE_CLIENT_IDS`), links an old account by verified email, returns our own session token. Email + password routes answer 404 in production (`PASSWORD_AUTH`). Admin = the Google email(s) in the Render setting `ADMIN_EMAILS` (never in the repo; a database role alone is not enough). `users.last_seen_at` powers "online now" in the admin panel; admin can terminate (force logout), block and remove accounts (typed email). Migration `20261127000000_google_signin` (additive; Neon backup BEFORE merging). Env: Render `GOOGLE_CLIENT_IDS`, `ADMIN_EMAILS`; Vercel + GitHub variable `VITE_GOOGLE_CLIENT_ID`. Android native sign-in needs the release key (CI debug builds use it too when the secrets exist). UNTESTED: real Google button / account chooser / Google Cloud set-up.
+- The notes below about passwords, reset emails and Brevo describe the old sign-in; they only matter in development.
 - Emails are trimmed + lower-cased everywhere (`backend/src/services/auth/credentials.js` is the only place that hashes or checks passwords). Password reset by email
   (Brevo or Resend over HTTPS; env `EMAIL_PROVIDER`, `RESET_EMAIL_FROM`, `BREVO_API_KEY` / `RESEND_API_KEY`, `FRONTEND_URL`). Notes and the owner scripts
   (`reset-password`, `verify-password`, `report:email-collisions`): `docs/AUTH.md`. Migrations `20261123000000_password_reset`, `20261123000100_email_lower_unique`
