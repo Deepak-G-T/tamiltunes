@@ -42,6 +42,9 @@ downloads `app-release.apk` from the same release, checks its SHA-256, and opens
 5. (Optional, to build a release APK on your own computer) create `frontend/android/keystore.properties` (git-ignored) with `storeFile=C:/path/tamiltunes-release.jks`, `storePassword=...`, `keyAlias=tamiltunes`, `keyPassword=...`.
 
 ## Releasing a version
+
+The Install page's Download APK button points to releases/latest/download/app-release.apk, so it works once the first non-pre-release exists.
+
 1. Make sure `master` has what you want to ship and its checks are green.
 2. Tag and push the tag (the tag decides the version; it must be `vX.Y.Z`, minor and patch up to 99):
    ```

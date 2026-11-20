@@ -120,7 +120,7 @@ async function run(browser) {
   await page.goto(`${BASE}/install`);
   await page.waitForSelector('[data-testid=install-page]');
   const apk = await page.locator('[data-testid=apk-link]').getAttribute('href');
-  check('the Install page links the Android APK', /TamilTunes\.apk$/.test(apk || ''), apk);
+  check('the Install page links the Android APK', /app-release\.apk$/.test(apk || ''), apk);
   check('the Install page explains installing from the browser for Android, iPhone and a computer', JSON.stringify(await page.locator('h3').allTextContents()) === JSON.stringify(['Android (Chrome)', 'iPhone and iPad (Safari)', 'Computer (Chrome or Edge)']));
   check('the download button is at least 44px high', (await page.locator('[data-testid=apk-link]').boundingBox()).height >= 44);
   await page.evaluate(() => window.dispatchEvent(Object.assign(new Event('beforeinstallprompt'), { prompt() { window.__prompted = true; }, userChoice: Promise.resolve({ outcome: 'accepted' }) })));
