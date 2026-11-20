@@ -2,28 +2,39 @@ import React, { useEffect, useState } from 'react';
 import { Download, RefreshCw, X } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import { applyUpdate, getInstallEvent, isNativeApp, isStandalone, promptInstall, rememberDismissed, wasDismissed } from '../../lib/pwa';
+import { useAudio } from '../../context/AudioContext';
 
 /**
  * A slim bar above the page: "A new version is ready" (Reload) takes priority; otherwise an install prompt for browsers that offer one
  * (`beforeinstallprompt`). Dismissing the install prompt is remembered for 30 days. Not shown in the installed app or the native app.
+ * Safe update rule: update prompt is shown only when music isn't actively playing, so listening is never interrupted.
  */
 const PwaBar = () => {
-  const [update, setUpdate] = useState(false);
+  const audio = useAudio();
+  const isPlaying = Boolean(audio?.isPlaying);
+  const [hasPendingUpdate, setHasPendingUpdate] = useState(false);
   const [canInstall, setCanInstall] = useState(() => Boolean(getInstallEvent())); // the offer may have arrived before this bar mounted
   const [hidden, setHidden] = useState(() => isNativeApp() || isStandalone() || wasDismissed(window.localStorage));
 
   useEffect(() => {
-    const onUpdate = () => setUpdate(true);
+    const onUpdate = () => setHasPendingUpdate(true);
     const onAvailable = () => setCanInstall(true);
     const onInstalled = () => { setCanInstall(false); setHidden(true); };
     window.addEventListener('tamiltunes:pwa-update', onUpdate);
     window.addEventListener('tamiltunes:install-available', onAvailable);
     window.addEventListener('tamiltunes:installed', onInstalled);
-    return () => { window.removeEventListener('tamiltunes:pwa-update', onUpdate); window.removeEventListener('tamiltunes:install-available', onAvailable); window.removeEventListener('tamiltunes:installed', onInstalled); };
+    return () => {
+      window.removeEventListener('tamiltunes:pwa-update', onUpdate);
+      window.removeEventListener('tamiltunes:install-available', onAvailable);
+      window.removeEventListener('tamiltunes:installed', onInstalled);
+    };
   }, []);
 
+  // Show update prompt only when not playing music
+  const showUpdatePrompt = hasPendingUpdate && !isPlaying;
+
   const bar = 'flex-shrink-0 relative z-30 flex items-center gap-3 px-4 py-2 text-sm border-b';
-  if (update) {
+  if (showUpdatePrompt) {
     return (
       <div role="status" data-testid="pwa-update" className={`${bar} bg-brand-950 border-brand-700/50 text-brand-100`}>
         <RefreshCw className="w-4 h-4 text-brand-400 flex-shrink-0" aria-hidden="true" />

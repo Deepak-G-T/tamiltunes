@@ -14,11 +14,13 @@ import { registerRoute, setCatchHandler } from 'workbox-routing';
 import { NetworkFirst, StaleWhileRevalidate } from 'workbox-strategies';
 import { ExpirationPlugin } from 'workbox-expiration';
 import { CacheableResponsePlugin } from 'workbox-cacheable-response';
+import { clientsClaim } from 'workbox-core';
 import { PUBLIC_API, isStreamRequest } from './lib/swRules';
 
 const sw = self;
 precacheAndRoute(self.__WB_MANIFEST); // the literal `self.__WB_MANIFEST` is what the build replaces
 cleanupOutdatedCaches();
+clientsClaim();
 
 // Audio / video streams, sign-in and every personal or write endpoint have NO route here on purpose: the worker never touches them, so the
 // browser handles them natively (Range requests keep working) and nothing can ever be stored. Only the routes below are intercepted.

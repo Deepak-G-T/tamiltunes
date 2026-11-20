@@ -3,6 +3,7 @@ import { Link, useNavigate, useSearchParams } from 'react-router-dom';
 import { Loader2 } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import { AuthShell, FormError } from '../components/auth/AuthParts';
+import PwaBar from '../components/common/PwaBar';
 import { isNativeApp } from '../lib/platform';
 import { googleConfigured, renderGoogleButton, nativeGoogleIdToken, describeGoogleError } from '../lib/googleAuth';
 
@@ -61,8 +62,10 @@ const Login = () => {
   };
 
   return (
-    <AuthShell
-      title="Sign in to TamilTunes"
+    <>
+      <PwaBar />
+      <AuthShell
+        title="Sign in to TamilTunes"
       subtitle="Your playlists, history and favourite Tamil music, with your Google account"
       footer={<>By continuing you agree to how TamilTunes uses your data: see the <Link to="/privacy" className="underline text-brand-300 hover:text-white">Privacy page</Link>.</>}
     >
@@ -83,6 +86,7 @@ const Login = () => {
       )}
       <p className="mt-5 text-center text-[11px] text-zinc-500">The first time you sign in, your TamilTunes account is created. If you already had one with this email, it is linked and nothing is lost.</p>
     </AuthShell>
+    </>
   );
 };
 
