@@ -1,6 +1,7 @@
 import { shareLink } from '../../lib/share';
+import { Link } from 'react-router-dom';
 import React, { Suspense, lazy, useState, useCallback, useMemo, useRef } from 'react';
-import { Settings, Pencil, Share2, MapPin, CalendarDays, Lock, Heart, ListMusic, History, MessageCircle } from 'lucide-react';
+import { Settings, Pencil, Share2, MapPin, CalendarDays, Lock, Heart, ListMusic, History, MessageCircle, Sparkles } from 'lucide-react';
 import Avatar from '../common/Avatar';
 import { RowSkeleton, SkeletonList } from '../common/Skeleton';
 import { EmptyState } from '../common/StateViews';
@@ -8,6 +9,7 @@ import FollowButton from './FollowButton';
 import PeopleSheet from './PeopleSheet';
 import EditProfileSheet from './EditProfileSheet';
 import SettingsSheet from './SettingsSheet';
+import { wrappedWindow } from '../../lib/wrapped';
 import AppUpdateCard from '../native/AppUpdateCard';
 import { compactCount } from '../../lib/format';
 import { usePageMeta } from '../../hooks/usePageMeta';
@@ -125,6 +127,12 @@ const ProfileView = ({ profile, isSelf, onProfileChange }) => {
         </div>
 
         {isSelf && <AppUpdateCard />}
+        {isSelf && wrappedWindow().open && (
+          <Link to={`/wrapped?year=${wrappedWindow().year}`} data-testid="profile-wrapped" className="press mt-4 flex items-center gap-3 rounded-xl bg-gradient-to-r from-emerald-700 to-emerald-900 px-4 py-3 min-h-11">
+            <Sparkles className="w-5 h-5 text-emerald-200" aria-hidden="true" />
+            <span className="text-sm font-bold text-white">Your {wrappedWindow().year} Wrapped</span>
+          </Link>
+        )}
 
         <div className={`mt-4 grid ${isPrivate ? 'grid-cols-2' : 'grid-cols-5'} gap-1 rounded-xl bg-black/30 px-1`}>
           {!isPrivate && <Stat label="Liked" value={stats.favorites ?? 0} />}
