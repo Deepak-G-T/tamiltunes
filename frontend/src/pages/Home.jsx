@@ -6,6 +6,7 @@ import AlbumCard from '../components/cards/AlbumCard';
 import ArtistCard from '../components/cards/ArtistCard';
 import RadioMixCard from '../components/cards/RadioMixCard';
 import SpeedDial from '../components/home/SpeedDial';
+import WrappedBanner from '../components/home/WrappedBanner';
 import Shelf from '../components/common/Shelf';
 import FeaturedHero from '../components/cards/FeaturedHero';
 import { useAuth } from '../context/AuthContext';
@@ -212,6 +213,7 @@ const Home = () => {
           </span>
         </div>
       )}
+      <WrappedBanner />
       {/* Greeting + category pills */}
       <div className="space-y-4">
         <div>

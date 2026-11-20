@@ -8,6 +8,7 @@ import {
 } from '../controllers/speedDialController.js';
 
 import { getQueue, getQueueMeta, putQueue, deleteQueue, queueSchema } from '../controllers/queueController.js';
+import { getWrapped } from '../controllers/wrappedController.js';
 import { listBlocks, addBlock, removeBlock, blockSchema } from '../controllers/blocksController.js';
 
 const router = Router();
@@ -22,6 +23,9 @@ router.delete('/queue', queueWriteLimiter, deleteQueue);
 router.get('/blocks', listBlocks);
 router.post('/blocks', queueWriteLimiter, validateBody(blockSchema), addBlock);
 router.delete('/blocks/:songId', queueWriteLimiter, removeBlock);
+
+// TamilTunes Wrapped: this person's year in listening (read only, private to them)
+router.get('/wrapped', getWrapped);
 
 router.post('/play-events', playEventLimiter, validateBody(playEventSchema), postPlayEvent);
 

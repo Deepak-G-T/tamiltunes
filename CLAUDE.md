@@ -184,3 +184,9 @@ Songs may carry an optional `videoId`. It comes from the curated map `backend/sr
 - Privacy: only stack traces, route patterns, platform. Never user, email, headers, cookies, bodies, query strings. Do not add `setUser`, request data or Replay without the owner's say-so. Tests guard the scrubbing.
 - `ErrorBoundary` wraps every page and the app: a render crash shows "Something went wrong" instead of a black screen.
 - UNTESTED: a real event arriving in Sentry (needs the owner's DSNs), native Java/Kotlin crashes (not covered).
+
+## Wrapped (feature/wrapped)
+- Year in listening, private: `GET /api/me/wrapped` (no migration), page `/wrapped`, banner + Profile link from 1 Dec to 31 Jan. Rules (counted plays, versions merged, local time zone), share picture and tests: `docs/WRAPPED.md`. `npm run test:wrapped --prefix frontend`.
+- Full-screen pages that use `position: fixed` MUST render through `createPortal(..., document.body)`: the page wrapper animates with a transform, which makes fixed children content-sized (this collapsed Wrapped to zero height).
+- Do not add download links or object URLs for the share picture (`noMediaStorage.test.js`): preview = data URL, share = Web Share with a file made at tap time.
+- UNTESTED: real year of data, system share sheet, real phone.
