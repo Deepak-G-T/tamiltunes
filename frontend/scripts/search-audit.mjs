@@ -40,7 +40,7 @@ const startServer = () => new Promise((resolve, reject) => {
 
 let searchCalls = [];
 async function open(browser, { legacy } = {}) {
-  const ctx = await browser.newContext({ viewport: { width: 1280, height: 800 } });
+  const ctx = await browser.newContext({ viewport: { width: 1280, height: 800 }, serviceWorkers: 'block' } /* the service worker answers /api/music/search itself, which skips page.route: block it so the mock is used */);
   const page = await ctx.newPage();
   await page.addInitScript(() => {
     localStorage.setItem('tamiltunes_token', 'audit_token');
