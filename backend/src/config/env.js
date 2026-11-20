@@ -47,6 +47,23 @@ export const parseVideoConfig = (env = process.env) => ({
   videoSearchFallback: (env.VIDEO_SEARCH_FALLBACK || 'true').toLowerCase() !== 'false'
 });
 
+/** Google sign-in client ids (public values, comma separated: the Web client and the Android client) and the admin emails. */
+const parseList = (v) => String(v || '').split(',').map((x) => x.trim()).filter(Boolean);
+export const parseAuthConfig = (env = process.env) => {
+  const prod = (env.NODE_ENV || 'development') === 'production';
+  const adminEmails = new Set(parseList(env.ADMIN_EMAILS).map((e) => e.toLowerCase()));
+  return {
+    googleClientIds: parseList(env.GOOGLE_CLIENT_IDS),
+    adminEmails,
+    // In production an admin must be on the ADMIN_EMAILS list (an empty list means nobody is admin). Elsewhere (development, tests) the list is
+    // only enforced when it is set.
+    adminEmailsEnforced: prod || adminEmails.size > 0,
+    // Email + password sign-in is off in production (Google only). Development and the test suite keep it unless PASSWORD_AUTH says otherwise.
+    passwordAuth: env.PASSWORD_AUTH !== undefined && env.PASSWORD_AUTH !== '' ? env.PASSWORD_AUTH.toLowerCase() === 'true' : !prod
+  };
+};
+export const isAdminEmail = (email, c = config) => c.adminEmails.has(String(email || '').trim().toLowerCase());
+
 export const config = {
   port: process.env.PORT || 5000,
   nodeEnv: process.env.NODE_ENV || 'development',
@@ -61,5 +78,6 @@ export const config = {
   enableExternalStreams: process.env.ENABLE_EXTERNAL_STREAMS === 'true',
   requireLogin: (process.env.REQUIRE_LOGIN || 'true').toLowerCase() !== 'false',
   trustProxy: parseTrustProxy(),
-  ...parseVideoConfig()
+  ...parseVideoConfig(),
+  ...parseAuthConfig()
 };

@@ -132,15 +132,9 @@ const TopNav = ({ onToggleMobileSidebar }) => {
           <div className="flex items-center gap-2">
             <button
               onClick={() => navigate('/login')}
-              className="px-4 py-2 text-sm font-bold text-zinc-300 hover:text-white hover:scale-105 transition-all"
-            >
-              Log In
-            </button>
-            <button
-              onClick={() => navigate('/signup')}
               className="px-6 py-2 text-sm font-bold text-black bg-white hover:bg-zinc-100 rounded-full transition-all hover:scale-105"
             >
-              Sign Up
+              Sign in with Google
             </button>
           </div>
         )}

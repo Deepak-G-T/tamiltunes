@@ -1,8 +1,9 @@
 import crypto from 'crypto';
 import { db } from '../prisma/client.js';
-import { config } from '../config/env.js';
+import { config, isAdminEmail } from '../config/env.js';
 import { verifyPassword } from '../services/auth/credentials.js';
 import { recordAuditLog } from '../middleware/requireAdmin.js';
+import { getStore } from '../community/store/index.js';
 import {
   generateTotpSecret,
   verifyTotpToken,
@@ -12,6 +13,10 @@ import {
 } from '../services/auth/totp.js';
 
 // Safe user presentation (never leak passwords, hashes, recovery codes, or secrets)
+/** "Online now": any request in the last 5 minutes. */
+export const ONLINE_WINDOW_MS = 5 * 60 * 1000;
+export const isOnline = (lastSeenAt, now = Date.now()) => Boolean(lastSeenAt) && now - new Date(lastSeenAt).getTime() <= ONLINE_WINDOW_MS;
+
 export const presentAdminUser = (u) => ({
   id: u.id,
   email: u.email,
@@ -21,9 +26,20 @@ export const presentAdminUser = (u) => ({
   isActive: u.isActive !== false,
   failedLoginAttempts: u.failedLoginAttempts || 0,
   twoFactorEnabled: Boolean(u.twoFactorEnabled),
+  signsInWithGoogle: Boolean(u.googleSub),
+  lastSeenAt: u.lastSeenAt || null,
+  lastLoginAt: u.lastLoginAt || null,
+  online: isOnline(u.lastSeenAt),
   createdAt: u.createdAt,
   updatedAt: u.updatedAt
 });
+
+// Critical admin actions ask for a second confirmation. A Google-only admin has no password, so they type CONFIRM (the admin is already signed in
+// with Google and on the ADMIN_EMAILS list). An account that still has a password (development, tests) confirms with it as before.
+async function assertAdminConfirmation(admin, body) {
+  if (admin.password && config.passwordAuth) return assertAdminPassword(admin, body?.password);
+  if (body?.confirm !== 'CONFIRM') throw new Error('Type CONFIRM to continue');
+}
 
 // Helper to verify admin's password before critical operations
 async function assertAdminPassword(admin, password) {
@@ -50,6 +66,9 @@ export const getDashboardStats = async (req, res, next) => {
       db.song.count().catch(() => 0),
       db.playlist.count().catch(() => 0)
     ]);
+
+    // Online now: any request in the last 5 minutes
+    const onlineNow = await db.user.count({ where: { lastSeenAt: { gte: new Date(now.getTime() - ONLINE_WINDOW_MS) } } }).catch(() => 0);
 
     // Active users: users with isActive: true
     const activeUsers = await db.user.count({ where: { isActive: true } }).catch(() => totalUsers);
@@ -85,6 +104,7 @@ export const getDashboardStats = async (req, res, next) => {
       signups7d,
       signups30d,
       activeUsers,
+      onlineNow,
       totalSongs,
       totalPlaylists,
       totalPlays,
@@ -110,6 +130,8 @@ export const listUsers = async (req, res, next) => {
     if (roleFilter) where.role = roleFilter;
     if (statusFilter === 'active') where.isActive = true;
     if (statusFilter === 'blocked') where.isActive = false;
+    const onlineOnly = req.query.online === '1' || req.query.online === 'true';
+    if (onlineOnly) where.lastSeenAt = { gte: new Date(Date.now() - ONLINE_WINDOW_MS) };
 
     if (search) {
       where.OR = [
@@ -123,7 +145,7 @@ export const listUsers = async (req, res, next) => {
         where,
         take: limit,
         skip,
-        orderBy: { createdAt: 'desc' }
+        orderBy: onlineOnly ? { lastSeenAt: 'desc' } : { createdAt: 'desc' }
       }),
       db.user.count({ where })
     ]);
@@ -208,6 +230,34 @@ export const blockUser = async (req, res, next) => {
     });
 
     res.json({ message: `User ${target.email} has been blocked`, ok: true });
+  } catch (err) {
+    next(err);
+  }
+};
+
+// REMOVE ACCOUNT: deletes the person and everything of theirs (playlists, likes, history, comments ...). Typed email confirmation; never yourself or an admin.
+export const deleteUser = async (req, res, next) => {
+  try {
+    const { id } = req.params;
+    if (id === req.user.id) return res.status(400).json({ message: 'You cannot remove your own admin account' });
+    const target = await db.user.findUnique({ where: { id } });
+    if (!target) return res.status(404).json({ message: 'User not found' });
+    if (target.role === 'admin') return res.status(400).json({ message: 'An admin account cannot be removed here (remove the admin role on the server first)' });
+    if (String(req.body?.confirmEmail || '').trim().toLowerCase() !== String(target.email).toLowerCase()) {
+      return res.status(400).json({ message: "Type the person's email address to confirm" });
+    }
+
+    await recordAuditLog({
+      actorId: req.user.id,
+      actorEmail: req.user.email,
+      action: 'USER_DELETE',
+      targetType: 'User',
+      targetId: id,
+      details: { targetEmail: target.email, targetName: target.name },
+      ip: req.ip
+    });
+    await getStore().deleteUser(id); // foreign keys cascade
+    res.json({ message: `Account ${target.email} has been removed`, ok: true });
   } catch (err) {
     next(err);
   }
@@ -318,7 +368,7 @@ export const generateResetLink = async (req, res, next) => {
 export const changeUserRole = async (req, res, next) => {
   try {
     const { id } = req.params;
-    const { role, password } = req.body || {};
+    const { role } = req.body || {};
 
     if (!['user', 'admin'].includes(role)) {
       return res.status(400).json({ message: 'Invalid role. Must be user or admin' });
@@ -329,13 +379,16 @@ export const changeUserRole = async (req, res, next) => {
     }
 
     try {
-      await assertAdminPassword(req.user, password);
+      await assertAdminConfirmation(req.user, req.body);
     } catch (err) {
       return res.status(401).json({ message: err.message });
     }
 
     const target = await db.user.findUnique({ where: { id } });
     if (!target) return res.status(404).json({ message: 'User not found' });
+    if (role === 'admin' && config.adminEmailsEnforced && !isAdminEmail(target.email)) {
+      return res.status(400).json({ message: 'Add this email to ADMIN_EMAILS on the server first: admins are chosen there, not in the app' });
+    }
 
     const oldRole = target.role || 'user';
     await db.user.update({
@@ -540,10 +593,10 @@ export const findDuplicateSongs = async (req, res, next) => {
   }
 };
 
-// 14. MERGE SONGS (Requires password confirmation)
+// 14. MERGE SONGS (asks for a second confirmation)
 export const mergeDuplicateSongs = async (req, res, next) => {
   try {
-    const { sourceSongId, targetSongId, password } = req.body || {};
+    const { sourceSongId, targetSongId } = req.body || {};
     if (!sourceSongId || !targetSongId) {
       return res.status(400).json({ message: 'sourceSongId and targetSongId are required' });
     }
@@ -887,9 +940,8 @@ export const verify2FA = async (req, res, next) => {
 
 export const disable2FA = async (req, res, next) => {
   try {
-    const { password } = req.body || {};
     try {
-      await assertAdminPassword(req.user, password);
+      await assertAdminConfirmation(req.user, req.body);
     } catch (err) {
       return res.status(401).json({ message: err.message });
     }

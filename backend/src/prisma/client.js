@@ -42,6 +42,7 @@ class InMemoryDb {
         if (where.id && u.id === where.id) return { ...u };
         if (where.email && u.email === where.email.toLowerCase()) return { ...u };
         if (where.username && u.username === where.username) return { ...u };
+        if (where.googleSub && u.googleSub === where.googleSub) return { ...u };
       }
       return null;
     },
@@ -50,6 +51,7 @@ class InMemoryDb {
       if (where) {
         if (where.role) list = list.filter((u) => u.role === where.role);
         if (where.isActive !== undefined) list = list.filter((u) => Boolean(u.isActive) === Boolean(where.isActive));
+        if (where.lastSeenAt?.gte) list = list.filter((u) => u.lastSeenAt && new Date(u.lastSeenAt) >= new Date(where.lastSeenAt.gte));
         if (where.OR && Array.isArray(where.OR)) {
           list = list.filter((u) => where.OR.some((cond) => {
             if (cond.email?.contains) return (u.email || '').toLowerCase().includes(cond.email.contains.toLowerCase());
@@ -68,6 +70,7 @@ class InMemoryDb {
         if (where.role) list = list.filter((u) => u.role === where.role);
         if (where.isActive !== undefined) list = list.filter((u) => Boolean(u.isActive) === Boolean(where.isActive));
         if (where.createdAt?.gte) list = list.filter((u) => new Date(u.createdAt) >= new Date(where.createdAt.gte));
+        if (where.lastSeenAt?.gte) list = list.filter((u) => u.lastSeenAt && new Date(u.lastSeenAt) >= new Date(where.lastSeenAt.gte));
       }
       return list.length;
     },

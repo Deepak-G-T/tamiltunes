@@ -48,12 +48,28 @@ jobs:
           }
       - run: npm test
       - name: Build the web app and copy it into the Android project
+        env:
+          VITE_GOOGLE_CLIENT_ID: ${{ vars.VITE_GOOGLE_CLIENT_ID }}   # public Web client id (GitHub variable), see docs/GOOGLE_SIGNIN.md
         run: npm run build:android
 
       - uses: gradle/actions/setup-gradle@v4
 
+      # Optional: sign with the release key when the four secrets exist (see docs/APP_UPDATES.md and docs/GOOGLE_SIGNIN.md). Without them the throw-away debug key is used.
+      - name: Decode the release key (only if the secret exists; never printed)
+        env:
+          KEYSTORE_BASE64: ${{ secrets.KEYSTORE_BASE64 }}
+        run: |
+          if [ -n "$KEYSTORE_BASE64" ]; then
+            echo "$KEYSTORE_BASE64" | base64 -d > "$RUNNER_TEMP/tamiltunes-release.jks"
+            echo "TAMILTUNES_KEYSTORE_PATH=$RUNNER_TEMP/tamiltunes-release.jks" >> "$GITHUB_ENV"
+          fi
+
       - name: Build the debug APK
         working-directory: frontend/android
+        env:
+          TAMILTUNES_KEYSTORE_PASSWORD: ${{ secrets.KEYSTORE_PASSWORD }}
+          TAMILTUNES_KEY_ALIAS: ${{ secrets.KEY_ALIAS }}
+          TAMILTUNES_KEY_PASSWORD: ${{ secrets.KEY_PASSWORD }}
         run: ./gradlew assembleDebug -PtamiltunesVersionCode=${{ github.run_number }} -PtamiltunesVersionName=1.0.${{ github.run_number }}
 
       - uses: actions/upload-artifact@v4

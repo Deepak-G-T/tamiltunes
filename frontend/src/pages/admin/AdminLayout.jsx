@@ -8,7 +8,6 @@ import {
   MessageSquare,
   ListMusic,
   Settings,
-  ShieldCheck,
   ArrowLeft,
   Music2,
   ExternalLink
@@ -23,7 +22,6 @@ const NAV_ITEMS = [
   { to: '/admin/moderation', label: 'Moderation', icon: MessageSquare },
   { to: '/admin/playlists', label: 'Playlists', icon: ListMusic },
   { to: '/admin/settings', label: 'Settings', icon: Settings },
-  { to: '/admin/security', label: '2FA Security', icon: ShieldCheck },
 ];
 
 const AdminLayout = () => {

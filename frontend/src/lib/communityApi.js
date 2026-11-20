@@ -55,7 +55,8 @@ export const profileApi = {
   me: () => run(api.get('/profile/me'), 'Could not load your profile.'),
   update: (patch) => run(api.patch('/profile/me', patch), 'Could not save your changes.'),
   usernameAvailable: (u) => run(api.get('/profile/username-available', { params: { u } })),
-  deleteAccount: (password) => run(api.delete('/profile/me', { data: { password } }), 'Could not delete your account.'),
+  // Google accounts have no password: the person types their own email address
+  deleteAccount: (confirmEmail) => run(api.delete('/profile/me', { data: { confirmEmail } }), 'Could not delete your account.'),
 };
 
 export const usersApi = {

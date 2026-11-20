@@ -1,5 +1,6 @@
 import { db } from '../prisma/client.js';
 import { requireAuth } from './auth.js';
+import { config, isAdminEmail } from '../config/env.js';
 
 /**
  * Re-check admin role and active status directly from DB.
@@ -26,6 +27,11 @@ export const requireAdmin = [
       }
 
       if (freshUser.role !== 'admin') {
+        return res.status(403).json({ message: 'Admin privileges required' });
+      }
+
+      // Google-only: the admin is the Google account(s) listed in ADMIN_EMAILS (a Render setting, not in the repository). A database role alone is not enough.
+      if (config.adminEmailsEnforced && !isAdminEmail(freshUser.email)) {
         return res.status(403).json({ message: 'Admin privileges required' });
       }
 

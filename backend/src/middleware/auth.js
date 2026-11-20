@@ -2,6 +2,13 @@ import jwt from 'jsonwebtoken';
 import { config } from '../config/env.js';
 import { db } from '../prisma/client.js';
 
+const PRESENCE_EVERY_MS = 60 * 1000;
+/** "Online now" in the admin panel: remember the last request, at most once a minute per person (a failed write never breaks the request). */
+export const touchLastSeen = (user, now = Date.now()) => {
+  if (user.lastSeenAt && now - new Date(user.lastSeenAt).getTime() < PRESENCE_EVERY_MS) return;
+  Promise.resolve(db.user.update({ where: { id: user.id }, data: { lastSeenAt: new Date(now) } })).catch(() => {});
+};
+
 /** A token issued before the last password change is no longer accepted (a reset signs everyone else out). */
 export const tokenPredatesPasswordChange = (decoded, user) =>
   Boolean(user.passwordChangedAt) && Number(decoded.iat) < Math.floor(new Date(user.passwordChangedAt).getTime() / 1000);
@@ -46,6 +53,7 @@ export const requireAuth = async (req, res, next) => {
       role: user.role || 'user',
       isActive: user.isActive !== false
     };
+    touchLastSeen(user);
 
     next();
   } catch (err) {

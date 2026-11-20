@@ -1,23 +1,21 @@
-import React, { useState, useEffect } from 'react';
-import {
-  Users,
-  Search,
-  Download,
-  Shield,
-  ShieldAlert,
-  Lock,
-  Unlock,
-  KeyRound,
-  LogOut,
-  Check,
-  Copy,
-  AlertTriangle,
-  X,
-  ChevronLeft,
-  ChevronRight
-} from 'lucide-react';
+import React, { useState, useEffect, useCallback } from 'react';
+import { Users, Search, Download, Shield, ShieldAlert, Lock, Unlock, LogOut, Check, Trash2, X, ChevronLeft, ChevronRight, AlertTriangle } from 'lucide-react';
 import { adminApi } from '../../services/adminApi';
 import { useAuth } from '../../context/AuthContext';
+import { formatLastSeen, sameText } from '../../lib/lastSeen';
+
+const Dot = ({ online }) => (
+  <span role="img" aria-label={online ? 'Online now' : 'Offline'} data-testid={online ? 'online-dot' : 'offline-dot'}
+    className={`inline-block w-2.5 h-2.5 rounded-full ${online ? 'bg-emerald-400 shadow-[0_0_6px_rgba(52,211,153,0.8)]' : 'bg-zinc-600'}`} />
+);
+const Badge = ({ children, tone = 'zinc' }) => {
+  const tones = { zinc: 'bg-zinc-800 text-zinc-300', green: 'bg-emerald-500/15 text-emerald-400', rose: 'bg-rose-500/15 text-rose-400', brand: 'bg-brand-500/15 text-brand-300' };
+  return <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold ${tones[tone]}`}>{children}</span>;
+};
+const Btn = ({ onClick, disabled, tone = 'zinc', children, testId }) => {
+  const tones = { zinc: 'bg-zinc-800 hover:bg-zinc-700 text-zinc-200', rose: 'bg-rose-500/15 text-rose-400 hover:bg-rose-500/25', green: 'bg-emerald-500/15 text-emerald-400 hover:bg-emerald-500/25' };
+  return <button type="button" onClick={onClick} disabled={disabled} data-testid={testId} className={`px-2.5 py-1 rounded-lg text-[11px] font-semibold inline-flex items-center gap-1 transition-colors disabled:opacity-50 ${tones[tone]}`}>{children}</button>;
+};
 
 const AdminUsers = () => {
   const { user: currentAdmin } = useAuth();
@@ -28,30 +26,21 @@ const AdminUsers = () => {
   const [search, setSearch] = useState('');
   const [roleFilter, setRoleFilter] = useState('all');
   const [statusFilter, setStatusFilter] = useState('all');
+  const [onlineOnly, setOnlineOnly] = useState(false);
   const [loading, setLoading] = useState(true);
-  const [actionLoading, setActionLoading] = useState(false);
-  const [toastMessage, setToastMessage] = useState('');
+  const [busy, setBusy] = useState(false);
+  const [toast, setToast] = useState('');
+  const [roleModal, setRoleModal] = useState(null);     // { user, role }
+  const [removeModal, setRemoveModal] = useState(null); // user
+  const [typed, setTyped] = useState('');
+  const [modalError, setModalError] = useState('');
 
-  // Password confirmation modal for role change
-  const [roleModalUser, setRoleModalUser] = useState(null);
-  const [targetRole, setTargetRole] = useState('admin');
-  const [adminPassword, setAdminPassword] = useState('');
-  const [roleModalError, setRoleModalError] = useState('');
+  const showToast = (msg) => { setToast(msg); setTimeout(() => setToast(''), 3500); };
 
-  // Reset link modal
-  const [resetModalUrl, setResetModalUrl] = useState('');
-  const [copiedLink, setCopiedLink] = useState(false);
-
-  const fetchUsers = async () => {
+  const fetchUsers = useCallback(async () => {
     try {
       setLoading(true);
-      const res = await adminApi.getUsers({
-        page,
-        limit: 15,
-        search: search.trim() || undefined,
-        role: roleFilter,
-        status: statusFilter
-      });
+      const res = await adminApi.getUsers({ page, limit: 15, search: search.trim() || undefined, role: roleFilter, status: statusFilter, online: onlineOnly ? 1 : undefined });
       setUsers(res.users || []);
       setTotal(res.total || 0);
       setTotalPages(res.totalPages || 1);
@@ -60,188 +49,108 @@ const AdminUsers = () => {
     } finally {
       setLoading(false);
     }
+  }, [page, search, roleFilter, statusFilter, onlineOnly]);
+
+  useEffect(() => { fetchUsers(); }, [page, roleFilter, statusFilter, onlineOnly]); // eslint-disable-line react-hooks/exhaustive-deps
+  // "Online now" changes by itself: refresh the list every 30 seconds while the page is open
+  useEffect(() => { const t = setInterval(fetchUsers, 30000); return () => clearInterval(t); }, [fetchUsers]);
+
+  const act = async (fn, okMsg) => {
+    try { setBusy(true); await fn(); showToast(okMsg); fetchUsers(); } catch (err) { showToast(err.response?.data?.message || 'Action failed'); } finally { setBusy(false); }
   };
+  const toggleBlock = (u) => act(() => (u.isActive ? adminApi.blockUser(u.id) : adminApi.unblockUser(u.id)), u.isActive ? `${u.email} blocked` : `${u.email} unblocked`);
+  const terminate = (u) => act(() => adminApi.forceLogoutUser(u.id), `${u.email} signed out everywhere`);
 
-  useEffect(() => {
-    fetchUsers();
-  }, [page, roleFilter, statusFilter]);
-
-  const handleSearchSubmit = (e) => {
+  const openModal = (setter, value) => { setTyped(''); setModalError(''); setter(value); };
+  const submitRole = async (e) => {
     e.preventDefault();
-    setPage(1);
-    fetchUsers();
+    if (typed !== 'CONFIRM') { setModalError('Type CONFIRM (capitals) to continue'); return; }
+    try { setBusy(true); await adminApi.changeUserRole(roleModal.user.id, { role: roleModal.role, confirm: 'CONFIRM' }); showToast(`Role changed to ${roleModal.role}`); setRoleModal(null); fetchUsers(); }
+    catch (err) { setModalError(err.response?.data?.message || 'Failed to change role'); } finally { setBusy(false); }
   };
-
-  const showToast = (msg) => {
-    setToastMessage(msg);
-    setTimeout(() => setToastMessage(''), 3500);
-  };
-
-  // Block / Unblock
-  const handleToggleBlock = async (u) => {
-    try {
-      setActionLoading(true);
-      if (u.isActive) {
-        await adminApi.blockUser(u.id);
-        showToast(`User ${u.email} blocked`);
-      } else {
-        await adminApi.unblockUser(u.id);
-        showToast(`User ${u.email} unblocked`);
-      }
-      fetchUsers();
-    } catch (err) {
-      showToast(err.response?.data?.message || 'Action failed');
-    } finally {
-      setActionLoading(false);
-    }
-  };
-
-  // Force Logout
-  const handleForceLogout = async (u) => {
-    try {
-      setActionLoading(true);
-      await adminApi.forceLogoutUser(u.id);
-      showToast(`Logged out ${u.email}`);
-    } catch (err) {
-      showToast(err.response?.data?.message || 'Action failed');
-    } finally {
-      setActionLoading(false);
-    }
-  };
-
-  // Generate Reset Link
-  const handleGenerateReset = async (u) => {
-    try {
-      setActionLoading(true);
-      const res = await adminApi.generateResetLink(u.id);
-      setResetModalUrl(res.resetUrl);
-      setCopiedLink(false);
-    } catch (err) {
-      showToast(err.response?.data?.message || 'Failed to generate reset link');
-    } finally {
-      setActionLoading(false);
-    }
-  };
-
-  // Submit Role Change
-  const submitRoleChange = async (e) => {
+  const submitRemove = async (e) => {
     e.preventDefault();
-    if (!adminPassword) {
-      setRoleModalError('Enter your password to confirm');
-      return;
-    }
-    try {
-      setActionLoading(true);
-      setRoleModalError('');
-      await adminApi.changeUserRole(roleModalUser.id, {
-        role: targetRole,
-        password: adminPassword
-      });
-      showToast(`User role changed to ${targetRole}`);
-      setRoleModalUser(null);
-      setAdminPassword('');
-      fetchUsers();
-    } catch (err) {
-      setRoleModalError(err.response?.data?.message || 'Failed to change role');
-    } finally {
-      setActionLoading(false);
-    }
+    if (!sameText(typed, removeModal.email)) { setModalError("Type the person's email address exactly to continue"); return; }
+    try { setBusy(true); await adminApi.deleteUser(removeModal.id, typed.trim()); showToast(`${removeModal.email} removed`); setRemoveModal(null); fetchUsers(); }
+    catch (err) { setModalError(err.response?.data?.message || 'Failed to remove the account'); } finally { setBusy(false); }
   };
 
-  // Export CSV
-  const handleExportCsv = async () => {
+  const exportCsv = async () => {
     try {
       const blob = await adminApi.exportUsersCsv();
       const url = window.URL.createObjectURL(new Blob([blob], { type: 'text/csv' }));
       const a = document.createElement('a');
       a.href = url;
       a.download = `tamiltunes-users-${new Date().toISOString().slice(0, 10)}.csv`;
-      document.body.appendChild(a);
-      a.click();
-      a.remove();
+      document.body.appendChild(a); a.click(); a.remove();
       showToast('Users exported to CSV');
-    } catch (err) {
-      showToast('Export failed');
-    }
+    } catch { showToast('Export failed'); }
   };
 
+  const Actions = ({ u }) => {
+    const self = u.id === currentAdmin?.id;
+    const isAdmin = u.role === 'admin';
+    return (
+      <div className="flex items-center gap-1.5 flex-wrap">
+        {!self && <Btn onClick={() => toggleBlock(u)} disabled={busy} tone={u.isActive ? 'rose' : 'green'} testId="user-block">{u.isActive ? <Lock className="w-3 h-3" /> : <Unlock className="w-3 h-3" />}{u.isActive ? 'Block' : 'Unblock'}</Btn>}
+        {!self && <Btn onClick={() => terminate(u)} disabled={busy} testId="user-terminate"><LogOut className="w-3 h-3" />Terminate session</Btn>}
+        {!self && <Btn onClick={() => openModal(setRoleModal, { user: u, role: isAdmin ? 'user' : 'admin' })} disabled={busy} testId="user-role">{isAdmin ? <ShieldAlert className="w-3 h-3" /> : <Shield className="w-3 h-3" />}{isAdmin ? 'Remove admin' : 'Make admin'}</Btn>}
+        {!self && !isAdmin && <Btn onClick={() => openModal(setRemoveModal, u)} disabled={busy} tone="rose" testId="user-remove"><Trash2 className="w-3 h-3" />Remove account</Btn>}
+        {self && <span className="text-[11px] text-zinc-500">This is you</span>}
+      </div>
+    );
+  };
+  const Who = ({ u }) => (
+    <div className="min-w-0">
+      <div className="flex items-center gap-2 flex-wrap">
+        <Dot online={u.online} />
+        <span className="text-sm font-semibold text-white truncate">{u.name}</span>
+        {u.role === 'admin' && <Badge tone="brand">Admin</Badge>}
+        {!u.isActive && <Badge tone="rose">Blocked</Badge>}
+        {u.signsInWithGoogle && <Badge>Google</Badge>}
+      </div>
+      <p className="text-xs text-zinc-400 truncate">{u.email}</p>
+      <p className="text-[11px] text-zinc-500" data-testid="user-last-seen">{formatLastSeen(u.lastSeenAt, { online: u.online })}{u.lastLoginAt ? ` · signed in ${formatLastSeen(u.lastLoginAt)}` : ''}</p>
+    </div>
+  );
+
+  const sel = 'px-3 py-2 rounded-xl bg-zinc-900 border border-zinc-800 text-xs text-zinc-300 focus:outline-none focus:border-brand-500';
   return (
     <div className="space-y-6">
-      {/* Toast Alert */}
-      {toastMessage && (
-        <div className="fixed bottom-6 right-6 z-50 px-4 py-2.5 rounded-xl bg-zinc-900 border border-brand-500/50 text-white text-xs font-semibold shadow-2xl flex items-center gap-2 animate-in fade-in slide-in-from-bottom-3">
-          <Check className="w-4 h-4 text-brand-400" />
-          <span>{toastMessage}</span>
+      {toast && (
+        <div role="status" className="fixed bottom-6 right-6 z-50 px-4 py-2.5 rounded-xl bg-zinc-900 border border-brand-500/50 text-white text-xs font-semibold shadow-2xl flex items-center gap-2">
+          <Check className="w-4 h-4 text-brand-400" /><span>{toast}</span>
         </div>
       )}
 
-      {/* Header & Controls */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
           <h1 className="text-2xl font-black text-white tracking-tight">Users Management</h1>
-          <p className="text-xs sm:text-sm text-zinc-400 mt-0.5">
-            {total} registered accounts • Roles, blocklist, sessions, and recovery
-          </p>
+          <p className="text-xs sm:text-sm text-zinc-400 mt-0.5">{total} accounts • Who is online, sign out, block or remove an account</p>
         </div>
-
-        <button
-          onClick={handleExportCsv}
-          className="px-4 py-2 rounded-xl bg-zinc-900 hover:bg-zinc-800 border border-zinc-800 text-zinc-200 text-xs font-semibold flex items-center gap-2 self-start sm:self-auto transition-colors"
-        >
-          <Download className="w-4 h-4" />
-          <span>Export CSV</span>
+        <button onClick={exportCsv} className="px-4 py-2 rounded-xl bg-zinc-900 hover:bg-zinc-800 border border-zinc-800 text-zinc-200 text-xs font-semibold flex items-center gap-2 self-start sm:self-auto transition-colors">
+          <Download className="w-4 h-4" /><span>Export CSV</span>
         </button>
       </div>
 
-      {/* Filter and Search Bar */}
       <div className="p-4 rounded-2xl bg-[#18181B] border border-zinc-800/80 flex flex-col md:flex-row items-center gap-3">
-        <form onSubmit={handleSearchSubmit} className="relative flex-1 w-full">
+        <form onSubmit={(e) => { e.preventDefault(); setPage(1); fetchUsers(); }} className="relative flex-1 w-full">
           <Search className="w-4 h-4 text-zinc-400 absolute left-3.5 top-1/2 -translate-y-1/2" />
-          <input
-            type="text"
-            value={search}
-            onChange={(e) => setSearch(e.target.value)}
-            placeholder="Search by name or email..."
-            className="w-full pl-10 pr-4 py-2 rounded-xl bg-zinc-900 border border-zinc-800 text-white text-xs placeholder:text-zinc-500 focus:outline-none focus:border-brand-500"
-          />
+          <input type="text" value={search} onChange={(e) => setSearch(e.target.value)} placeholder="Search by name or email..." aria-label="Search users"
+            className="w-full pl-10 pr-4 py-2 rounded-xl bg-zinc-900 border border-zinc-800 text-white text-xs placeholder:text-zinc-500 focus:outline-none focus:border-brand-500" />
         </form>
-
-        <div className="flex items-center gap-2 w-full md:w-auto">
-          <select
-            value={roleFilter}
-            onChange={(e) => {
-              setRoleFilter(e.target.value);
-              setPage(1);
-            }}
-            className="px-3 py-2 rounded-xl bg-zinc-900 border border-zinc-800 text-xs text-zinc-300 focus:outline-none focus:border-brand-500"
-          >
-            <option value="all">All Roles</option>
-            <option value="user">User</option>
-            <option value="admin">Admin</option>
-          </select>
-
-          <select
-            value={statusFilter}
-            onChange={(e) => {
-              setStatusFilter(e.target.value);
-              setPage(1);
-            }}
-            className="px-3 py-2 rounded-xl bg-zinc-900 border border-zinc-800 text-xs text-zinc-300 focus:outline-none focus:border-brand-500"
-          >
-            <option value="all">All Statuses</option>
-            <option value="active">Active</option>
-            <option value="blocked">Blocked</option>
-          </select>
+        <div className="flex items-center gap-2 w-full md:w-auto flex-wrap">
+          <label className="inline-flex items-center gap-2 text-xs text-zinc-300 cursor-pointer">
+            <input type="checkbox" checked={onlineOnly} onChange={(e) => { setOnlineOnly(e.target.checked); setPage(1); }} data-testid="online-only" className="accent-emerald-400" />
+            Online now
+          </label>
+          <select value={roleFilter} onChange={(e) => { setRoleFilter(e.target.value); setPage(1); }} className={sel} aria-label="Role"><option value="all">All Roles</option><option value="user">User</option><option value="admin">Admin</option></select>
+          <select value={statusFilter} onChange={(e) => { setStatusFilter(e.target.value); setPage(1); }} className={sel} aria-label="Status"><option value="all">All Statuses</option><option value="active">Active</option><option value="blocked">Blocked</option></select>
         </div>
       </div>
 
-      {/* Users List: Mobile Cards / Desktop Table */}
-      {loading ? (
-        <div className="space-y-3">
-          {[1, 2, 3, 4, 5].map((i) => (
-            <div key={i} className="h-16 bg-zinc-900/60 rounded-xl animate-pulse" />
-          ))}
-        </div>
+      {loading && users.length === 0 ? (
+        <div className="space-y-3">{[1, 2, 3, 4, 5].map((i) => <div key={i} className="h-16 bg-zinc-900/60 rounded-xl animate-pulse" />)}</div>
       ) : users.length === 0 ? (
         <div className="p-12 text-center rounded-2xl bg-[#18181B] border border-zinc-800/80">
           <Users className="w-8 h-8 text-zinc-600 mx-auto mb-2" />
@@ -250,360 +159,59 @@ const AdminUsers = () => {
         </div>
       ) : (
         <>
-          {/* Mobile View: Card List (<768px) */}
-          <div className="md:hidden space-y-3">
-            {users.map((u) => {
-              const isSelf = u.id === currentAdmin?.id;
-              return (
-                <div
-                  key={u.id}
-                  className="p-4 rounded-2xl bg-[#18181B] border border-zinc-800/80 space-y-3"
-                >
-                  <div className="flex items-start justify-between">
-                    <div className="flex items-center gap-2.5">
-                      <div className="w-8 h-8 rounded-full bg-gradient-to-tr from-brand-600 to-brand-400 text-black font-extrabold text-xs flex items-center justify-center">
-                        {(u.name || u.email)[0].toUpperCase()}
-                      </div>
-                      <div>
-                        <div className="text-xs font-bold text-white flex items-center gap-1.5">
-                          <span>{u.name}</span>
-                          {isSelf && (
-                            <span className="text-[10px] text-zinc-500 font-normal">(You)</span>
-                          )}
-                        </div>
-                        <div className="text-[11px] text-zinc-400">{u.email}</div>
-                      </div>
-                    </div>
-
-                    <div className="flex items-center gap-1.5">
-                      <span
-                        className={`px-2 py-0.5 rounded-full text-[10px] font-bold uppercase ${
-                          u.role === 'admin'
-                            ? 'bg-amber-500/15 text-amber-400 border border-amber-500/30'
-                            : 'bg-zinc-800 text-zinc-400'
-                        }`}
-                      >
-                        {u.role}
-                      </span>
-                      <span
-                        className={`px-2 py-0.5 rounded-full text-[10px] font-bold ${
-                          u.isActive
-                            ? 'bg-emerald-500/15 text-emerald-400 border border-emerald-500/30'
-                            : 'bg-rose-500/15 text-rose-400 border border-rose-500/30'
-                        }`}
-                      >
-                        {u.isActive ? 'Active' : 'Blocked'}
-                      </span>
-                    </div>
-                  </div>
-
-                  {/* Actions for Mobile */}
-                  <div className="pt-2 border-t border-zinc-800/60 flex items-center gap-2 flex-wrap">
-                    {!isSelf && (
-                      <button
-                        onClick={() => handleToggleBlock(u)}
-                        disabled={actionLoading}
-                        className={`px-2.5 py-1 rounded-lg text-[11px] font-semibold flex items-center gap-1 transition-colors ${
-                          u.isActive
-                            ? 'bg-rose-500/15 text-rose-400 hover:bg-rose-500/25'
-                            : 'bg-emerald-500/15 text-emerald-400 hover:bg-emerald-500/25'
-                        }`}
-                      >
-                        {u.isActive ? <Lock className="w-3 h-3" /> : <Unlock className="w-3 h-3" />}
-                        <span>{u.isActive ? 'Block' : 'Unblock'}</span>
-                      </button>
-                    )}
-
-                    <button
-                      onClick={() => handleGenerateReset(u)}
-                      disabled={actionLoading}
-                      className="px-2.5 py-1 rounded-lg bg-zinc-800 hover:bg-zinc-700 text-zinc-200 text-[11px] font-semibold flex items-center gap-1"
-                    >
-                      <KeyRound className="w-3 h-3" />
-                      <span>Reset Link</span>
-                    </button>
-
-                    <button
-                      onClick={() => handleForceLogout(u)}
-                      disabled={actionLoading}
-                      className="px-2.5 py-1 rounded-lg bg-zinc-800 hover:bg-zinc-700 text-zinc-200 text-[11px] font-semibold flex items-center gap-1"
-                    >
-                      <LogOut className="w-3 h-3" />
-                      <span>Logout</span>
-                    </button>
-
-                    {!isSelf && (
-                      <button
-                        onClick={() => {
-                          setRoleModalUser(u);
-                          setTargetRole(u.role === 'admin' ? 'user' : 'admin');
-                          setAdminPassword('');
-                          setRoleModalError('');
-                        }}
-                        disabled={actionLoading}
-                        className="px-2.5 py-1 rounded-lg bg-zinc-800 hover:bg-zinc-700 text-zinc-200 text-[11px] font-semibold flex items-center gap-1"
-                      >
-                        <Shield className="w-3 h-3 text-brand-400" />
-                        <span>{u.role === 'admin' ? 'Demote' : 'Make Admin'}</span>
-                      </button>
-                    )}
-                  </div>
-                </div>
-              );
-            })}
+          {/* phones: cards */}
+          <div className="md:hidden space-y-3" data-testid="users-cards">
+            {users.map((u) => (
+              <div key={u.id} className="p-4 rounded-2xl bg-[#18181B] border border-zinc-800/80 space-y-3" data-testid="user-card">
+                <Who u={u} />
+                <div className="pt-2 border-t border-zinc-800/60"><Actions u={u} /></div>
+              </div>
+            ))}
           </div>
-
-          {/* Desktop Table (>=768px) */}
-          <div className="hidden md:block rounded-2xl bg-[#18181B] border border-zinc-800/80 overflow-hidden shadow-sm">
-            <table className="w-full text-left text-xs">
-              <thead className="bg-zinc-900/60 border-b border-zinc-800/80 text-zinc-400 uppercase font-semibold text-[11px]">
-                <tr>
-                  <th className="px-5 py-3.5">User</th>
-                  <th className="px-4 py-3.5">Role</th>
-                  <th className="px-4 py-3.5">Status</th>
-                  <th className="px-4 py-3.5">2FA</th>
-                  <th className="px-4 py-3.5">Created</th>
-                  <th className="px-5 py-3.5 text-right">Actions</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-zinc-800/50">
-                {users.map((u) => {
-                  const isSelf = u.id === currentAdmin?.id;
-                  return (
-                    <tr key={u.id} className="hover:bg-zinc-800/30 transition-colors">
-                      <td className="px-5 py-3.5">
-                        <div className="flex items-center gap-3">
-                          <div className="w-8 h-8 rounded-full bg-gradient-to-tr from-brand-600 to-brand-400 text-black font-extrabold text-xs flex items-center justify-center">
-                            {(u.name || u.email)[0].toUpperCase()}
-                          </div>
-                          <div>
-                            <div className="font-bold text-white flex items-center gap-1.5">
-                              <span>{u.name}</span>
-                              {isSelf && (
-                                <span className="text-[10px] text-zinc-500 font-normal">(You)</span>
-                              )}
-                            </div>
-                            <div className="text-[11px] text-zinc-400">{u.email}</div>
-                          </div>
-                        </div>
-                      </td>
-
-                      <td className="px-4 py-3.5">
-                        <span
-                          className={`px-2 py-0.5 rounded-full text-[10px] font-bold uppercase ${
-                            u.role === 'admin'
-                              ? 'bg-amber-500/15 text-amber-400 border border-amber-500/30'
-                              : 'bg-zinc-800 text-zinc-400'
-                          }`}
-                        >
-                          {u.role}
-                        </span>
-                      </td>
-
-                      <td className="px-4 py-3.5">
-                        <span
-                          className={`px-2 py-0.5 rounded-full text-[10px] font-bold ${
-                            u.isActive
-                              ? 'bg-emerald-500/15 text-emerald-400 border border-emerald-500/30'
-                              : 'bg-rose-500/15 text-rose-400 border border-rose-500/30'
-                          }`}
-                        >
-                          {u.isActive ? 'Active' : 'Blocked'}
-                        </span>
-                      </td>
-
-                      <td className="px-4 py-3.5">
-                        <span className="text-zinc-400 font-mono text-[11px]">
-                          {u.twoFactorEnabled ? 'Enabled' : 'Off'}
-                        </span>
-                      </td>
-
-                      <td className="px-4 py-3.5 text-zinc-400 text-[11px]">
-                        {new Date(u.createdAt).toLocaleDateString()}
-                      </td>
-
-                      <td className="px-5 py-3.5 text-right">
-                        <div className="flex items-center justify-end gap-1.5">
-                          <button
-                            onClick={() => handleGenerateReset(u)}
-                            title="Generate password reset link"
-                            className="p-1.5 rounded-lg bg-zinc-800/80 hover:bg-zinc-700 text-zinc-300 hover:text-white transition-colors"
-                          >
-                            <KeyRound className="w-3.5 h-3.5" />
-                          </button>
-
-                          <button
-                            onClick={() => handleForceLogout(u)}
-                            title="Force logout"
-                            className="p-1.5 rounded-lg bg-zinc-800/80 hover:bg-zinc-700 text-zinc-300 hover:text-white transition-colors"
-                          >
-                            <LogOut className="w-3.5 h-3.5" />
-                          </button>
-
-                          {!isSelf && (
-                            <>
-                              <button
-                                onClick={() => handleToggleBlock(u)}
-                                title={u.isActive ? 'Block user' : 'Unblock user'}
-                                className={`p-1.5 rounded-lg transition-colors ${
-                                  u.isActive
-                                    ? 'bg-rose-500/10 hover:bg-rose-500/25 text-rose-400'
-                                    : 'bg-emerald-500/10 hover:bg-emerald-500/25 text-emerald-400'
-                                }`}
-                              >
-                                {u.isActive ? (
-                                  <Lock className="w-3.5 h-3.5" />
-                                ) : (
-                                  <Unlock className="w-3.5 h-3.5" />
-                                )}
-                              </button>
-
-                              <button
-                                onClick={() => {
-                                  setRoleModalUser(u);
-                                  setTargetRole(u.role === 'admin' ? 'user' : 'admin');
-                                  setAdminPassword('');
-                                  setRoleModalError('');
-                                }}
-                                title={u.role === 'admin' ? 'Demote to User' : 'Promote to Admin'}
-                                className="p-1.5 rounded-lg bg-zinc-800/80 hover:bg-zinc-700 text-brand-400 hover:text-brand-300 transition-colors"
-                              >
-                                <Shield className="w-3.5 h-3.5" />
-                              </button>
-                            </>
-                          )}
-                        </div>
-                      </td>
-                    </tr>
-                  );
-                })}
+          {/* larger screens: table */}
+          <div className="hidden md:block rounded-2xl bg-[#18181B] border border-zinc-800/80 overflow-hidden" data-testid="users-table">
+            <table className="w-full text-left">
+              <thead className="text-[11px] uppercase tracking-wider text-zinc-500 border-b border-zinc-800/80"><tr><th className="px-4 py-3">Person</th><th className="px-4 py-3">Actions</th></tr></thead>
+              <tbody className="divide-y divide-zinc-800/60">
+                {users.map((u) => <tr key={u.id} data-testid="user-row"><td className="px-4 py-3"><Who u={u} /></td><td className="px-4 py-3"><Actions u={u} /></td></tr>)}
               </tbody>
             </table>
           </div>
-
-          {/* Pagination */}
-          <div className="flex items-center justify-between text-xs text-zinc-400 pt-2">
-            <span>
-              Page {page} of {totalPages} ({total} users)
-            </span>
-            <div className="flex items-center gap-1.5">
-              <button
-                onClick={() => setPage((p) => Math.max(1, p - 1))}
-                disabled={page <= 1}
-                className="p-2 rounded-lg bg-zinc-900 border border-zinc-800 text-zinc-300 hover:text-white disabled:opacity-40"
-              >
-                <ChevronLeft className="w-4 h-4" />
-              </button>
-              <button
-                onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
-                disabled={page >= totalPages}
-                className="p-2 rounded-lg bg-zinc-900 border border-zinc-800 text-zinc-300 hover:text-white disabled:opacity-40"
-              >
-                <ChevronRight className="w-4 h-4" />
-              </button>
+          {totalPages > 1 && (
+            <div className="flex items-center justify-center gap-3 text-xs text-zinc-400">
+              <button onClick={() => setPage((p) => Math.max(1, p - 1))} disabled={page <= 1} aria-label="Previous page" className="p-2 rounded-lg bg-zinc-900 disabled:opacity-40"><ChevronLeft className="w-4 h-4" /></button>
+              <span>Page {page} of {totalPages}</span>
+              <button onClick={() => setPage((p) => Math.min(totalPages, p + 1))} disabled={page >= totalPages} aria-label="Next page" className="p-2 rounded-lg bg-zinc-900 disabled:opacity-40"><ChevronRight className="w-4 h-4" /></button>
             </div>
-          </div>
+          )}
         </>
       )}
 
-      {/* Role Confirmation Modal */}
-      {roleModalUser && (
-        <div className="fixed inset-0 z-50 bg-black/80 backdrop-blur-sm flex items-center justify-center p-4">
-          <div className="w-full max-w-md rounded-2xl bg-[#18181B] border border-zinc-800 p-6 shadow-2xl relative">
-            <button
-              onClick={() => setRoleModalUser(null)}
-              className="absolute top-4 right-4 text-zinc-400 hover:text-white"
-            >
-              <X className="w-5 h-5" />
-            </button>
-
-            <div className="flex items-center gap-3 mb-4">
-              <div className="w-10 h-10 rounded-xl bg-amber-500/15 border border-amber-500/30 flex items-center justify-center text-amber-400">
-                <AlertTriangle className="w-5 h-5" />
-              </div>
-              <div>
-                <h3 className="text-base font-bold text-white">Confirm Role Change</h3>
-                <p className="text-xs text-zinc-400">{roleModalUser.email}</p>
-              </div>
-            </div>
-
-            <p className="text-xs text-zinc-300 mb-4">
-              You are changing this user&apos;s role from{' '}
-              <span className="font-bold uppercase text-white">{roleModalUser.role}</span> to{' '}
-              <span className="font-bold uppercase text-brand-400">{targetRole}</span>.
-              Re-enter your admin password to proceed:
-            </p>
-
-            <form onSubmit={submitRoleChange} className="space-y-4">
-              <div>
-                <input
-                  type="password"
-                  value={adminPassword}
-                  onChange={(e) => setAdminPassword(e.target.value)}
-                  placeholder="Your admin password"
-                  autoFocus
-                  className="w-full px-4 py-2.5 rounded-xl bg-zinc-900 border border-zinc-800 text-white text-xs focus:outline-none focus:border-brand-500"
-                />
-                {roleModalError && (
-                  <p className="text-[11px] text-rose-400 mt-1.5">{roleModalError}</p>
-                )}
-              </div>
-
-              <div className="flex items-center justify-end gap-2">
-                <button
-                  type="button"
-                  onClick={() => setRoleModalUser(null)}
-                  className="px-4 py-2 rounded-xl bg-zinc-800 hover:bg-zinc-700 text-zinc-300 text-xs font-semibold"
-                >
-                  Cancel
-                </button>
-                <button
-                  type="submit"
-                  disabled={actionLoading}
-                  className="px-4 py-2 rounded-xl bg-brand-500 hover:bg-brand-400 text-black text-xs font-bold transition-transform active:scale-95"
-                >
-                  {actionLoading ? 'Verifying...' : 'Confirm Change'}
-                </button>
-              </div>
-            </form>
-          </div>
+      {roleModal && (
+        <div role="dialog" aria-modal="true" aria-label="Change role" data-testid="role-modal" className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/70">
+          <form onSubmit={submitRole} className="w-full max-w-sm rounded-2xl bg-[#18181B] border border-zinc-800 p-5 space-y-3">
+            <div className="flex items-start justify-between"><h3 className="text-base font-bold text-white">{roleModal.role === 'admin' ? 'Make admin' : 'Remove admin'}: {roleModal.user.email}</h3><button type="button" onClick={() => setRoleModal(null)} aria-label="Close"><X className="w-4 h-4 text-zinc-400" /></button></div>
+            {roleModal.role === 'admin' && <p className="text-xs text-zinc-400">Admins are chosen on the server (ADMIN_EMAILS). This only works for an email that is already on that list.</p>}
+            <label className="block text-xs font-semibold text-zinc-300">Type CONFIRM to continue
+              <input autoFocus value={typed} onChange={(e) => setTyped(e.target.value)} data-testid="confirm-input" className="mt-1.5 w-full px-3 py-2 rounded-xl bg-zinc-900 border border-zinc-700 text-white text-sm focus:outline-none focus:border-brand-500" />
+            </label>
+            {modalError && <p role="alert" className="text-xs text-rose-400">{modalError}</p>}
+            <div className="flex gap-2 justify-end"><button type="button" onClick={() => setRoleModal(null)} className="px-3 py-2 rounded-xl bg-zinc-800 text-zinc-200 text-xs font-semibold">Cancel</button><button type="submit" disabled={busy} className="px-3 py-2 rounded-xl bg-brand-500 text-black text-xs font-bold disabled:opacity-60">Confirm</button></div>
+          </form>
         </div>
       )}
 
-      {/* Password Reset Link Modal */}
-      {resetModalUrl && (
-        <div className="fixed inset-0 z-50 bg-black/80 backdrop-blur-sm flex items-center justify-center p-4">
-          <div className="w-full max-w-md rounded-2xl bg-[#18181B] border border-zinc-800 p-6 shadow-2xl relative">
-            <button
-              onClick={() => setResetModalUrl('')}
-              className="absolute top-4 right-4 text-zinc-400 hover:text-white"
-            >
-              <X className="w-5 h-5" />
-            </button>
-
-            <h3 className="text-base font-bold text-white mb-2">Password Reset Link</h3>
-            <p className="text-xs text-zinc-400 mb-4">
-              This single-use link expires in 1 hour. Copy and share it securely with the user:
-            </p>
-
-            <div className="p-3 rounded-xl bg-zinc-900 border border-zinc-800 text-zinc-300 font-mono text-xs break-all mb-4 select-all">
-              {resetModalUrl}
-            </div>
-
-            <div className="flex items-center justify-end gap-2">
-              <button
-                onClick={() => {
-                  navigator.clipboard.writeText(resetModalUrl);
-                  setCopiedLink(true);
-                  setTimeout(() => setCopiedLink(false), 2000);
-                }}
-                className="px-4 py-2 rounded-xl bg-brand-500 hover:bg-brand-400 text-black text-xs font-bold flex items-center gap-1.5 transition-transform active:scale-95"
-              >
-                {copiedLink ? <Check className="w-4 h-4" /> : <Copy className="w-4 h-4" />}
-                <span>{copiedLink ? 'Copied!' : 'Copy Link'}</span>
-              </button>
-            </div>
-          </div>
+      {removeModal && (
+        <div role="dialog" aria-modal="true" aria-label="Remove account" data-testid="remove-modal" className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/70">
+          <form onSubmit={submitRemove} className="w-full max-w-sm rounded-2xl bg-[#18181B] border border-rose-500/40 p-5 space-y-3">
+            <div className="flex items-start justify-between"><h3 className="text-base font-bold text-white inline-flex items-center gap-2"><AlertTriangle className="w-4 h-4 text-rose-400" />Remove this account?</h3><button type="button" onClick={() => setRemoveModal(null)} aria-label="Close"><X className="w-4 h-4 text-zinc-400" /></button></div>
+            <p className="text-xs text-zinc-300">This permanently deletes <b>{removeModal.email}</b> and their playlists, likes, history and comments. It cannot be undone.</p>
+            <label className="block text-xs font-semibold text-zinc-300">Type their email address to confirm
+              <input autoFocus value={typed} onChange={(e) => setTyped(e.target.value)} data-testid="remove-input" autoCapitalize="off" autoCorrect="off" spellCheck={false} className="mt-1.5 w-full px-3 py-2 rounded-xl bg-zinc-900 border border-zinc-700 text-white text-sm focus:outline-none focus:border-rose-400" />
+            </label>
+            {modalError && <p role="alert" className="text-xs text-rose-400">{modalError}</p>}
+            <div className="flex gap-2 justify-end"><button type="button" onClick={() => setRemoveModal(null)} className="px-3 py-2 rounded-xl bg-zinc-800 text-zinc-200 text-xs font-semibold">Cancel</button><button type="submit" disabled={busy} data-testid="remove-confirm" className="px-3 py-2 rounded-xl bg-rose-500 text-white text-xs font-bold disabled:opacity-60">Remove account</button></div>
+          </form>
         </div>
       )}
     </div>

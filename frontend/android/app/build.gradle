@@ -36,6 +36,11 @@ android {
         }
     }
     buildTypes {
+        // CI debug builds use the SAME key as release builds when the signing secrets exist. Google checks the app's signing key (SHA-1) for sign-in, so one
+        // key means one Android client in Google Cloud and every build can sign in; it also lets a debug APK be updated by a release APK.
+        debug {
+            if (signValue('TAMILTUNES_KEYSTORE_PATH', 'storeFile')) { signingConfig signingConfigs.release }
+        }
         release {
             if (signValue('TAMILTUNES_KEYSTORE_PATH', 'storeFile')) { signingConfig signingConfigs.release }
             minifyEnabled false

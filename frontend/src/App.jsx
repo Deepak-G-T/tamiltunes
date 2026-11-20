@@ -24,9 +24,6 @@ const PlaylistDetail = lazy(() => import('./pages/PlaylistDetail'));
 const Favorites = lazy(() => import('./pages/Favorites'));
 const History = lazy(() => import('./pages/History'));
 const Login = lazy(() => import('./pages/Login'));
-const Signup = lazy(() => import('./pages/Signup'));
-const ForgotPassword = lazy(() => import('./pages/ForgotPassword'));
-const ResetPassword = lazy(() => import('./pages/ResetPassword'));
 const Profile = lazy(() => import('./pages/Profile'));
 const UserProfile = lazy(() => import('./pages/UserProfile'));
 const Install = lazy(() => import('./pages/Install'));
@@ -41,7 +38,6 @@ const AdminSongs = lazy(() => import('./pages/admin/AdminSongs'));
 const AdminHomeContent = lazy(() => import('./pages/admin/AdminHomeContent'));
 const AdminModeration = lazy(() => import('./pages/admin/AdminModeration'));
 const AdminSettings = lazy(() => import('./pages/admin/AdminSettings'));
-const Admin2FA = lazy(() => import('./pages/admin/Admin2FA'));
 
 function App() {
   return (
@@ -54,9 +50,10 @@ function App() {
               <Routes>
                 {/* Public Auth & PWA Routes */}
                 <Route path="/login" element={<Login />} />
-                <Route path="/signup" element={<Signup />} />
-                <Route path="/forgot-password" element={<ForgotPassword />} />
-                <Route path="/reset-password" element={<ResetPassword />} />
+                {/* Google is the only way in: the old email/password addresses (and old emailed reset links) lead to the same screen */}
+                <Route path="/signup" element={<Navigate to="/login" replace />} />
+                <Route path="/forgot-password" element={<Navigate to="/login" replace />} />
+                <Route path="/reset-password" element={<Navigate to="/login" replace />} />
                 <Route path="/install" element={<Install />} />
                 <Route path="/privacy" element={<Privacy />} />
 
@@ -76,7 +73,6 @@ function App() {
                   <Route path="moderation" element={<AdminModeration />} />
                   <Route path="playlists" element={<AdminModeration />} />
                   <Route path="settings" element={<AdminSettings />} />
-                  <Route path="security" element={<Admin2FA />} />
                 </Route>
 
                 {/* Main Application Routes (Protected by Login-First Gate) */}

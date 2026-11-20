@@ -151,3 +151,12 @@ export const registerIpLimiter = perAddress({ windowMs: 60 * 60 * 1000, max: 10 
 export const forgotEmailLimiter = perEmail({ windowMs: 60 * 60 * 1000, max: 3 });
 export const forgotIpLimiter = perAddress({ windowMs: 15 * 60 * 1000, max: 5 });
 export const resetIpLimiter = perAddress({ windowMs: 15 * 60 * 1000, max: 10 });
+
+// Google sign-in: each attempt costs us a token check, so keep it tight per IP
+export const googleLoginLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000,
+  max: 40,
+  standardHeaders: true,
+  legacyHeaders: false,
+  message: { success: false, message: 'Too many sign-in attempts, please try again after 15 minutes' }
+});

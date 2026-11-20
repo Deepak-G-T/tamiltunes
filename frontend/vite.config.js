@@ -10,7 +10,7 @@ import { fileURLToPath } from 'node:url'
 const nativeMocks = fileURLToPath(new URL('./scripts/native-mocks/index.js', import.meta.url))
 const appUpdaterReal = fileURLToPath(new URL('./src/lib/appUpdaterPlugin.js', import.meta.url))
 const appUpdaterMock = fileURLToPath(new URL('./scripts/native-mocks/appUpdater.js', import.meta.url))
-const NATIVE_PACKAGES = ['@capacitor/app', '@capacitor/preferences', '@capacitor/network', '@capacitor/share', '@capacitor/haptics', '@capacitor/status-bar', '@capacitor/splash-screen', 'capacitor-music-controls-plugin']
+const NATIVE_PACKAGES = ['@capacitor/app', '@capacitor/preferences', '@capacitor/network', '@capacitor/share', '@capacitor/haptics', '@capacitor/status-bar', '@capacitor/splash-screen', 'capacitor-music-controls-plugin', '@capgo/capacitor-social-login']
 
 export default defineConfig(({ mode }) => ({
   ...(mode === 'nativetest' ? { build: { outDir: 'dist-nativetest', emptyOutDir: true }, resolve: { alias: { ...Object.fromEntries(NATIVE_PACKAGES.map((p) => [p, nativeMocks])), '@tamiltunes/app-updater': appUpdaterMock } } } : { resolve: { alias: { '@tamiltunes/app-updater': appUpdaterReal } } }),

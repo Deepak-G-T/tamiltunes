@@ -51,3 +51,16 @@ export const CapacitorMusicControls = asPlugin('CapacitorMusicControls', {
   openNotificationSettings: async () => { log('MusicControls.openNotificationSettings'); },
   openBatterySettings: async () => { log('MusicControls.openBatterySettings'); },
 });
+
+// Native Google sign-in: window.__native.google = { idToken: '...' } or { cancel: true } or { error: '...' } picks what the account chooser returns
+export const SocialLogin = asPlugin('SocialLogin', {
+  initialize: async (o) => { log('SocialLogin.initialize', { webClientId: o?.google?.webClientId, mode: o?.google?.mode }); },
+  login: async (o) => {
+    log('SocialLogin.login', { provider: o?.provider });
+    const g = n.google || {};
+    if (g.cancel) { const e = new Error('User cancelled the login'); e.code = 'USER_CANCELLED'; throw e; }
+    if (g.error) throw new Error(g.error);
+    return { provider: 'google', result: { idToken: g.idToken || 'TEST_GOOGLE_ID_TOKEN' } };
+  },
+  logout: async (o) => { log('SocialLogin.logout', { provider: o?.provider }); },
+});

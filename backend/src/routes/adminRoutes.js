@@ -18,6 +18,7 @@ router.post('/users/:id/unblock', adminCtrl.unblockUser);
 router.post('/users/:id/force-logout', adminCtrl.forceLogoutUser);
 router.post('/users/:id/reset-link', adminCtrl.generateResetLink);
 router.post('/users/:id/role', adminCtrl.changeUserRole);
+router.delete('/users/:id', adminCtrl.deleteUser);
 
 // 3. Songs Management & Duplicates
 router.get('/songs/duplicates', adminCtrl.findDuplicateSongs);

@@ -1,3 +1,4 @@
+import { installGoogleStub } from './google-stub.mjs';
 import { createRequire } from 'node:module';
 import { spawn } from 'node:child_process';
 import path from 'node:path';
@@ -25,11 +26,12 @@ const check = (name, ok, detail) => {
 
 async function run(browser) {
   const ctx = await browser.newContext({ viewport: { width: 375, height: 667 } });
+  await installGoogleStub(ctx);
   const page = await ctx.newPage();
 
   // Mock all API calls
   await page.route('**/api/auth/me', (route) => route.fulfill({ status: 401, json: { success: false } }));
-  await page.route('**/api/auth/login', (route) =>
+  await page.route('**/api/auth/google', (route) =>
     route.fulfill({
       status: 200,
       json: { success: true, token: 'mock-jwt-token', user: { id: 'u1', name: 'Tester', email: 'tester@example.com', role: 'user' } }
@@ -51,9 +53,8 @@ async function run(browser) {
   check('deep link /explore redirects to /login with redirect param', page.url().includes('redirect='));
 
   // 4. Log in and verify destination is restored
-  await page.fill('input[type="email"]', 'tester@example.com');
-  await page.fill('input[type="password"]', 'password123');
-  await page.click('button[type="submit"]');
+  await page.waitForSelector('[data-testid=fake-google]');
+  await page.click('[data-testid=fake-google]');
   await page.waitForURL('**/explore');
   check('after login, user is redirected back to the original page (/explore)', page.url().includes('/explore'));
 
@@ -64,7 +65,7 @@ let server;
 let browser;
 try {
   server = await startServer();
-  browser = await chromium.launch();
+  browser = await chromium.launch({ ...(process.env.CHROMIUM_PATH ? { executablePath: process.env.CHROMIUM_PATH } : {}) });
   await run(browser);
 } catch (err) {
   console.error('Gate audit crashed:', err.message);

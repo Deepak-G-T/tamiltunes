@@ -37,7 +37,7 @@ const startPreview = () => new Promise((resolve, reject) => {
   setTimeout(() => { if (!done) reject(new Error('vite preview start timeout')); }, 30000);
 });
 
-const seen = { auth: [], wrongOrigin: [] };
+const seen = { auth: [], wrongOrigin: [], googleBodies: [] };
 async function run(browser) {
   const ctx = await browser.newContext({ viewport: { width: 390, height: 844 }, isMobile: true, hasTouch: true });
   const page = await ctx.newPage();
@@ -46,7 +46,7 @@ async function run(browser) {
   page.on('pageerror', (e) => { errors.push(e.message); consoleErrors.push(e.message); });
   page.on('console', (msg) => { if (msg.type() === 'error' || msg.text().includes('is not implemented')) consoleErrors.push(msg.text()); });
   page.on('request', (r) => { const u = new URL(r.url()); if (u.pathname.startsWith('/api/') && u.origin !== API) seen.wrongOrigin.push(r.url()); });
-  await page.addInitScript(() => { window.Capacitor = { isNativePlatform: () => true, getPlatform: () => 'android' }; });
+  await page.addInitScript(() => { window.Capacitor = { isNativePlatform: () => true, getPlatform: () => 'android' }; window.__TT_GOOGLE_CLIENT_ID = 'test-web-client.apps.googleusercontent.com'; });
 
   const cors = { 'access-control-allow-origin': '*', 'access-control-allow-headers': '*', 'access-control-allow-methods': '*' };
   await page.route(`${API}/api/**`, async (route) => {
@@ -56,7 +56,7 @@ async function run(browser) {
     const auth = req.headers().authorization;
     if (auth) seen.auth.push({ path: p, auth });
     const json = (body, status = 200) => route.fulfill({ status, headers: cors, json: body });
-    if (p === '/auth/login') return json({ success: true, token: TOKEN, user: USER });
+    if (p === '/auth/google') { seen.googleBodies.push(req.postData()); return json({ success: true, token: TOKEN, user: USER }); }
     if (p === '/auth/me') return json({ success: true, user: USER });
     if (p === '/music/home') return json({ success: true, data: { trending: S, latest: [], gana: [], nineties: [], twoThousands: [], melodies: [], love: [], sad: [], folk: [], instrumental: [], popularAlbums: [], popularArtists: [], albums: [], artists: [] } });
     if (p === '/home') return json({ success: true, seed: 's', hero: null, hidden: [], sections: [{ id: 'trending', title: 'Trending now', kind: 'songs', items: S }] });
@@ -83,10 +83,20 @@ async function run(browser) {
   check('start up: no service worker is registered inside the app', (await native(async () => (await navigator.serviceWorker.getRegistrations()).length)) === 0);
 
   // ---- sign in: the token goes to private storage, never to localStorage
-  await page.getByLabel('Email address').fill('test@example.com');
-  await page.getByLabel('Password', { exact: true }).fill('Throwaway-test-1');
-  await page.locator('form button[type=submit]').click();
+  check('sign in: the app offers only Google (no email or password field)', (await page.locator('input[type=email], input[type=password]').count()) === 0 && (await page.getByTestId('google-signin').count()) === 1);
+  await native(() => { window.__native.google = { cancel: true }; });
+  await page.getByTestId('google-signin').click();
+  await page.waitForTimeout(500);
+  check('sign in: closing the Google account chooser shows no error and nothing is sent', (await page.locator('[role=alert]').count()) === 0 && seen.googleBodies.length === 0 && (await path()) === '/login');
+  await native(() => { window.__native.google = { error: 'DEVELOPER_ERROR: signing SHA-1 does not match' }; });
+  await page.getByTestId('google-signin').click();
+  check('sign in: a Google set-up problem is explained in plain words', await until(async () => /not set up/.test(await page.locator('[role=alert]').first().innerText().catch(() => ''))));
+  await native(() => { window.__native.google = { idToken: 'TEST_GOOGLE_ID_TOKEN_0123456789' }; });
+  await page.getByTestId('google-signin').click();
   await page.waitForSelector('section[aria-label="Trending now"]', { timeout: 15000 });
+  l = await log();
+  check('sign in: the native Google sign-in is started with the WEB client id', l.some((x) => x.name === 'SocialLogin.initialize' && x.arg.webClientId === 'test-web-client.apps.googleusercontent.com' && x.arg.mode === 'online'), JSON.stringify(l.filter((x) => x.name.startsWith('SocialLogin'))));
+  check('sign in: the server gets only the Google ID token (no password)', seen.googleBodies.length === 1 && JSON.parse(seen.googleBodies[0]).idToken === 'TEST_GOOGLE_ID_TOKEN_0123456789' && !seen.googleBodies[0].includes('password'), seen.googleBodies.join('|'));
   check('sign in: the token is NOT in localStorage', (await native(() => localStorage.getItem('tamiltunes_token'))) === null);
   check('sign in: the token is in private storage (Preferences)', (await native(() => JSON.parse(sessionStorage.getItem('__native_prefs') || '{}').tamiltunes_token)) === TOKEN);
   check('the app calls the Render server directly, never a relative /api on the phone', seen.wrongOrigin.length === 0, seen.wrongOrigin.slice(0, 2).join(' '));
