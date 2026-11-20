@@ -10,6 +10,7 @@ import {
   Plus,
   Library,
   Music2,
+  ShieldAlert,
   ShieldCheck
 } from 'lucide-react';
 import { useAuth } from '../../context/AuthContext';
