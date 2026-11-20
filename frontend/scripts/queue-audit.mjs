@@ -761,8 +761,8 @@ async function playingFrom(browser) {
   await page.goto(`${BASE}/`);
   await page.waitForSelector('[aria-label="Open now playing full screen"]');
   await page.locator('[aria-label="Open now playing full screen"]').tap();
-  await page.waitForSelector('[data-testid=marquee-text]');
-  const mq = page.locator('[data-testid=marquee-text]');
+  await page.waitForSelector('[data-testid=fs-source] [data-testid=marquee-text]');
+  const mq = page.locator('[data-testid=fs-source] [data-testid=marquee-text]'); // the "Playing from" name (the song title scrolls too)
   const full = await mq.getAttribute('aria-label');
   check(`${tag} "Playing from" carries the full source name`, /Collection Of The Year Volume Two Special Edition/.test(full), full);
   check(`${tag} a long source name scrolls (marquee) instead of being cut`, (await mq.getAttribute('data-overflow')) === 'true' && (await mq.locator('span').first().getAttribute('class')).includes('marquee-slide'));
