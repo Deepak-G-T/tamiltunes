@@ -27,6 +27,7 @@ import Toast from '../components/common/Toast';
 import { getCoverColor, rgbVar } from '../lib/coverColor';
 import { engineFor, canToggleVideo, getVideoId, planSwitch, planEmbedError, hasAudioStream } from '../lib/playbackLogic';
 import { getToken } from '../lib/tokenStore';
+import { resolveDuration, pauseKind, stallShouldFinish, errorAction, PAUSE_FINISH_MS, STALL_FINISH_MS, TRANSITION_WATCHDOG_MS } from '../lib/playbackEnd';
 
 const AudioContext = createContext();
 const QUEUE_ACTIONS = ['jumpToUid', 'removeUids', 'moveUidsToQueue', 'reorderByUid', 'clearQueue', 'refreshRecommendations', 'removeCurrentSong', 'playFromHistoryAt', 'saveQueueAsPlaylist', 'toggleStopAfter', 'startSleepTimer', 'cancelSleepTimer', 'setAutoplay', 'continueWithRadio', 'startRadio', 'addToQueue', 'playNext'];
@@ -77,6 +78,14 @@ export const AudioProvider = ({ children }) => {
   // Race condition & adaptive streaming refs
   const playPromiseRef = useRef(null);
   const playRequestIdRef = useRef(0);
+  // End-of-song bookkeeping (rules in lib/playbackEnd.js)
+  const userPausedRef = useRef(false);        // true when the person (or the notification / headset) paused: never treated as "the song ended"
+  const finishedRequestRef = useRef(-1);      // the play request already advanced, so 'ended' and the fallbacks never advance twice
+  const midSongErrorsRef = useRef(0);
+  const endTimersRef = useRef({ pause: null, stall: null, transition: null });
+  const stallStartRef = useRef(0);
+  const finishSongRef = useRef(() => {});
+  const goNextRef = useRef(() => {});
   const activeCandidatesRef = useRef([]);
   const candidateIndexRef = useRef(0);
   const currentSongRef = useRef(null);
@@ -363,6 +372,7 @@ export const AudioProvider = ({ children }) => {
     // Never start the audio element while the YouTube engine is the active one (Video mode)
     if (isYouTubeSong(currentSongRef.current)) return;
     try {
+      userPausedRef.current = false;
       const playPromise = audio.play();
       playPromiseRef.current = playPromise;
       await playPromise;
@@ -423,6 +433,34 @@ export const AudioProvider = ({ children }) => {
     }, 1500);
   };
 
+  // ---- end of a song -------------------------------------------------------------------------------------------------------------------
+  // Between two songs the player keeps saying "playing" (no flash of "paused", and the Android notification and its foreground service are
+  // not told to stop right before the next stream must load). A watchdog turns it back to paused if the next song never starts.
+  const clearEndTimers = ({ keepTransition = false } = {}) => {
+    const t = endTimersRef.current;
+    clearTimeout(t.pause); clearTimeout(t.stall);
+    if (!keepTransition) { clearTimeout(t.transition); }
+  };
+  const endTransition = () => { clearTimeout(endTimersRef.current.transition); };
+  const beginTransition = () => {
+    clearTimeout(endTimersRef.current.transition);
+    endTimersRef.current.transition = setTimeout(() => {
+      const audio = audioRef.current;
+      if (audio && audio.paused && !userPausedRef.current && !isYouTubeSong(currentSongRef.current)) setIsPlaying(false);
+    }, TRANSITION_WATCHDOG_MS);
+  };
+  /** The song is over: 'ended', or the stream stopped / stalled / broke close to the end. Runs once per play request. */
+  const finishSong = (reason) => {
+    const rid = playRequestIdRef.current;
+    if (finishedRequestRef.current === rid) return;
+    finishedRequestRef.current = rid;
+    clearEndTimers({ keepTransition: true });
+    if (reason !== 'ended') console.info(`Song finished early (${reason}); going on to the next one.`);
+    beginTransition();
+    goNextRef.current('ended');
+  };
+  finishSongRef.current = finishSong;
+
   // Initialize HTML5 audio element events with thorough cleanup
   useEffect(() => {
     const audio = audioRef.current;
@@ -445,19 +483,34 @@ export const AudioProvider = ({ children }) => {
       }
     };
 
+    const syncDuration = () => {
+      if (isYouTubeSong(currentSongRef.current)) return;
+      setDuration(resolveDuration({ audioDuration: audio.duration, catalogDuration: currentSongRef.current?.duration }));
+    };
     const onLoadedMetadata = () => {
       if (!isYouTubeSong(currentSongRef.current)) {
-        setDuration(audio.duration || currentSongRef.current?.duration || 0);
+        syncDuration();
         setIsBuffering(false);
       }
     };
 
+    // Buffering near the end for 5 seconds: the rest of the song is not coming, so the song is finished
+    const watchStall = () => {
+      clearTimeout(endTimersRef.current.stall);
+      stallStartRef.current = Date.now();
+      const rid = playRequestIdRef.current;
+      endTimersRef.current.stall = setTimeout(() => {
+        if (rid !== playRequestIdRef.current || audio.ended || audio.readyState >= 3) return;
+        if (stallShouldFinish({ stalledForMs: Date.now() - stallStartRef.current, currentTime: audio.currentTime, duration: resolveDuration({ audioDuration: audio.duration, catalogDuration: currentSongRef.current?.duration }) })) finishSongRef.current('stalled-near-end');
+      }, STALL_FINISH_MS);
+    };
+
     const onWaiting = () => {
-      if (!isYouTubeSong(currentSongRef.current)) setIsBuffering(true);
+      if (!isYouTubeSong(currentSongRef.current)) { setIsBuffering(true); watchStall(); }
     };
 
     const onCanPlay = () => {
-      if (!isYouTubeSong(currentSongRef.current)) setIsBuffering(false);
+      if (!isYouTubeSong(currentSongRef.current)) { setIsBuffering(false); clearTimeout(endTimersRef.current.stall); }
     };
 
     const onPlaying = () => {
@@ -466,6 +519,9 @@ export const AudioProvider = ({ children }) => {
         return;
       }
       {
+        clearTimeout(endTimersRef.current.stall);
+        clearTimeout(endTimersRef.current.pause);
+        endTransition(); // the next song is really playing
         setIsPlaying(true);
         setIsBuffering(false);
         setPlaybackError(null);
@@ -473,14 +529,63 @@ export const AudioProvider = ({ children }) => {
     };
 
     const onPause = () => {
-      if (!isYouTubeSong(currentSongRef.current)) setIsPlaying(false);
+      if (isYouTubeSong(currentSongRef.current)) return;
+      const duration = resolveDuration({ audioDuration: audio.duration, catalogDuration: currentSongRef.current?.duration });
+      const kind = pauseKind({ ended: audio.ended, userPaused: userPausedRef.current, seeking: audio.seeking, currentTime: audio.currentTime, duration });
+      if (kind === 'finished') {
+        // The stream reached its end: do NOT tell the app or the Android notification "paused" (that demotes the foreground service while the
+        // screen is locked, right before the next song must load). 'ended' follows at once and the queue decides what happens next.
+        beginTransition();
+        return;
+      }
+      setIsPlaying(false);
+      if (kind === 'suspect') {
+        // Paused by something other than the person, close to the end (the connection died, Android took the audio). Still paused soon after = finished.
+        const rid = playRequestIdRef.current;
+        clearTimeout(endTimersRef.current.pause);
+        endTimersRef.current.pause = setTimeout(() => {
+          if (rid === playRequestIdRef.current && audio.paused && !audio.ended && !userPausedRef.current) finishSongRef.current('paused-near-end');
+        }, PAUSE_FINISH_MS);
+      }
     };
 
     const onError = async () => {
       if (isYouTubeSong(currentSongRef.current)) return;
       console.warn('Playback error encountered on source:', audio.src);
+      const song = currentSongRef.current;
+      const t = audio.currentTime;
+      const action = errorAction({ currentTime: t, duration: resolveDuration({ audioDuration: audio.duration, catalogDuration: song?.duration }), midSongErrors: midSongErrorsRef.current });
 
-      // Try next audio candidate if available
+      if (action === 'finish') { // the stream broke within the last 20 seconds: the song is finished
+        setIsBuffering(false);
+        finishSongRef.current('error-near-end');
+        return;
+      }
+      if (action === 'retry') { // broke in the middle: load the same stream again and carry on from the same second, once
+        midSongErrorsRef.current += 1;
+        try {
+          const src = audio.currentSrc || audio.src;
+          audio.src = src;
+          audio.load();
+          seekAudioWhenReady(t);
+          setIsBuffering(true);
+          await safeAudioPlay(audio, playRequestIdRef.current);
+          return;
+        } catch (err) {
+          console.warn('Retrying the stream failed:', err.message);
+        }
+      }
+      if (action === 'retry' || action === 'skip') { // broke in the middle again: give up on this song
+        setIsBuffering(false);
+        setIsPlaying(false);
+        showToast(song?.title ? `Couldn't play "${song.title}", skipped.` : "Couldn't play that song, skipped.");
+        clearEndTimers();
+        endTransition();
+        goNextRef.current('skip');
+        return;
+      }
+
+      // 'candidates': the song never really started. Try the next audio address (the old behaviour)
       if (candidateIndexRef.current < activeCandidatesRef.current.length - 1) {
         candidateIndexRef.current += 1;
         const nextUrl = activeCandidatesRef.current[candidateIndexRef.current];
@@ -505,12 +610,14 @@ export const AudioProvider = ({ children }) => {
 
     const onEnded = () => {
       if (!isYouTubeSong(currentSongRef.current)) {
-        handleTrackEnd();
+        finishSongRef.current('ended');
       }
     };
 
     audio.addEventListener('timeupdate', onTimeUpdate);
     audio.addEventListener('loadedmetadata', onLoadedMetadata);
+    audio.addEventListener('durationchange', syncDuration);
+    audio.addEventListener('stalled', onWaiting);
     audio.addEventListener('waiting', onWaiting);
     audio.addEventListener('canplay', onCanPlay);
     audio.addEventListener('playing', onPlaying);
@@ -521,6 +628,8 @@ export const AudioProvider = ({ children }) => {
     return () => {
       audio.removeEventListener('timeupdate', onTimeUpdate);
       audio.removeEventListener('loadedmetadata', onLoadedMetadata);
+      audio.removeEventListener('durationchange', syncDuration);
+      audio.removeEventListener('stalled', onWaiting);
       audio.removeEventListener('waiting', onWaiting);
       audio.removeEventListener('canplay', onCanPlay);
       audio.removeEventListener('playing', onPlaying);
@@ -531,7 +640,7 @@ export const AudioProvider = ({ children }) => {
   }, [isYouTubeSong, checkRecordHistory]);
 
   // Handle track end
-  const handleTrackEnd = () => goNextRef.current('ended');
+
 
   // Start a song on the right engine (audio element or YouTube). The queue is handled by the engine, not here.
   const startPlayback = async (song) => {
@@ -540,6 +649,10 @@ export const AudioProvider = ({ children }) => {
     // Increment request ID to invalidate in-flight play attempts
     const requestId = ++playRequestIdRef.current;
     restoredRef.current = null; // a real play replaces any restored-but-paused song
+    userPausedRef.current = false;
+    midSongErrorsRef.current = 0;
+    clearEndTimers({ keepTransition: true });
+    song._hasRetriedFreshFetch = false; // a song that was refreshed once earlier may be refreshed again
 
     setPlaybackError(null);
     playbackModeRef.current = 'audio'; // every new song starts in audio mode
@@ -571,6 +684,7 @@ export const AudioProvider = ({ children }) => {
       if (ytPlayerRef.current) {
         ytPlayerRef.current.pause();
       }
+      setDuration(0); // the real length arrives with loadedmetadata; never show (or send to the notification) the previous song's length
 
       const audio = audioRef.current;
       const candidates = buildCandidateUrls(song);
@@ -812,6 +926,8 @@ export const AudioProvider = ({ children }) => {
     } else {
       const audio = audioRef.current;
       if (isPlaying) {
+        userPausedRef.current = true;
+        endTransition();
         audio.pause();
         setIsPlaying(false);
       } else {
@@ -828,6 +944,8 @@ export const AudioProvider = ({ children }) => {
   };
 
   const pause = () => {
+    userPausedRef.current = true; // the person (or the notification / headset) paused: never mistaken for "the song ended"
+    clearEndTimers();
     if (isYouTubeSong(currentSong)) {
       ytPlayerRef.current?.pause();
     } else {
@@ -976,7 +1094,6 @@ export const AudioProvider = ({ children }) => {
     return () => clearTimeout(t);
   }, [sleepTimer, showToast]);
 
-  const goNextRef = useRef(goNext);
   goNextRef.current = goNext;
 
   const nextTrack = () => goNext('skip');
@@ -1374,7 +1491,7 @@ export const AudioProvider = ({ children }) => {
         }}
         onEnded={() => {
           if (isYouTubeSong(currentSongRef.current)) {
-            handleTrackEnd();
+            finishSongRef.current('ended');
           }
         }}
         onTimeUpdate={(cur, dur) => {
