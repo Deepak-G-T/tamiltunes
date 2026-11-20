@@ -161,3 +161,7 @@ Songs may carry an optional `videoId`. It comes from the curated map `backend/sr
   (every redirect hop checked against the host list kept in sync with `src/lib/appUpdate.js` by a test). Never widen the host list; never store audio or video.
 - Never commit a keystore, `keystore.properties` or passwords. Never resolve a promise with the `AppUpdater` plugin object (same Capacitor rule as above).
 - UNTESTED on a real phone: the whole flow (install v1, publish v2, tap the button, download, installer prompt, login and data kept). A debug APK cannot be updated by a release APK (different signing key).
+
+## Song ends (fix/playback-end)
+- `frontend/src/lib/playbackEnd.js` holds the rules (one real length per song, finish on ended / stalled / error / stop within 20 s of the end, one retry in the middle, then skip). At a natural end the player keeps saying "playing" until the next song decides, so the Android notification and foreground service never flip to paused between tracks. Phone checks in `docs/ANDROID_APP.md` (19-24): UNTESTED.
+- Do not set `isPlaying` false on the audio element's `pause` that comes from the stream ending; `pauseKind()` decides. Do not use the catalog duration when the audio element has a real one.

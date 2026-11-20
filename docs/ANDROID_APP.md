@@ -90,3 +90,19 @@ Chrome on Android, installed from the browser (menu > Install app, or the bar on
 17. Open the keyboard in the login form: the form stays visible (the layout resizes). [UNTESTED]
 18. Rotate with the player open: nothing breaks. [UNTESTED]
 
+
+### Song ends (fix/playback-end): checks on the phone, all UNTESTED until reported
+19. The song that stopped early (Kikku Aerudae, Padayappa), screen on: it plays to the end or stops early, and the next song starts by itself within a few seconds.
+20. The same song with the screen LOCKED for the whole song: the next song starts by itself; the notification never shows "paused" between the two songs.
+21. A normal song, screen on, then screen locked for a full song and the next one starting. [UNTESTED]
+22. The length shown in the app and in the notification is the same, for the first song and for every later one. [UNTESTED]
+23. Headset / Bluetooth: Next and Pause work at the end of a song. [UNTESTED]
+24. Switch off Wi-Fi and data 10 s before a song ends: it moves on (or skips with a message); switch off in the middle of a song: it retries once, then skips with "Couldn't play ..., skipped". [UNTESTED]
+
+How it works: `lib/playbackEnd.js` (pure rules, tests `playbackEnd.test.js`) used by `AudioContext.jsx`.
+- One length per song: the audio element's real duration (loadedmetadata and durationchange); the catalog length is only used when the element has none. At every new song the length is reset, so the notification never gets the previous song's.
+- A song is finished on `ended`, or when the stream stops (pause nobody asked for), stalls for 5 s, or errors within 20 s of the end. Once per play request.
+- An error in the middle: one retry of the same stream from the same second, then skip with a toast.
+- At a natural end the player keeps saying "playing" until the next song decides (15 s watchdog), so the Android notification and its foreground service are not told "paused" while the screen is locked.
+- The notification waits up to 3 s for the real length and is made again if the length changes.
+- `nativePlayback.test.js` guards that Capacitor's WebView does not require a tap to play audio and that one audio element is reused.

@@ -4,6 +4,7 @@ import { Preferences } from '@capacitor/preferences';
 import { useAudio } from '../../context/AudioContext';
 import { isNativeApp } from '../../lib/platform';
 import { controlsOptions, actionForEvent, shouldShowControls } from '../../lib/nativeMedia';
+import { NOTIFICATION_WAIT_MS } from '../../lib/playbackEnd';
 
 const PREF_PROMPT_SHOWN = 'music_notification_prompt_shown';
 const PREF_HINT_SHOWN = 'music_notification_denied_hint_shown';
@@ -22,7 +23,8 @@ const NativeMediaControls = () => {
   const native = isNativeApp();
   const song = audio.currentSong;
   const show = shouldShowControls({ native, song, engine: audio.activeEngine });
-  const durationKnown = audio.duration > 0;
+  // The notification shows the real length (the audio element's). It is made again when that length changes, so it always matches the app.
+  const durationSec = Math.round(audio.duration > 0 ? audio.duration : 0);
 
   // Notification permission UI state
   const [showPermissionPrompt, setShowPermissionPrompt] = useState(false);
@@ -107,11 +109,13 @@ const NativeMediaControls = () => {
     }
   };
 
-  // The notification for the current song (made again once the length is known, so the seek bar has an end)
+  // The notification for the current song. For a new song it waits (up to 3 s) for the real length, so it is made once with the right length and
+  // not first with the previous song's; it is made again if the length changes (a stream shorter or longer than its header said).
   useEffect(() => {
     if (!native) return undefined;
     let cancelled = false;
-    (async () => {
+    let timer = null;
+    const run = async () => {
       try {
         await ensure();
         const controls = plugin.current;
@@ -131,9 +135,11 @@ const NativeMediaControls = () => {
           setTimeout(() => setDevToast(''), 4000);
         }
       }
-    })();
-    return () => { cancelled = true; };
-  }, [native, show, song?.id, durationKnown, ensure]);
+    };
+    if (show && !(durationSec > 0)) timer = setTimeout(run, NOTIFICATION_WAIT_MS);
+    else run();
+    return () => { cancelled = true; clearTimeout(timer); };
+  }, [native, show, song?.id, durationSec, ensure]);
 
   // Play / pause state, and a position refresh every 10 s (the system moves the bar on by itself in between)
   useEffect(() => {

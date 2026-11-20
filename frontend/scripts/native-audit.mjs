@@ -24,7 +24,9 @@ const song = (id, title) => ({ id, title, artist: 'Test Artist', album: `Film ${
 const S = Array.from({ length: 10 }, (_, i) => song(`s${i + 1}`, `Song ${i + 1}`));
 const R = Array.from({ length: 12 }, (_, i) => song(`r${i + 1}`, `Radio Song ${i + 1}`));
 const USER = { id: 'u1', name: 'Test User', email: 'test@example.com', role: 'user', username: 'testuser' };
-const wav = (() => { const n = 8000 * 600; const b = Buffer.alloc(44 + n, 0x80); b.write('RIFF', 0); b.writeUInt32LE(36 + n, 4); b.write('WAVEfmt ', 8); b.writeUInt32LE(16, 16); b.writeUInt16LE(1, 20); b.writeUInt16LE(1, 22); b.writeUInt32LE(8000, 24); b.writeUInt32LE(8000, 28); b.writeUInt16LE(1, 32); b.writeUInt16LE(8, 34); b.write('data', 36); b.writeUInt32LE(n, 40); return b; })();
+const wavOf = (sec) => { const n = 8000 * sec; const b = Buffer.alloc(44 + n, 0x80); b.write('RIFF', 0); b.writeUInt32LE(36 + n, 4); b.write('WAVEfmt ', 8); b.writeUInt32LE(16, 16); b.writeUInt16LE(1, 20); b.writeUInt16LE(1, 22); b.writeUInt32LE(8000, 24); b.writeUInt32LE(8000, 28); b.writeUInt16LE(1, 32); b.writeUInt16LE(8, 34); b.write('data', 36); b.writeUInt32LE(n, 40); return b; };
+const wav = wavOf(600); // every song is a 10 minute stream, except Song 3 (the catalog says 200 s for all of them)
+const wavShort = wavOf(6); // Song 3 really lasts 6 seconds
 
 const startPreview = () => new Promise((resolve, reject) => {
   const p = spawn(process.execPath, [viteBin, 'preview', '--outDir', 'dist-nativetest', '--port', String(PORT), '--strictPort', '--host', '127.0.0.1'], { stdio: ['ignore', 'pipe', 'pipe'], detached: process.platform !== 'win32' });
@@ -64,7 +66,7 @@ async function run(browser) {
     if (/^\/users\//.test(p)) return json({ success: false, message: 'User not found' }, 404); // a real server answers an unknown profile with 404
     return json({ success: true, items: [], songs: {} });
   });
-  await page.route('https://aac.saavncdn.com/**', (r) => r.fulfill({ status: 200, contentType: 'audio/wav', body: wav, headers: { 'Accept-Ranges': 'bytes' } }));
+  await page.route('https://aac.saavncdn.com/**', (r) => r.fulfill({ status: 200, contentType: 'audio/wav', body: /\/s3_/.test(r.request().url()) ? wavShort : wav, headers: { 'Accept-Ranges': 'bytes' } }));
   await page.route('https://www.youtube.com/iframe_api', (r) => r.fulfill({ contentType: 'application/javascript', body: '' }));
   await page.route('https://fonts.googleapis.com/**', (r) => r.fulfill({ contentType: 'text/css', body: '' }));
 
@@ -266,6 +268,74 @@ async function run(browser) {
   })());
   await until(async () => (await calls('AppUpdater.install')).length === 2);
   await page.getByRole('button', { name: 'Later' }).click();
+
+
+  // ---- the end of a song (stream shorter than its catalog length, errors near the end, mid-song errors, between-track notification state)
+  await page.goto(`${BASE}/`);
+  await page.waitForSelector('section[aria-label="Trending now"]', { timeout: 15000 });
+  const mcCreates = async () => (await log()).filter((x) => x.name === 'MusicControls.create');
+  const sameSong = async (title) => (await mcCreates()).at(-1)?.arg.track === title;
+  const nextCreate = async (from, ms = 15000) => until(async () => { const c = await mcCreates(); return c.length > from && c.at(-1).arg.track !== c[from - 1]?.arg.track; }, ms);
+  const audioState = () => native(() => ({ t: window.__tamiltunes_audio.currentTime, d: window.__tamiltunes_audio.duration, paused: window.__tamiltunes_audio.paused, seeking: window.__tamiltunes_audio.seeking }));
+  const seekTo = async (sec) => { await native((x) => { window.__tamiltunes_audio.currentTime = x; }, sec); await until(async () => { const a = await audioState(); return a.t >= sec && !a.seeking; }); };
+
+  // A: a 6 second stream whose catalog length says 200 s
+  await page.getByRole('button', { name: 'Play Song 3', exact: true }).first().click();
+  await until(async () => (await mcCreates()).some((x) => x.arg.track === 'Song 3'));
+  const nAfter3 = (await mcCreates()).length;
+  check('the notification gets the REAL length of the song (6 s), not the catalog length (200 s) and not the previous song\'s', (await mcCreates()).filter((x) => x.arg.track === 'Song 3').at(-1)?.arg.duration === 6, JSON.stringify((await mcCreates()).map((x) => [x.arg.track, x.arg.duration])));
+  check('a song whose stream is shorter than its catalog length still moves on to the next song', await nextCreate(nAfter3), JSON.stringify((await mcCreates()).map((x) => x.arg.track)));
+  const cs = await mcCreates();
+  const next = cs.at(-1);
+  check('...and the next song\'s notification shows its own length (600 s), made again with it', next.arg.track !== 'Song 3' && next.arg.duration === 600, `${next.arg.track} ${next.arg.duration}`);
+  const iFirst3 = cs.findIndex((x) => x.arg.track === 'Song 3');
+  const logAll = await log();
+  const idxCreate3 = logAll.findIndex((x) => x.name === 'MusicControls.create' && x.arg.track === 'Song 3');
+  const idxNext = logAll.findIndex((x, i) => i > idxCreate3 && x.name === 'MusicControls.create' && x.arg.track !== 'Song 3');
+  check('between the two songs the notification is never told "paused"', !logAll.slice(idxCreate3, idxNext).some((x) => x.name === 'MusicControls.updateElapsed' && x.arg.isPlaying === false), JSON.stringify(logAll.slice(idxCreate3, idxNext).filter((x) => x.name === 'MusicControls.updateElapsed').map((x) => x.arg)));
+  check('...and the next song really plays', await until(playing));
+  check('...the notification says playing from its first moment', next.arg.isPlaying === true);
+  void iFirst3;
+
+  // B: the stream breaks within the last 20 seconds (the queue went on from Song 3 to Song 4 by itself)
+  await until(async () => (await mcCreates()).some((x) => x.arg.track === 'Song 4') && (await playing()));
+  await seekTo(592);
+  let n = (await mcCreates()).length;
+  await native(() => window.__tamiltunes_audio.dispatchEvent(new Event('error')));
+  check('an error near the end of a song goes on to the next song', await nextCreate(n, 8000), JSON.stringify((await mcCreates()).slice(-2).map((x) => x.arg.track)));
+
+  // C: the stream breaks in the middle: one retry from the same second, then skip with a message
+  await until(async () => (await mcCreates()).some((x) => x.arg.track === 'Song 5') && (await playing()));
+  await seekTo(100);
+  await native(() => window.__tamiltunes_audio.dispatchEvent(new Event('error')));
+  check('an error in the middle of a song retries the same stream from the same second', await until(async () => { const a = await audioState(); return !a.paused && a.t >= 99 && a.t < 130; }, 6000) && (await sameSong('Song 5')));
+  n = (await mcCreates()).length;
+  await native(() => window.__tamiltunes_audio.dispatchEvent(new Event('error')));
+  check('a second error in the middle skips the song with a message', await nextCreate(n, 8000) && (await page.locator('text=skipped').count()) > 0, JSON.stringify((await mcCreates()).slice(-2).map((x) => x.arg.track)));
+
+  // D: stopped by something other than the person, close to the end, and it stays stopped
+  await until(async () => (await mcCreates()).some((x) => x.arg.track === 'Song 6') && (await playing()));
+  await seekTo(595);
+  n = (await mcCreates()).length;
+  await native(() => window.__tamiltunes_audio.pause()); // not the app's own pause: like Android taking the audio or the connection dying
+  check('a stop near the end that nobody asked for counts as the end of the song', await nextCreate(n, 8000));
+
+  // E: stuck buffering close to the end for 5 seconds
+  await until(async () => (await mcCreates()).some((x) => x.arg.track === 'Song 7') && (await playing()));
+  await seekTo(596);
+  n = (await mcCreates()).length;
+  await native(() => { Object.defineProperty(window.__tamiltunes_audio, 'readyState', { get: () => 1, configurable: true }); window.__tamiltunes_audio.dispatchEvent(new Event('waiting')); });
+  check('buffering for 5 seconds close to the end counts as the end of the song', await nextCreate(n, 12000));
+  await native(() => { delete window.__tamiltunes_audio.readyState; });
+
+  // F: the person pausing close to the end is a real pause (never mistaken for the end)
+  await until(async () => (await mcCreates()).some((x) => x.arg.track === 'Song 8') && (await playing()));
+  await seekTo(595);
+  n = (await mcCreates()).length;
+  const trackF = (await mcCreates()).at(-1).arg.track;
+  await press('music-controls-pause');
+  await page.waitForTimeout(3500);
+  check('a pause by the person near the end stays paused on the same song', !(await playing()) && (await mcCreates()).length === n && (await sameSong(trackF)));
 
   check("no 'is not implemented' errors in the page console", !consoleErrors.some((e) => e.includes('is not implemented')), consoleErrors.filter((e) => e.includes('is not implemented')).join(' | '));
   check('no page errors', errors.length === 0, errors.join(' | '));
