@@ -45,7 +45,7 @@ const MainLayout = () => {
             className="fixed inset-0 bg-black/60 backdrop-blur-sm"
             onClick={() => setMobileSidebarOpen(false)}
           />
-          <div className="relative w-72 h-full bg-black p-2 z-10 shadow-2xl animate-in slide-in-from-left duration-200">
+          <div className="relative w-72 h-full bg-black p-2 pt-[calc(0.5rem+var(--safe-top))] pb-[calc(0.5rem+var(--safe-bottom))] z-10 shadow-2xl animate-in slide-in-from-left duration-200">
             <Sidebar
               onOpenCreatePlaylist={() => {
                 setMobileSidebarOpen(false);

@@ -47,7 +47,7 @@ const BottomSheet = ({ open, onClose, title, subtitle, children, footer, tall = 
   if (!open || typeof document === 'undefined') return null;
 
   return createPortal(
-    <div style={{ zIndex: 100000 }} className="fixed inset-0 flex items-end sm:items-center justify-center">
+    <div style={{ zIndex: 100000 }} className="fixed inset-0 flex items-end sm:items-center justify-center pt-[var(--safe-top)]">
       <div className="absolute inset-0 bg-black/70 backdrop-blur-sm" onClick={onClose} aria-hidden="true" />
       <div
         ref={ref}
@@ -57,7 +57,7 @@ const BottomSheet = ({ open, onClose, title, subtitle, children, footer, tall = 
         aria-labelledby={bare ? undefined : titleId}
         aria-label={bare ? title : undefined}
         className={`slide-up relative w-full sm:max-w-lg bg-surface-2 border border-white/10 rounded-t-2xl sm:rounded-2xl shadow-2xl flex flex-col ${
-          tall ? 'h-[84dvh]' : 'max-h-[84dvh]'
+          tall ? 'h-[min(84dvh,calc(100dvh-var(--safe-top)-0.5rem))]' : 'max-h-[min(84dvh,calc(100dvh-var(--safe-top)-0.5rem))]'
         } sm:max-h-[85dvh]`}
       >
         {/* Drag handle: swipe down to close (phones). Escape, the backdrop and the X still work. */}
@@ -91,8 +91,8 @@ const BottomSheet = ({ open, onClose, title, subtitle, children, footer, tall = 
         ) : (
           <div className="flex-1 min-h-0 overflow-y-auto overscroll-contain px-4">{children}</div>
         )}
-        {footer && <div className="flex-shrink-0 border-t border-white/10 px-4 pt-3 pb-[max(0.75rem,env(safe-area-inset-bottom))]">{footer}</div>}
-        {!footer && <div className="h-[env(safe-area-inset-bottom)]" />}
+        {footer && <div className="flex-shrink-0 border-t border-white/10 px-4 pt-3 pb-[max(0.75rem,var(--safe-bottom))]">{footer}</div>}
+        {!footer && <div className="h-[var(--safe-bottom)]" />}
       </div>
     </div>,
     document.body

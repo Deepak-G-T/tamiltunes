@@ -134,10 +134,11 @@ const FullScreenPlayer = ({ isOpen, onClose: onCloseProp, onToggleFavorite, isFa
   const content = (
     <div
       style={{ zIndex: 99999 }}
-      className="fixed inset-0 bg-black flex flex-col justify-between p-4 sm:p-8 select-none overflow-y-auto overflow-x-hidden animate-in fade-in duration-200"
+      data-testid="fs-root"
+      className="fixed inset-0 bg-black flex flex-col justify-between px-4 pb-4 pt-[calc(1rem+var(--safe-top))] sm:px-8 sm:pb-8 sm:pt-[calc(2rem+var(--safe-top))] select-none overflow-y-auto overflow-x-hidden animate-in fade-in duration-200"
     >
       {/* Cover-colour wash (follows the artwork) */}
-      <div aria-hidden="true" className="fixed inset-0 cover-wash-strong pointer-events-none" />
+      <div aria-hidden="true" data-testid="fs-background" className="fixed inset-0 cover-wash-strong pointer-events-none" />
 
       {/* Blurred ambient background effect */}
       <div
@@ -164,7 +165,7 @@ const FullScreenPlayer = ({ isOpen, onClose: onCloseProp, onToggleFavorite, isFa
           <ChevronDown className="w-7 h-7" />
         </button>
 
-        <div className="text-center px-2 min-w-0">
+        <div data-testid="fs-source" className="text-center px-2 min-w-0 flex-1">
           <p className="text-[10px] sm:text-xs uppercase tracking-widest text-zinc-500 font-semibold">Playing from</p>
           <MarqueeText text={sourceName} className="text-xs sm:text-sm uppercase tracking-widest text-zinc-300 font-semibold" />
         </div>
@@ -190,7 +191,7 @@ const FullScreenPlayer = ({ isOpen, onClose: onCloseProp, onToggleFavorite, isFa
       </div>
 
       {view === 'queue' && (
-        <div data-testid="fs-queue" className="fixed inset-x-0 bottom-0 top-[4.75rem] z-20 bg-black/80 backdrop-blur-md">
+        <div data-testid="fs-queue" className="fixed inset-x-0 bottom-0 top-[calc(4.75rem+var(--safe-top))] z-20 bg-black/80 backdrop-blur-md">
           <div className="h-full max-w-2xl mx-auto">
             <QueueContent embedded />
           </div>
@@ -306,7 +307,7 @@ const FullScreenPlayer = ({ isOpen, onClose: onCloseProp, onToggleFavorite, isFa
       </div>
 
       {/* Bottom Controls */}
-      <div className="relative z-10 max-w-sm sm:max-w-md mx-auto w-full pb-[max(0.5rem,env(safe-area-inset-bottom))]">
+      <div className="relative z-10 max-w-sm sm:max-w-md mx-auto w-full pb-[max(0.5rem,var(--safe-bottom))]">
         {/* Scrubber */}
         <div className="mb-5">
           <ProgressBar

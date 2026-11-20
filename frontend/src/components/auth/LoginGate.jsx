@@ -6,7 +6,7 @@ import { Music2, Loader2 } from 'lucide-react';
 export const SplashLoader = () => (
   <div
     data-testid="gate-splash-loader"
-    className="fixed inset-0 z-50 flex flex-col items-center justify-center bg-[#09090B] text-white"
+    className="fixed inset-0 z-50 flex flex-col items-center justify-center bg-[#09090B] text-white pt-[var(--safe-top)] pb-[var(--safe-bottom)]"
   >
     <div className="w-14 h-14 rounded-2xl bg-gradient-to-tr from-brand-600 to-brand-400 flex items-center justify-center shadow-xl shadow-brand-600/30 mb-4 animate-pulse">
       <Music2 className="w-7 h-7 text-white" />
