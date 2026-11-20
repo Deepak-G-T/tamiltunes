@@ -4,7 +4,7 @@ import { Preferences } from '@capacitor/preferences';
 import { useAudio } from '../../context/AudioContext';
 import { isNativeApp } from '../../lib/platform';
 import { controlsOptions, actionForEvent, shouldShowControls } from '../../lib/nativeMedia';
-import { NOTIFICATION_WAIT_MS } from '../../lib/playbackEnd';
+import { NOTIFICATION_WAIT_MS, DEBOUNCE_PAUSE_MS } from '../../lib/playbackEnd';
 
 const PREF_PROMPT_SHOWN = 'music_notification_prompt_shown';
 const PREF_HINT_SHOWN = 'music_notification_denied_hint_shown';
@@ -141,25 +141,71 @@ const NativeMediaControls = () => {
     return () => { cancelled = true; clearTimeout(timer); };
   }, [native, show, song?.id, durationSec, ensure]);
 
-  // Play / pause state, and a position refresh every 10 s (the system moves the bar on by itself in between)
+  // Play / pause state, and a position refresh every 10 s (the system moves the bar on by itself in between).
+  // Debounce rule: pauses from track transitions or stream handovers are held for 8 s so the foreground service and
+  // wake lock are not dropped. User pauses (button, lock-screen pause, headset unplug, audio focus loss) are forwarded immediately.
+  const pauseDebounceRef = useRef(null);
   useEffect(() => {
     if (!native || !show) return undefined;
-    const push = async () => {
+    const push = async (overridePlaying) => {
       if (!created.current) return;
       try {
         await ensure();
         const controls = plugin.current;
         if (controls) {
-          await controls.updateElapsed({ isPlaying: latest.current.isPlaying, elapsed: Math.round(latest.current.currentTime) });
+          const isPlaying = overridePlaying !== undefined ? overridePlaying : latest.current.isPlaying;
+          await controls.updateElapsed({ isPlaying, elapsed: Math.round(latest.current.currentTime) });
         }
       } catch (err) {
         console.warn('[NativeMediaControls] Failed to update elapsed:', err?.message || err);
       }
     };
-    push();
-    const t = audio.isPlaying ? setInterval(push, 10000) : null;
+
+    if (audio.isPlaying) {
+      if (pauseDebounceRef.current) {
+        clearTimeout(pauseDebounceRef.current);
+        pauseDebounceRef.current = null;
+      }
+      push(true);
+    } else {
+      if (audio.isUserPaused?.()) {
+        if (pauseDebounceRef.current) {
+          clearTimeout(pauseDebounceRef.current);
+          pauseDebounceRef.current = null;
+        }
+        push(false);
+      } else {
+        if (!pauseDebounceRef.current) {
+          pauseDebounceRef.current = setTimeout(() => {
+            pauseDebounceRef.current = null;
+            push(false);
+          }, DEBOUNCE_PAUSE_MS);
+        }
+      }
+    }
+
+    const t = audio.isPlaying ? setInterval(() => push(), 10000) : null;
     return () => { if (t) clearInterval(t); };
   }, [native, show, audio.isPlaying, song?.id, ensure]);
+
+  // Track transition events for native handover
+  useEffect(() => {
+    if (!native) return undefined;
+    const onStart = async (e) => {
+      await ensure();
+      plugin.current?.startTrackTransition?.({ repeatOne: e.detail?.repeatOne, timeoutMs: DEBOUNCE_PAUSE_MS }).catch(() => {});
+    };
+    const onEnd = async () => {
+      await ensure();
+      plugin.current?.endTrackTransition?.().catch(() => {});
+    };
+    window.addEventListener('tamiltunes:track-transition-start', onStart);
+    window.addEventListener('tamiltunes:track-transition-end', onEnd);
+    return () => {
+      window.removeEventListener('tamiltunes:track-transition-start', onStart);
+      window.removeEventListener('tamiltunes:track-transition-end', onEnd);
+    };
+  }, [native, ensure]);
 
   // Buttons on the notification, the headset and the lock screen (Android delivers them as a document event)
   useEffect(() => {

@@ -27,7 +27,7 @@ import Toast from '../components/common/Toast';
 import { getCoverColor, rgbVar } from '../lib/coverColor';
 import { engineFor, canToggleVideo, getVideoId, planSwitch, planEmbedError, hasAudioStream } from '../lib/playbackLogic';
 import { getToken } from '../lib/tokenStore';
-import { resolveDuration, pauseKind, stallShouldFinish, errorAction, PAUSE_FINISH_MS, STALL_FINISH_MS, TRANSITION_WATCHDOG_MS } from '../lib/playbackEnd';
+import { resolveDuration, pauseKind, stallShouldFinish, errorAction, PAUSE_FINISH_MS, STALL_FINISH_MS, TRANSITION_WATCHDOG_MS, DEBOUNCE_PAUSE_MS } from '../lib/playbackEnd';
 
 const AudioContext = createContext();
 const QUEUE_ACTIONS = ['jumpToUid', 'removeUids', 'moveUidsToQueue', 'reorderByUid', 'clearQueue', 'refreshRecommendations', 'removeCurrentSong', 'playFromHistoryAt', 'saveQueueAsPlaylist', 'toggleStopAfter', 'startSleepTimer', 'cancelSleepTimer', 'setAutoplay', 'continueWithRadio', 'startRadio', 'addToQueue', 'playNext'];
@@ -80,6 +80,7 @@ export const AudioProvider = ({ children }) => {
   const playRequestIdRef = useRef(0);
   // End-of-song bookkeeping (rules in lib/playbackEnd.js)
   const userPausedRef = useRef(false);        // true when the person (or the notification / headset) paused: never treated as "the song ended"
+  const isTransitioningRef = useRef(false);   // true while advancing to next track or loading fresh source
   const finishedRequestRef = useRef(-1);      // the play request already advanced, so 'ended' and the fallbacks never advance twice
   const midSongErrorsRef = useRef(0);
   const endTimersRef = useRef({ pause: null, stall: null, transition: null });
@@ -378,6 +379,7 @@ export const AudioProvider = ({ children }) => {
       await playPromise;
 
       if (requestId === playRequestIdRef.current) {
+        isTransitioningRef.current = false;
         setIsPlaying(true);
         setIsBuffering(false);
         setPlaybackError(null);
@@ -387,7 +389,23 @@ export const AudioProvider = ({ children }) => {
         // Play was safely aborted by a newer track selection
         return;
       }
-      throw err;
+      // One retry for background/gesture policy edge cases before skipping
+      try {
+        const retryPromise = audio.play();
+        playPromiseRef.current = retryPromise;
+        await retryPromise;
+        if (requestId === playRequestIdRef.current) {
+          isTransitioningRef.current = false;
+          setIsPlaying(true);
+          setIsBuffering(false);
+          setPlaybackError(null);
+        }
+      } catch (retryErr) {
+        if (requestId !== playRequestIdRef.current) return;
+        console.warn('Playback play() retry failed:', retryErr.message);
+        showToast(currentSongRef.current?.title ? `Couldn't play "${currentSongRef.current.title}", skipped.` : "Couldn't play that song, skipped.");
+        setTimeout(() => nextTrack(), 500);
+      }
     }
   };
 
@@ -454,9 +472,11 @@ export const AudioProvider = ({ children }) => {
     const rid = playRequestIdRef.current;
     if (finishedRequestRef.current === rid) return;
     finishedRequestRef.current = rid;
+    isTransitioningRef.current = true;
     clearEndTimers({ keepTransition: true });
     if (reason !== 'ended') console.info(`Song finished early (${reason}); going on to the next one.`);
     beginTransition();
+    window.dispatchEvent(new CustomEvent('tamiltunes:track-transition-start', { detail: { repeatOne: qsRef.current?.repeat === 'one' } }));
     goNextRef.current('ended');
   };
   finishSongRef.current = finishSong;
@@ -522,9 +542,11 @@ export const AudioProvider = ({ children }) => {
         clearTimeout(endTimersRef.current.stall);
         clearTimeout(endTimersRef.current.pause);
         endTransition(); // the next song is really playing
+        isTransitioningRef.current = false;
         setIsPlaying(true);
         setIsBuffering(false);
         setPlaybackError(null);
+        window.dispatchEvent(new CustomEvent('tamiltunes:track-transition-end'));
       }
     };
 
@@ -532,13 +554,16 @@ export const AudioProvider = ({ children }) => {
       if (isYouTubeSong(currentSongRef.current)) return;
       const duration = resolveDuration({ audioDuration: audio.duration, catalogDuration: currentSongRef.current?.duration });
       const kind = pauseKind({ ended: audio.ended, userPaused: userPausedRef.current, seeking: audio.seeking, currentTime: audio.currentTime, duration });
-      if (kind === 'finished') {
-        // The stream reached its end: do NOT tell the app or the Android notification "paused" (that demotes the foreground service while the
-        // screen is locked, right before the next song must load). 'ended' follows at once and the queue decides what happens next.
+      if (kind === 'finished' || isTransitioningRef.current) {
+        // The stream reached its end or is transitioning to the next track: do NOT tell the app or the Android notification "paused"
+        // (that demotes the foreground service while the screen is locked, right before the next song must load).
         beginTransition();
         return;
       }
-      setIsPlaying(false);
+      if (userPausedRef.current) {
+        setIsPlaying(false);
+        return;
+      }
       if (kind === 'suspect') {
         // Paused by something other than the person, close to the end (the connection died, Android took the audio). Still paused soon after = finished.
         const rid = playRequestIdRef.current;
@@ -546,6 +571,8 @@ export const AudioProvider = ({ children }) => {
         endTimersRef.current.pause = setTimeout(() => {
           if (rid === playRequestIdRef.current && audio.paused && !audio.ended && !userPausedRef.current) finishSongRef.current('paused-near-end');
         }, PAUSE_FINISH_MS);
+      } else {
+        setIsPlaying(false);
       }
     };
 
@@ -646,6 +673,7 @@ export const AudioProvider = ({ children }) => {
   const startPlayback = async (song) => {
     if (!song) return;
 
+    isTransitioningRef.current = true;
     // Increment request ID to invalidate in-flight play attempts
     const requestId = ++playRequestIdRef.current;
     restoredRef.current = null; // a real play replaces any restored-but-paused song
@@ -945,7 +973,9 @@ export const AudioProvider = ({ children }) => {
 
   const pause = () => {
     userPausedRef.current = true; // the person (or the notification / headset) paused: never mistaken for "the song ended"
+    isTransitioningRef.current = false;
     clearEndTimers();
+    window.dispatchEvent(new CustomEvent('tamiltunes:track-transition-end'));
     if (isYouTubeSong(currentSong)) {
       ytPlayerRef.current?.pause();
     } else {
@@ -1262,16 +1292,31 @@ export const AudioProvider = ({ children }) => {
   useEffect(() => {
     const next = qs.upcoming[0]?.song;
     if (!next || !currentSong || engineFor(next, 'audio', unavailableVideosRef.current) === 'youtube') return undefined;
-    const t = setTimeout(() => {
+    let cancelled = false;
+    const t = setTimeout(async () => {
       try {
-        const url = buildCandidateUrls(next)[0];
-        if (!url) return;
-        const el = preloadRef.current ?? (preloadRef.current = new Audio());
-        el.preload = 'auto';
-        el.src = new URL(url, window.location.origin).href;
+        let url = buildCandidateUrls(next)[0];
+        // If streamUrl is not a full URL or needs fresh resolution, pre-resolve ahead of time
+        if (!url || !url.startsWith('http')) {
+          try {
+            const res = await api.get(`/music/song/${next.id}?fresh=1`);
+            if (!cancelled && res.data?.success && res.data?.song?.streamUrl) {
+              next.streamUrl = res.data.song.streamUrl;
+              url = buildCandidateUrls(next)[0];
+            }
+          } catch { /* best effort */ }
+        }
+        if (url && !cancelled) {
+          const resolvedUrl = new URL(url, window.location.origin).href;
+          // Warm TCP/TLS handshake and first chunk in browser socket pool / HTTP cache
+          fetch(resolvedUrl, { headers: { Range: 'bytes=0-65535' } }).catch(() => {});
+          const el = preloadRef.current ?? (preloadRef.current = new Audio());
+          el.preload = 'auto';
+          el.src = resolvedUrl;
+        }
       } catch { /* preloading is best effort */ }
-    }, 4000); // after the current song has settled
-    return () => clearTimeout(t);
+    }, 2000); // 2s after the current song has settled
+    return () => { cancelled = true; clearTimeout(t); };
   }, [nextUpId, currentSong?.id]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // In video mode, fetch the next song's thumbnail ahead of time (the embed API cannot preload a second video without replacing the
@@ -1461,7 +1506,9 @@ export const AudioProvider = ({ children }) => {
         playAsVideo,
         switchPlaybackMode,
         registerVideoSlot,
-        unavailableVersion
+        unavailableVersion,
+        isUserPaused: () => userPausedRef.current,
+        isTransitioning: () => isTransitioningRef.current
       }}
     >
       {/* YouTube IFrame Engine (visible floating player, min 200x200) */}
