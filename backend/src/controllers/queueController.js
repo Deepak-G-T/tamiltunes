@@ -4,6 +4,7 @@ import { musicService } from '../services/music/providerManager.js';
 import { getSignalsStore } from '../services/related/signalsStore.js';
 import { getQueueStore } from '../services/queueState/store.js';
 import { resolveSongs } from '../services/queueState/resolve.js';
+import { NO_REPEAT } from '../services/noRepeat/config.js';
 
 export const MAX_UPCOMING = 500;
 export const MAX_HISTORY = 50;
@@ -21,6 +22,9 @@ export const queueSchema = z.object({
   mode: z.enum(['radio', 'context']),
   sourceLabel: z.string().max(120).nullish(),
   deviceId: z.string().min(1).max(64).regex(/^[\w\-]+$/).nullish(),
+  // no-repeat session memory: compact keys only (nothing else from the client is stored)
+  heard: z.array(z.object({ k: z.string().min(1).max(200), id: songId.optional() }).strict()).max(NO_REPEAT.sessionMemoryMax).optional(),
+  allowRepeats: z.boolean().optional(),
 }).strict().refine((q) => q.currentIndex < q.items.length, { message: 'currentIndex is outside the queue', path: ['currentIndex'] });
 
 const songs = {
@@ -45,6 +49,8 @@ const presentState = (row) => ({
   mode: row.mode,
   sourceLabel: row.sourceLabel ?? null,
   deviceId: row.deviceId ?? null,
+  heard: row.heard ?? [],
+  allowRepeats: Boolean(row.allowRepeats),
   updatedAt: row.updatedAt instanceof Date ? row.updatedAt.toISOString() : row.updatedAt,
 });
 
@@ -74,6 +80,7 @@ export const putQueue = async (req, res, next) => {
     const row = await getQueueStore().put(req.user.id, {
       items: q.items, currentIndex: q.currentIndex, positionSec: q.positionSec, shuffle: q.shuffle, repeat: q.repeat,
       autoplay: q.autoplay, mode: q.mode, sourceLabel: q.sourceLabel ?? null, deviceId: q.deviceId ?? null,
+      heard: q.heard ?? [], allowRepeats: Boolean(q.allowRepeats),
     });
     res.json({ success: true, updatedAt: presentState(row).updatedAt });
   } catch (err) { next(err); }

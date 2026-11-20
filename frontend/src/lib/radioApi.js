@@ -6,9 +6,11 @@ import api from '../services/api';
  * @param {{ seedId: string, exclude?: string[], limit?: number }} req
  * @returns {Promise<object[]>} songs (each with a `why` label such as "Same singer")
  */
-export async function fetchRelated({ seedId, exclude = [], limit = 20 }) {
+export async function fetchRelated({ seedId, exclude = [], limit = 20, allowRepeats = false, wide = false, context = null }) {
   const { data } = await api.get(`/songs/${encodeURIComponent(seedId)}/related`, {
-    params: { limit, ...(exclude.length ? { exclude: exclude.join(',') } : {}) },
+    params: { limit, ...(exclude.length ? { exclude: exclude.join(',') } : {}), ...(allowRepeats ? { allowRepeats: 1 } : {}), ...(wide ? { wide: 1 } : {}), ...(context ? { context } : {}) },
   });
-  return data?.items ?? [];
+  const items = data?.items ?? [];
+  items.meta = data?.meta ?? null; // fresh / widened / exhausted: the queue shows "You've heard everything close to this" when exhausted
+  return items;
 }

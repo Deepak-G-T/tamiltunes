@@ -55,8 +55,14 @@ export function pickSection(candidates, { seen, rng, weekPlays = new Map(), max 
  * @param {{ exclude?: object[], seed: string, weekPlays?: Map<string, number>, hero?: boolean }} opts
  * @returns {{ hero: object | null, sections: { id: string, title: string, kind: string, items: object[] }[], hidden: string[] }}
  */
-export function assembleHome(plan, { exclude = [], seed, weekPlays = new Map(), hero = true }) {
-  const seen = createSeen(exclude); // Speed Dial songs (and anything else already on the page) never appear again
+export function assembleHome(plan, { exclude = [], seed, weekPlays = new Map(), hero = true, recent = [], blocked = [], exempt = [] }) {
+  const seen = createSeen(exclude);
+  // No-repeat: songs played in the last day are left out of every shelf except the exempt ones ("Continue listening", Speed Dial, Liked),
+  // and songs the person blocked are left out of all of them. Compared by song identity, so a re-upload or a version counts as the same song.
+  const recentSeen = createSeen(recent);
+  const blockedSeen = createSeen(blocked);
+  const exemptIds = new Set(exempt);
+  const allowed = (spec) => (song) => !blockedSeen.has(song) && (exemptIds.has(spec.id) || !recentSeen.has(song)); // Speed Dial songs (and anything else already on the page) never appear again
   const sections = [];
   const hidden = [];
   let heroSong = null;
@@ -69,11 +75,11 @@ export function assembleHome(plan, { exclude = [], seed, weekPlays = new Map(), 
       continue;
     }
     if (hero && !heroSong && spec.heroFrom) {
-      heroSong = pickSection(spec.pool, { seen, rng: rngFrom(`${seed}:hero`), weekPlays, max: 1, caps: false })[0] || null;
+      heroSong = pickSection((spec.pool || []).filter(allowed(spec)), { seen, rng: rngFrom(`${seed}:hero`), weekPlays, max: 1, caps: false })[0] || null;
       if (heroSong) seen.add(heroSong);
     }
     const min = spec.min ?? MIN_ITEMS;
-    const items = pickSection(spec.pool || [], { seen, rng, weekPlays, max: spec.max ?? MAX_ITEMS, caps: spec.caps !== false });
+    const items = pickSection((spec.pool || []).filter(allowed(spec)), { seen, rng, weekPlays, max: spec.max ?? MAX_ITEMS, caps: spec.caps !== false });
     if (items.length < min) { hidden.push(spec.id); continue; } // hide rather than repeat or show a thin shelf
     for (const s of items) seen.add(s);
     sections.push({ id: spec.id, title: spec.title, ...(spec.subtitle ? { subtitle: spec.subtitle } : {}), ...(spec.display ? { display: spec.display } : {}), kind: 'songs', items });

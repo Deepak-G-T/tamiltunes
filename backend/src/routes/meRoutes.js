@@ -8,6 +8,7 @@ import {
 } from '../controllers/speedDialController.js';
 
 import { getQueue, getQueueMeta, putQueue, deleteQueue, queueSchema } from '../controllers/queueController.js';
+import { listBlocks, addBlock, removeBlock, blockSchema } from '../controllers/blocksController.js';
 
 const router = Router();
 router.use(requireAuth);
@@ -16,6 +17,11 @@ router.get('/queue/meta', getQueueMeta);
 router.get('/queue', getQueue);
 router.put('/queue', queueWriteLimiter, validateBody(queueSchema), putQueue);
 router.delete('/queue', queueWriteLimiter, deleteQueue);
+
+// "Don't recommend this": blocked songs (and their versions) never come back in a radio or a mix
+router.get('/blocks', listBlocks);
+router.post('/blocks', queueWriteLimiter, validateBody(blockSchema), addBlock);
+router.delete('/blocks/:songId', queueWriteLimiter, removeBlock);
 
 router.post('/play-events', playEventLimiter, validateBody(playEventSchema), postPlayEvent);
 

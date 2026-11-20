@@ -167,3 +167,9 @@ Songs may carry an optional `videoId`. It comes from the curated map `backend/sr
 ## Song ends (fix/playback-end)
 - `frontend/src/lib/playbackEnd.js` holds the rules (one real length per song, finish on ended / stalled / error / stop within 20 s of the end, one retry in the middle, then skip). At a natural end the player keeps saying "playing" until the next song decides, so the Android notification and foreground service never flip to paused between tracks. Phone checks in `docs/ANDROID_APP.md` (19-24): UNTESTED.
 - Do not set `isPlaying` false on the audio element's `pause` that comes from the stream ending; `pauseKind()` decides. Do not use the catalog duration when the audio element has a real one.
+
+## No repeats (feature/no-repeat, on master)
+- Notes, settings and rules: `docs/NO_REPEAT.md`; knobs in `backend/src/services/noRepeat/config.js`. Memory = `play_events` (rolling 200 + cool-downs) + `queue_state.heard` (session) + `user_song_blocks`.
+- Migration `20261128000000_no_repeat` (additive; Neon backup BEFORE merging). Passed on a scratch Postgres 16 (migrate deploy, re-run, API suite, store round trips).
+- Blocked songs never return, even with allow repeats. Blocks take only a song id (the server looks the song up).
+- UNTESTED: live JioSaavn widening, the exhausted card and "Don't recommend this" in a browser/phone, guests (blocks need sign-in).
