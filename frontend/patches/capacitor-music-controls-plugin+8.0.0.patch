@@ -1,5 +1,5 @@
 diff --git a/node_modules/capacitor-music-controls-plugin/android/src/main/java/com/ingageco/capacitormusiccontrols/CapacitorMusicControls.java b/node_modules/capacitor-music-controls-plugin/android/src/main/java/com/ingageco/capacitormusiccontrols/CapacitorMusicControls.java
-index 144c4a7..1a4cf63 100644
+index 144c4a7..0dbc601 100644
 --- a/node_modules/capacitor-music-controls-plugin/android/src/main/java/com/ingageco/capacitormusiccontrols/CapacitorMusicControls.java
 +++ b/node_modules/capacitor-music-controls-plugin/android/src/main/java/com/ingageco/capacitormusiccontrols/CapacitorMusicControls.java
 @@ -5,6 +5,9 @@ import com.getcapacitor.Plugin;
@@ -26,87 +26,34 @@ index 144c4a7..1a4cf63 100644
  public class CapacitorMusicControls extends Plugin {
  
  	private static final String TAG = "CapacitorMusicControls";
-@@ -64,6 +72,9 @@ public class CapacitorMusicControls extends Plugin {
+@@ -64,6 +72,8 @@ public class CapacitorMusicControls extends Plugin {
  	private boolean hasScrubbing = false;
  	private boolean hasPrev = true;
  	private boolean hasNext = true;
-+	private AudioManager.OnAudioFocusChangeListener audioFocusListener;
 +	private static android.os.Handler mainHandler = new android.os.Handler(android.os.Looper.getMainLooper());
 +	private Runnable syntheticNextRunnable = null;
  
  
  	private MediaSessionCallback mMediaSessionCallback = new MediaSessionCallback(this);
-@@ -112,10 +123,12 @@ public class CapacitorMusicControls extends Plugin {
+@@ -112,10 +122,11 @@ public class CapacitorMusicControls extends Plugin {
  				this.hasPrev = infos.hasPrev;
  				this.hasNext = infos.hasNext;
  
 -				if(infos.isPlaying)
-+				if(infos.isPlaying) {
-+					requestAudioFocus();
- 					setMediaPlaybackState(PlaybackStateCompat.STATE_PLAYING);
+-					setMediaPlaybackState(PlaybackStateCompat.STATE_PLAYING);
 -				else
++				if(infos.isPlaying) {
++						setMediaPlaybackState(PlaybackStateCompat.STATE_PLAYING);
 +				} else {
  					setMediaPlaybackState(PlaybackStateCompat.STATE_PAUSED);
 +				}
  
  				call.resolve();
  
-@@ -238,9 +251,61 @@ public class CapacitorMusicControls extends Plugin {
+@@ -238,9 +249,9 @@ public class CapacitorMusicControls extends Plugin {
  		};
  
  
-+		// Register audio focus listener
-+		this.mAudioManager = (AudioManager) context.getSystemService(Context.AUDIO_SERVICE);
-+		this.audioFocusListener = new AudioManager.OnAudioFocusChangeListener() {
-+			private boolean pausedForLoss = false;
-+			private boolean isDucked = false;
-+
-+			@Override
-+			public void onAudioFocusChange(int focusChange) {
-+				Log.i(TAG, "onAudioFocusChange: " + focusChange);
-+				switch (focusChange) {
-+					case AudioManager.AUDIOFOCUS_LOSS:
-+						pausedForLoss = false;
-+						isDucked = false;
-+						if (mConnection != null && mConnection.service != null) {
-+							mConnection.service.clearForeground(true);
-+						}
-+						cancelSyntheticNext();
-+						JSObject retLoss = new JSObject();
-+						retLoss.put("message", "music-controls-pause");
-+						controlsNotification(retLoss);
-+						abandonAudioFocus();
-+						break;
-+					case AudioManager.AUDIOFOCUS_LOSS_TRANSIENT:
-+						pausedForLoss = true;
-+						cancelSyntheticNext();
-+						JSObject retTrans = new JSObject();
-+						retTrans.put("message", "music-controls-pause");
-+						controlsNotification(retTrans);
-+						break;
-+					case AudioManager.AUDIOFOCUS_LOSS_TRANSIENT_CAN_DUCK:
-+						isDucked = true;
-+						JSObject retDuck = new JSObject();
-+						retDuck.put("message", "music-controls-duck");
-+						controlsNotification(retDuck);
-+						break;
-+					case AudioManager.AUDIOFOCUS_GAIN:
-+						if (isDucked) {
-+							isDucked = false;
-+							JSObject retUnduck = new JSObject();
-+							retUnduck.put("message", "music-controls-unduck");
-+							controlsNotification(retUnduck);
-+						}
-+						if (pausedForLoss) {
-+							pausedForLoss = false;
-+							JSObject retGain = new JSObject();
-+							retGain.put("message", "music-controls-play");
-+							controlsNotification(retGain);
-+						}
-+						break;
-+				}
-+			}
-+		};
 +
  		// Register media (headset) button event receiver
  		try {
@@ -114,16 +61,15 @@ index 144c4a7..1a4cf63 100644
  			Intent headsetIntent = new Intent("music-controls-media-button");
  			this.mediaButtonPendingIntent = PendingIntent.getBroadcast(
  				context, 0, headsetIntent, 
-@@ -266,6 +331,8 @@ public class CapacitorMusicControls extends Plugin {
+@@ -266,6 +277,7 @@ public class CapacitorMusicControls extends Plugin {
  		final Activity activity = getActivity();
  		final Context context = activity.getApplicationContext();
  
 +		cancelSyntheticNext();
-+		abandonAudioFocus();
  		this.destroyPlayerNotification();
  		this.stopMessageReceiver(context);
  		this.unregisterMediaButtonEvent();
-@@ -275,6 +342,55 @@ public class CapacitorMusicControls extends Plugin {
+@@ -275,6 +287,55 @@ public class CapacitorMusicControls extends Plugin {
  		call.resolve();
  	}
  
@@ -179,7 +125,7 @@ index 144c4a7..1a4cf63 100644
  
  	protected void handleOnDestroy() {
  
-@@ -316,6 +432,71 @@ public class CapacitorMusicControls extends Plugin {
+@@ -316,6 +377,57 @@ public class CapacitorMusicControls extends Plugin {
  		}
  	}
  
@@ -232,26 +178,12 @@ index 144c4a7..1a4cf63 100644
 +		}
 +	}
 +
-+	private void requestAudioFocus() {
-+		if (mAudioManager != null && audioFocusListener != null) {
-+			try {
-+				mAudioManager.requestAudioFocus(audioFocusListener, AudioManager.STREAM_MUSIC, AudioManager.AUDIOFOCUS_GAIN);
-+			} catch (Exception ignored) {}
-+		}
-+	}
-+
-+	private void abandonAudioFocus() {
-+		if (mAudioManager != null && audioFocusListener != null) {
-+			try {
-+				mAudioManager.abandonAudioFocus(audioFocusListener);
-+			} catch (Exception ignored) {}
-+		}
 +	}
 +
  	@PluginMethod()
  	public void updateIsPlaying(PluginCall call) {
  		JSObject params = call.getData();
-@@ -329,10 +510,14 @@ public class CapacitorMusicControls extends Plugin {
+@@ -329,10 +441,13 @@ public class CapacitorMusicControls extends Plugin {
  			final boolean isPlaying = params.getBoolean("isPlaying");
  			this.notification.updateIsPlaying(isPlaying);
  
@@ -259,7 +191,6 @@ index 144c4a7..1a4cf63 100644
 +			if(isPlaying) {
 +				cancelSyntheticNext();
 +				if (mConnection != null && mConnection.service != null) mConnection.service.endTransition();
-+				requestAudioFocus();
  				setMediaPlaybackState(PlaybackStateCompat.STATE_PLAYING);
 -			else
 +			} else {
@@ -268,13 +199,12 @@ index 144c4a7..1a4cf63 100644
  
  			call.resolve();
  		} catch(JSONException e){
-@@ -352,10 +537,12 @@ public class CapacitorMusicControls extends Plugin {
+@@ -352,10 +467,11 @@ public class CapacitorMusicControls extends Plugin {
  			this.elapsedMs = (long) (params.optDouble("elapsed", this.elapsedMs / 1000.0) * 1000);
  			this.notification.updateIsPlaying(isPlaying);
  
 -			if(isPlaying)
 +			if(isPlaying) {
-+				requestAudioFocus();
  				setMediaPlaybackState(PlaybackStateCompat.STATE_PLAYING);
 -			else
 +			} else {

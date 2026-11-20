@@ -42,7 +42,7 @@ describe('background playback handover safeguards', () => {
     expect(patch).toMatch(/isTransitioning/);
     expect(patch).toMatch(/startTrackTransition/);
     expect(patch).toMatch(/endTrackTransition/);
-    expect(patch).toMatch(/AUDIOFOCUS_LOSS/);
+    expect(patch).toMatch(/clearForeground/);
     expect(patch).toMatch(/safeTimeout/);
   });
 });
