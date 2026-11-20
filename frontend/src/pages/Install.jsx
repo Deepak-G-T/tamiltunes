@@ -45,7 +45,7 @@ const Install = () => {
           <Download className="w-4 h-4" aria-hidden="true" /> Download for Android
         </a>
         <ol className="space-y-2.5">
-          <Step n={1}>Tap <b>Download for Android</b> and open the file <b>TamilTunes.apk</b> when it finishes.</Step>
+          <Step n={1}>Tap <b>Download for Android</b> and open the downloaded file <b>app-release.apk</b> when it finishes.</Step>
           <Step n={2}>If Android asks, allow your browser (for example Chrome) to <b>install unknown apps</b>, then go back and tap <b>Install</b>.</Step>
           <Step n={3}>Open <b>TamilTunes</b> from your app list. Later versions install over this one and keep your account.</Step>
         </ol>
