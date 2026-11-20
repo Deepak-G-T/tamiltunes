@@ -106,6 +106,9 @@ const SettingsSheet = ({ profile, open, onClose, onChange }) => {
         )}
         <h3 className="pt-4 text-xs uppercase tracking-wider font-bold text-zinc-500">Video</h3>
         <VideoSettings />
+        <h3 className="mt-4 text-sm font-semibold text-white">Your favourites</h3>
+        <p className="text-xs text-zinc-400">Singers, music directors and eras that shape your Daily Mixes.</p>
+        <button type="button" onClick={() => { onClose(); navigate('/welcome?edit=1'); }} data-testid="edit-favourites" className="press mt-2 min-h-11 px-4 rounded-full bg-white/10 hover:bg-white/15 text-sm font-semibold text-white">Choose your favourites</button>
         <h3 className="mt-4 text-sm font-semibold text-white">Blocked songs</h3>
         <BlockedSongs />
       </div>
