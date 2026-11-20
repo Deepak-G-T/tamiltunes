@@ -17,7 +17,7 @@
 
 import { createIdentitySet, collapseDuplicates, movieOf, sameSong } from './songIdentity';
 
-export const REFILL_THRESHOLD = 3; // refill when fewer than this many songs remain
+export const REFILL_THRESHOLD = 4; // refill when 3 songs remain in the queue (plenty of runway)
 export const REFILL_BATCH = 10; // songs requested per refill (the panel then says "Added 10 similar songs")
 export const MAX_ARTIST_RUN = 3;
 export const MOVIE_WINDOW = 10; // within any 10 songs of the radio block ...
