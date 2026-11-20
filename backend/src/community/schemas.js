@@ -46,4 +46,4 @@ export const playlistUpdateSchema = z.object({
   isPublic: z.boolean().optional(),
 }).strict();
 
-export const deleteAccountSchema = z.object({ password: z.string().min(1).max(200) });
+export const deleteAccountSchema = z.object({ password: z.string().max(200).optional(), confirmEmail: z.string().max(320).optional() });

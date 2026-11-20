@@ -13,7 +13,7 @@ datasource db {
 model User {
   id        String   @id @default(uuid())
   email     String   @unique
-  password  String
+  password  String?   // null for Google accounts (Google-only sign-in)
   name      String
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -37,6 +37,9 @@ model User {
   twoFactorEnabled Boolean  @default(false) @map("two_factor_enabled")
   twoFactorRecoveryCodes String[] @default([]) @map("two_factor_recovery_codes")
   passwordChangedAt DateTime? @map("password_changed_at") // sign-in tokens issued before this are no longer accepted
+  googleSub       String?   @unique @map("google_sub") // Google's stable id for the person; the email may change, this does not
+  lastSeenAt      DateTime? @map("last_seen_at")        // last request (updated at most once a minute): "online now" in the admin panel
+  lastLoginAt     DateTime? @map("last_login_at")
   passwordResetTokens PasswordResetToken[]
 
   playlists        Playlist[]
@@ -53,6 +56,7 @@ model User {
   auditLogs        AuditLog[]
 
   @@map("users")
+  @@index([lastSeenAt], map: "users_last_seen_at_idx")
   videoReports VideoReport[]
 }
 

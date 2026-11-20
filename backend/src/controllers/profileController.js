@@ -5,6 +5,7 @@ import { checkContent, FILTER_MESSAGES } from '../community/contentFilter.js';
 import { presentOwnProfile } from '../community/presenters.js';
 import { db } from '../prisma/client.js';
 import { verifyPassword } from '../services/auth/credentials.js';
+import { config } from '../config/env.js';
 
 const fail = (res, status, message, extra = {}) => res.status(status).json({ success: false, message, ...extra });
 
@@ -79,10 +80,14 @@ export const checkUsername = async (req, res, next) => {
 
 export const deleteMyAccount = async (req, res, next) => {
   try {
-    // Re-check the password: a stolen token alone must not be able to destroy an account.
+    // Re-check who is asking: a stolen token alone must not be able to destroy an account.
+    // Google accounts have no password: they type their own email address to confirm.
     const row = await db.user.findUnique({ where: { id: req.user.id } });
-    if (!row || !(await verifyPassword(req.body.password, row.password))) {
-      return fail(res, 403, 'Incorrect password');
+    if (!row) return fail(res, 403, 'Account not found');
+    if (row.password && config.passwordAuth) {
+      if (!(await verifyPassword(req.body.password, row.password))) return fail(res, 403, 'Incorrect password');
+    } else if (String(req.body.confirmEmail || '').trim().toLowerCase() !== String(row.email).toLowerCase()) {
+      return fail(res, 403, 'Type your email address to confirm');
     }
     await getStore().deleteUser(req.user.id);
     res.json({ success: true });
