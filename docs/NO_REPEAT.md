@@ -1,40 +1,64 @@
-# No-repeat guarantee
+# No repeats (the simple rule)
 
-Goal: the queue, autoplay, Daily Mix and the Home shelves never play the same song twice by accident.
-"Same song" means the same *canonical* song: re-uploads, compilation copies, spelling variants (`Annul Maelae` / `Annul Melae`) and
-versions (`Pavazha Malli` / `Pavazha Malli (Unplugged)`) all count as one (see `docs/RADIO.md`, `songIdentity.js`, `identity.js`).
+**The same song must not appear twice inside the queue.** That is the whole rule. Listening history is not a rule: a song played yesterday (or a minute ago) may come back.
+(The first version of this feature had a 200-song rolling history, a 7-day cool-down, a 30-day skip cool-down and a memory of everything played in the session. It emptied
+the queue ("You've heard everything close to this" with one song left), so all of that was removed.)
+
+"Same song" = the same canonical song (`songIdentity.js` / `backend/src/services/related/identity.js`): another id, another cover or album, another spelling ("Annul Maelae" / "Annul Melae"),
+the singers in another order.
+
+## What the radio leaves out (the hard rules)
+1. The **playing song** and **versions of it** (unplugged, remix, acoustic ...).
+2. Songs **already in the queue** (what you added and the radio's block), and any copy of them under another id, cover or spelling.
+3. One copy of a song **inside a batch** (the best version: original release over a compilation).
+4. Songs you chose **"Don't recommend this"** for (and their versions), and hidden / deleted songs. This is the only thing a listener chose to keep out, so it stays.
+
+Versions of a song that is only *queued* are allowed (only the playing song is protected from its versions).
+
+## The one soft preference
+Prefer songs that are **not among the last 20 played** (`NO_REPEAT.recentAvoid`). It is only a preference: when fewer than **15** songs would remain without them
+(`NO_REPEAT.softMinPool`), it is dropped first and the small pool is used as it is. The app sends its last played ids (`recent`, newest first, at most 50); the server uses the first 20.
+Ranking nudges from the original radio stay (`recentlyPlayed` -3 for 6 hours, `skippedRecently` -2.5 for 7 days) but they only move a song down the list, never remove it.
+
+## Keeping the queue stocked
+- The app asks for more when **fewer than 5** songs remain (`REFILL_THRESHOLD` in `radioQueue.js`) and requests **50** (`REFILL_BATCH`; the server caps at 60).
+- If a batch has fewer than 15 candidates after the hard rules, the server widens the search step by step: same music director, same era, same language, trending in the language (`NO_REPEAT.widenSteps`).
+- After every refill the **whole queue is checked** (`cleanRadioDuplicates`): a duplicate radio row is removed, keeping the first. Songs you added yourself, and playlist / album rows, are never touched.
+  The same check runs when a queue is loaded or restored, when the playing song changes, and on "Refresh recommendations".
+
+## What the person sees
+- **"Out of new songs"**: a small one-line banner, only when the server says nothing is left that is not already in the queue, even after widening (`meta.exhausted`). It is about the playing song:
+  the next song asks again. Play history can never cause it.
+- **"Couldn't load more songs - Retry"**: a small banner when the request failed. Retry asks again at once (the app also retries by itself with a 1 s to 30 s back-off).
+- Adding a duplicate by hand still asks **"Already in queue - add again?"**, and the radio never touches what you added.
 
 ## Settings (one file)
-`backend/src/services/noRepeat/config.js`: rolling history 200, session memory 600, cool-down 7 days after a full listen,
-30 days after an early skip (< 30 s), liked songs return in Taste Radio after 24 h, widen when fewer than 10 fresh songs,
-Home skips songs played in the last 24 h (not "Continue listening", Speed Dial, Liked), block limit 1000.
+`backend/src/services/noRepeat/config.js`: `recentAvoid` 20, `softMinPool` 15, `maxRecent` 50, `minCandidates` 15, `widenSteps`, `maxBlocks`, `maxExclude`, and the Home page's own numbers
+(`homeSkipPlayedHours` 24, `homeShelvesExempt`). Frontend: `REFILL_THRESHOLD` 5, `REFILL_BATCH` 50 in `frontend/src/lib/radioQueue.js`.
 
 ## Where it lives
 | Part | Where |
 | --- | --- |
-| Memory (played, rolling 200, cool-downs, blocks) | `services/noRepeat/memory.js` (loaded from `play_events`, `queue_state.heard`, `user_song_blocks`) |
-| Filter order: a) in queue, b) heard, c) cooling / hidden, d) variant of playing or queued | `services/noRepeat/filter.js` |
-| Widening ladder: composer, era, language, trending | `services/noRepeat/widen.js`, used by `relatedService.getRelated` |
-| Exhausted: `meta.exhausted` (nothing fresh after widening) | `relatedService` + app card "You've heard everything close to this" |
-| Allow repeats (only after the listener agrees): least recently played first, flagged `repeat` | `GET /api/songs/:id/related?allowRepeats=1` |
-| Session memory saved with the queue (`heard`, `allowRepeats`), shared by devices | `PUT/GET /api/me/queue`; guests keep it in the browser queue copy |
-| "Don't recommend this" | `GET/POST/DELETE /api/me/blocks` (`POST` takes only `songId`), app: row menu, Settings > Blocked songs |
-| Home | `homeFeed/assemble.js` (one identity set in section order; 24 h skip; blocked; thin shelves hidden) |
-| Frontend engine | `frontend/src/lib/radioQueue.js` (`collectHeard`, `filterNewSongs`, `allowRepeatsNow`, `playSomethingDifferent`, `refreshRecommendations`) |
+| Hard rules and the soft preference | `services/noRepeat/filter.js` (`filterCandidates`, `softAvoidRecent`) |
+| The radio batch (hard rules, widening, soft preference, ranking) | `services/related/relatedService.js` (`getRelated`) |
+| Block list ("Don't recommend this") | `services/noRepeat/memory.js`, `blocksStore.js`, `GET/POST/DELETE /api/me/blocks` |
+| Widening ladder | `services/noRepeat/widen.js` |
+| Endpoint | `GET /api/songs/:id/related?limit=50&exclude=<queue ids>&recent=<last played ids>` |
+| Queue engine, refill, dedupe, banners | `frontend/src/lib/radioQueue.js` (`filterNewSongs`, `cleanRadioDuplicates`, `applyRefill`, `isExhausted`, `refillFailedBanner`, `retryRefill`) |
+| Banners | `components/player/queue/QueueContent.jsx` (`queue-banner-exhausted`, `queue-banner-error`) |
 
-## Rules worth remembering
-- Blocked songs (and their versions) never return, not even with "Allow repeats".
-- Repeat modes, manual adds, playlists, albums and Liked songs keep their own order. Autoplay after them is filtered against everything they played.
-- The playing and queued songs are never repeated, even with "Allow repeats". The server re-checks against the live queue (the app also checks again right before inserting).
-- Saved memory holds compact keys (`variantKey`), not titles. Spelling variants older than the last 50 songs are caught by the server (it has the song data); the app matches exact keys for them.
-- Existing queues are cleaned when loaded and on "Refresh recommendations": autoplay rows that repeat an earlier row or the playing song are removed (the first stays); songs you added are never touched.
+## Home page (unchanged by this simplification)
+The Home feed has its own rules: one song once across the shelves (same song, any id), shelves skip songs played in the last 24 hours (not "Continue listening", Speed Dial, Liked), blocked songs
+are left out, thin shelves are hidden (`docs/HOME_FEED.md`). That 24-hour rule is a history rule too; it was not part of the queue problem and is still on. Say if it should go as well.
 
-## Migration
-`20261128000000_no_repeat` (additive, idempotent): `queue_state.heard`, `queue_state.allow_repeats`, table `user_song_blocks`.
-Take the Neon backup BEFORE merging (Render runs `migrate deploy`).
+## Removed, and what is left behind
+- Removed: the 200-song rolling history, both cool-downs, the session memory (`heard`), "Allow repeats", "Play something different", the home-page exclusion (`shownOnHome`), the big "heard everything" card.
+- `PUT /api/me/queue` still accepts `heard` / `allowRepeats` from older apps and ignores them. The database columns `queue_state.heard` and `queue_state.allow_repeats` (migration
+  `20261128000000_no_repeat`) are now unused and still in place; they can be dropped in a later migration. **No new migration in this change.**
 
 ## Tests
-`backend`: `no-repeat.test.js` (fixtures, cool-downs, blocks, 500-song session, widening, exhaustion, repeats), `no-repeat-api.test.js`
-(memory shared by devices, blocks; also run on Postgres), `no-repeat-home.test.js`. `frontend`: `src/lib/noRepeat.test.js`.
+`backend/test/no-repeat.test.js` (hard rules on the reported pairs, the soft preference, a 300-song simulated session with refills of 50, yesterday's song can return, a small pool still fills,
+"out of new songs" only when everything is queued, blocks), `backend/test/no-repeat-api.test.js` (also on Postgres), `frontend/src/lib/noRepeat.test.js` and `radioQueue.test.js`, and the browser audit
+`npm run test:refill --prefix frontend` (28 checks: refill at 5, 50 per request, only the queue excluded, history can come back, both banners, Retry, 360x640 / 390x844).
 
-UNTESTED: live JioSaavn pools (widening quality), the "heard everything" card and the row menu item in a browser/phone, guests blocking songs (needs sign-in).
+UNTESTED: the live JioSaavn catalogue (how many songs each refill really finds), a real phone.

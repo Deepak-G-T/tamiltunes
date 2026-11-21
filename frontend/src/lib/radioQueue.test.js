@@ -156,15 +156,16 @@ describe('jumping and editing the queue', () => {
 });
 
 describe('radio refill', () => {
-  it('refills when 3 songs remain (fewer than 4 in upcoming), never while one is in flight', () => {
-    expect(needsRefill(radio('a', 'b', 'c', 'd', 'e'))).toBe(false); // 4 queued
-    const low = radio('a', 'b', 'c', 'd'); // 3 queued (refills when 3 songs remain)
+  it('refills when fewer than 5 songs remain, never while one is in flight', () => {
+    expect(REFILL_THRESHOLD).toBe(5);
+    expect(needsRefill(radio('a', 'b', 'c', 'd', 'e', 'f'))).toBe(false); // 5 queued
+    const low = radio('a', 'b', 'c', 'd', 'e'); // 4 queued
     expect(low.upcoming.length).toBeLessThan(REFILL_THRESHOLD);
     expect(needsRefill(low)).toBe(true);
     const { state: inFlight } = startRefill(low);
     expect(needsRefill(inFlight)).toBe(false);
     // playing a song also uses one up
-    expect(needsRefill(advance(radio('a', 'b', 'c', 'd', 'e')).state)).toBe(true);
+    expect(needsRefill(advance(radio('a', 'b', 'c', 'd', 'e', 'f')).state)).toBe(true);
   });
 
   it('does not refill for playlists / albums, with autoplay off, or with nothing playing', () => {
@@ -173,29 +174,32 @@ describe('radio refill', () => {
     expect(needsRefill(createQueueState())).toBe(false);
   });
 
-  it('the request seeds from the playing song and excludes everything already played or queued', () => {
-    let s = radio('a', 'b', 'c');
-    s = advance(advance(s).state).state; // playing c, played a b c
+  it('the request seeds from the playing song, excludes only what is queued, and asks for 50 (history is only a hint)', () => {
+    let s = radio('a', 'b', 'c', 'd', 'e');
+    s = advance(advance(s).state).state; // playing c; a and b are in the history; d and e are next
     const { request } = startRefill(s);
     expect(request.seedId).toBe('c');
-    expect(request.exclude).toEqual(expect.arrayContaining(['a', 'b', 'c']));
+    expect(request.exclude).toEqual(['c', 'd', 'e']); // the playing song and what is next: nothing else
+    expect(request.recent).toEqual(['b', 'a']); // the last played, newest first: the server's soft preference
     expect(request.limit).toBe(REFILL_BATCH);
+    expect(REFILL_BATCH).toBe(50);
   });
 
-  it('caps the exclude list at what the endpoint accepts, keeping the most recent plays', () => {
+  it('caps the exclude list at what the endpoint accepts, keeping the playing song and what is next', () => {
     let s = playFromSearch(createQueueState(), S('s0'));
-    s = { ...s, played: Array.from({ length: 400 }, (_, i) => `p${i}`) };
+    s = { ...s, upcoming: Array.from({ length: 300 }, (_, i) => ({ uid: `u${i}`, song: S(`q${i}`), origin: 'radio' })) };
     const { request } = startRefill(s);
     expect(request.exclude.length).toBe(MAX_EXCLUDE);
-    expect(request.exclude).toContain('p399');
-    expect(request.exclude).not.toContain('p0');
+    expect(request.exclude[0]).toBe('s0');
+    expect(request.exclude).toContain('q198');
+    expect(request.exclude).not.toContain('q250');
   });
 
-  it('never repeats a song already played this session, even if the server suggests it', () => {
+  it('only the queue is protected: a song played earlier may come back, a duplicate inside the batch may not', () => {
     let s = radio('a', 'b');
-    s = advance(s).state; // played a, b
-    s = applyRefill(s, list('a', 'b', 'c', 'c', 'd')); // a, b already played; c duplicated
-    expect(ids(s.upcoming)).toEqual(['c', 'd']);
+    s = advance(s).state; // b plays, a is in the history
+    s = applyRefill(s, list('a', 'b', 'c', 'c', 'd')); // b is playing; a was played earlier; c is duplicated
+    expect(ids(s.upcoming)).toEqual(['a', 'c', 'd']);
   });
 
   it('an empty or all-duplicate batch backs off instead of hammering the server', () => {
@@ -213,12 +217,12 @@ describe('radio refill', () => {
   it('runRefill: fetches once, applies the batch, and ignores concurrent calls', async () => {
     let state = playFromSearch(createQueueState(), S('seed'));
     const calls = [];
-    const io = { get: () => state, update: (fn) => { state = fn(state); }, fetchRelated: async (req) => { calls.push(req); return list('x1', 'x2', 'x3', 'x4'); } };
+    const io = { get: () => state, update: (fn) => { state = fn(state); }, fetchRelated: async (req) => { calls.push(req); return list('x1', 'x2', 'x3', 'x4', 'x5', 'x6'); } };
     const [a, b] = await Promise.all([runRefill(io), runRefill(io)]);
     expect([a, b].filter(Boolean)).toHaveLength(1);
     expect(calls).toHaveLength(1);
     expect(calls[0].seedId).toBe('seed');
-    expect(ids(state.upcoming)).toEqual(['x1', 'x2', 'x3', 'x4']);
+    expect(ids(state.upcoming)).toEqual(['x1', 'x2', 'x3', 'x4', 'x5', 'x6']);
     expect(state.refill.pending).toBe(false);
     expect(await runRefill(io)).toBe(false); // enough songs queued: nothing to do
     expect(calls).toHaveLength(1);
@@ -658,20 +662,21 @@ describe('smarter autoplay (queue feel)', () => {
     expect(added).toBe(10);
     expect(runOf([s.current, ...s.upcoming.map((e) => e.song)])).toBeLessThanOrEqual(MAX_ARTIST_RUN);
   });
-  it('asks for 10 songs, and keeps songs shown on the home page out (after the recent plays)', () => {
-    expect(REFILL_BATCH).toBe(10);
+  it('asks for 50 songs; songs shown on the home page are not excluded (only the queue is)', () => {
     const s = playFromSearch(createQueueState(), by('cur', 'A'));
-    const { request, state } = startRefill(s, { avoid: ['home1', 'home2'] });
-    expect(request.limit).toBe(10);
-    expect(request.exclude).toEqual(['cur', 'home1', 'home2']);
+    const { request, state } = startRefill(s);
+    expect(request.limit).toBe(50);
+    expect(request.exclude).toEqual(['cur']);
     const next = applyRefill(state, [by('home1', 'A'), by('fresh', 'B')]);
-    expect(next.upcoming.map((e) => e.song.id)).toEqual(['fresh']); // even if the server sent a home song, it is not added
+    expect(next.upcoming.map((e) => e.song.id).sort()).toEqual(['fresh', 'home1']);
   });
-  it('the last 50 played are kept out too', () => {
+  it('the last played ids are sent as a hint (newest first, at most 50), never as exclusions', () => {
     let s = playFromSearch(createQueueState(), by('p0', 'A'));
     for (let i = 1; i <= 60; i++) s = playFromSearch(s, by(`p${i}`, 'A'));
     const { request } = startRefill(s);
-    for (let i = 11; i <= 60; i++) expect(request.exclude).toContain(`p${i}`);
+    expect(request.exclude).toEqual(['p60']);
+    expect(request.recent.length).toBe(50);
+    expect(request.recent[0]).toBe('p59');
   });
 });
 
@@ -692,30 +697,31 @@ describe('no repeats of the same song or its versions (autoplay)', () => {
     expect(radioIds(s)).toEqual(['o1']);
   });
 
-  it('a version is not added while the original is in your queue, and the original is not added while a version is', () => {
+  it('a version of a QUEUED song is allowed (only the playing song is protected from its versions); a copy of a queued song is not', () => {
     let s = addToQueue(start(other('cur')), think('q1'));
     s = applyRefill(s, [unplugged('u1'), think('copy'), other('o1')]);
-    expect(radioIds(s)).toEqual(['o1']);
+    expect(radioIds(s)).toEqual(['u1', 'o1']);
     let t = addToQueue(start(other('cur')), unplugged('u2'));
-    t = applyRefill(t, [think('x1'), other('o1')]);
-    expect(radioIds(t)).toEqual(['o1']);
+    t = applyRefill(t, [think('x1'), unplugged('u2copy'), other('o1')]);
+    expect(radioIds(t)).toEqual(['x1', 'o1']);
   });
 
-  it('songs played or skipped lately (last 50) are kept out, also by version and other ids', () => {
+  it('songs played or skipped lately may come back: only the queue is protected', () => {
     let s = start(think('a'));
     s = applyRefill(s, [other('o1'), other('o2')]);
     s = advance(s, { reason: 'skip' }).state; // o1 plays; the original is in history and skipped
     s = advance(s, { reason: 'skip' }).state; // o2 plays
-    const next = applyRefill({ ...s, upcoming: [] }, [think('again'), unplugged('u9'), other('o3')]);
-    expect(radioIds(next)).toEqual(['o3']);
+    const next = applyRefill({ ...s, upcoming: [] }, [think('again'), other('o3')]);
+    expect(radioIds(next)).toEqual(['again', 'o3']);
     expect(s.skipped.map((x) => x.id)).toEqual(['a', 'o1']);
   });
 
-  it('at most one song per variant in the radio block (also across batches)', () => {
-    let s = applyRefill(start(other('cur')), [unplugged('u1'), think('t1', { title: 'Pavazha Malli (Remix)' }), think('t2', { title: 'Pavazha Malli Reprise' }), other('o1', 2)]);
+  it('one copy of a song in the radio block, also across batches (any id, cover or singer order)', () => {
+    let s = applyRefill(start(other('cur')), [think('t1'), think('t1b', { image: 'other.jpg', singers: 'Pragathi Guruprasad, Sam CS' }), other('o1', 2)]);
     expect(radioIds(s).filter((id) => id !== 'o1')).toHaveLength(1);
-    s = applyRefill(s, [think('t3', { title: 'Pavazha Malli (Acoustic)' }), other('o2', 3)]);
-    expect(radioIds(s).filter((id) => id.startsWith('u') || id.startsWith('t'))).toHaveLength(1);
+    s = applyRefill(s, [think('t3', { image: 'third.jpg' }), other('o2', 3)]);
+    expect(radioIds(s).filter((id) => id.startsWith('t'))).toHaveLength(1);
+    expect(radioIds(s)).toContain('o2');
   });
 
   it('at most 2 songs from one film within any 10 songs of the radio block', () => {
@@ -747,14 +753,14 @@ describe('no repeats of the same song or its versions (autoplay)', () => {
     expect(findQueued(s, 'q1')).toBe(0); // by id still works
   });
 
-  it('Refresh recommendations gives no duplicate of the playing song, the history or your queue', () => {
+  it('Refresh recommendations gives no duplicate of the playing song or your queue (the history may come back)', () => {
     let s = start(other('h1'));
     s = applyRefill(s, [other('o1')]);
     s = advance(s).state; // o1 plays, h1 in history
     s = addToQueue(s, think('q1'));
     s = clearRadio(s);
-    s = applyRefill(s, [other('h1x', 1, { title: 'Other h1', singers: 'Singer h1', artist: 'Artist h1' }), think('t9'), unplugged('u9'), other('o1', 1, { id: 'o1b', title: 'Other o1', singers: 'Singer o1', artist: 'Artist o1' }), other('fresh', 7)]);
-    expect(radioIds(s)).toEqual(['fresh']);
+    s = applyRefill(s, [other('h1x', 1, { title: 'Other h1', singers: 'Singer h1', artist: 'Artist h1' }), think('t9'), other('o1', 1, { id: 'o1b', title: 'Other o1', singers: 'Singer o1', artist: 'Artist o1' }), other('fresh', 7)]);
+    expect(radioIds(s)).toEqual(['h1x', 'fresh']); // t9 = your queued song; o1b = the playing song; h1x = played earlier, allowed
   });
 
   it('the queue is checked again when the answer arrives (you queued the song while the request was running)', async () => {

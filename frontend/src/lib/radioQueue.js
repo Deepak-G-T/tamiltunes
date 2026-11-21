@@ -15,19 +15,19 @@
  * @typedef {ReturnType<typeof createQueueState>} QueueState
  */
 
-import { createIdentitySet, collapseDuplicates, movieOf, sameSong, variantKey } from './songIdentity';
+import { createIdentitySet, collapseDuplicates, movieOf, sameSong } from './songIdentity';
 
-export const REFILL_THRESHOLD = 4; // refill when 3 songs remain in the queue (plenty of runway)
-export const REFILL_BATCH = 10; // songs requested per refill (the panel then says "Added 10 similar songs")
+export const REFILL_THRESHOLD = 5; // refill when fewer than this many songs remain (the radio keeps the queue well stocked)
+export const REFILL_BATCH = 50; // songs requested per refill (the panel then says "Added N similar songs")
 export const MAX_ARTIST_RUN = 3;
 export const MOVIE_WINDOW = 10; // within any 10 songs of the radio block ...
 export const MAX_PER_MOVIE = 2; // ... at most this many from one film or album
-export const RECENT_FOR_IDENTITY = 50; // the last 50 played (and skipped) songs are kept out by id, fingerprint and variant // never more than this many songs in a row by the same artist
+export const RECENT_FOR_IDENTITY = 50; // skipped songs kept in the "skipped" list (not a rule)
+export const RECENT_TO_SEND = 50; // last-played ids sent with a refill: the server prefers songs outside the last 20 (a soft preference, never a rule)
 export const MAX_HISTORY = 50; // songs kept in the History tab
 export const MAX_QUEUE = 500; // songs allowed in the upcoming list
 export const MAX_PLAYED = 500;
 export const MAX_EXCLUDE = 200; // the related-songs endpoint accepts at most this many excluded ids
-export const MAX_HEARD = 600; // session memory: songs (by variant key) heard, skipped or queued, saved with the queue and shared by devices
 
 const cap = (list, max) => (list.length > max ? list.slice(list.length - max) : list);
 const unique = (list) => [...new Set(list)];
@@ -44,16 +44,13 @@ export function createQueueState(overrides = {}) {
     autoplay: true,
     shuffle: false,
     repeat: 'off', // 'off' | 'all' | 'one'
-    refill: { pending: false, failures: 0, retryAt: 0 },
+    refill: { pending: false, failures: 0, retryAt: 0, error: false }, // error: the last request failed (the panel offers Retry)
     fallback: [], // songs to queue if the radio returns nothing (e.g. the other Speed Dial tiles)
     stopAfter: false, // "Stop after this song": pause when the current song ends
     skipped: [], // songs skipped this session (most recent last), kept out of autoplay like the played ones
     ended: false, // nothing left to play
     offerRadio: false, // a playlist / album finished: the UI may offer to continue with radio
-    heard: [], // session memory [{ k: variantKey, id }]: everything played, skipped or queued, kept across refresh and devices
-    allowRepeats: false, // the listener agreed to hear songs again (least recently played first)
-    exhausted: false, // the radio found nothing new even after widening: the UI asks what to do
-    wideNext: false, // one-shot: the next refill asks the server to search wider ("Play something different")
+    exhaustedFor: null, // the id of the playing song when the server said nothing new is left for it (not already queued) even after widening: the panel says "Out of new songs"
     ...overrides,
   };
 }
@@ -98,9 +95,7 @@ export function playFromSearch(state, song, { fallback = [] } = {}) {
     fallback: fallback.filter((s) => s?.id && s.id !== song.id),
     ended: false,
     offerRadio: false,
-    exhausted: false,
-    allowRepeats: false, // a new radio starts with the normal rules again (the session memory itself is kept)
-    wideNext: false,
+    exhaustedFor: null,
     refill: { pending: false, failures: 0, retryAt: 0 },
   });
 }
@@ -414,31 +409,20 @@ export function applyFallback(state) {
 
 const radioSongs = (state) => state.upcoming.filter((e) => e.origin !== 'user').map((e) => e.song);
 
-/** Songs that must not be added to the radio block: playing, queued (yours and the radio's), played or skipped lately. */
-function blockedSet(state, { recent = true } = {}) {
-  return createIdentitySet([
-    state.current,
-    ...state.upcoming.map((e) => e.song),
-    ...(recent ? [...state.history.slice(-RECENT_FOR_IDENTITY), ...(state.skipped || [])] : []),
-  ].filter(Boolean));
-}
-
 /**
- * Keep only songs that are really new: not seen by id (anything played this session, queued, or on the home page), not the same song
- * under another id or singer order, and not a version of a song that is playing, queued or recently played (unplugged, remix, ...).
- * At most one song per variant inside the batch too. Manual "Add to queue" does not use this: what you add yourself always wins.
+ * Keep only songs the queue does not hold yet (THE no-repeat rule; play history is not consulted):
+ *   - not the playing song, or a version of it (unplugged, remix ...)
+ *   - not the same song as anything queued (yours or the radio's), whatever its id, cover or spelling (canonical matching, songIdentity.js)
+ *   - one copy of each song inside the batch: the best version (original release over a compilation)
+ * A song played yesterday, or a minute ago, may come back. Manual "Add to queue" does not use this: what you add yourself always wins.
  */
 export function filterNewSongs(state, items) {
-  const repeats = Boolean(state.allowRepeats); // repeats agreed: only what is playing or queued is still kept out
-  const knownIds = new Set([state.current?.id, ...(repeats ? [] : state.played), ...state.upcoming.map((e) => e.song.id), ...(repeats ? [] : state.refill.avoid || [])].filter(Boolean));
-  const blocked = blockedSet(state, { recent: !repeats });
-  const heardKeys = repeats ? new Set() : new Set((state.heard || []).map((h) => h.k));
+  const queued = createIdentitySet([state.current, ...state.upcoming.map((e) => e.song)].filter(Boolean));
+  const playing = createIdentitySet(state.current ? [state.current] : []);
   const out = [];
-  // the batch itself keeps one copy per song: the best version (original release over a compilation), not just the first
   for (const song of collapseDuplicates((items || []).filter((x) => x?.id))) {
-    if (!song?.id || knownIds.has(song.id) || blocked.hasVariant(song) || heardKeys.has(variantKey(song))) continue;
-    knownIds.add(song.id);
-    blocked.add(song);
+    if (queued.has(song) || playing.hasVariant(song)) continue;
+    queued.add(song);
     out.push(song);
   }
   return out;
@@ -464,15 +448,17 @@ export function arrangeBatch(state, fresh) {
 }
 
 /**
- * Remove radio (autoplay) songs that repeat the playing song, a song queued before them, or a version of either.
- * Songs you added yourself are never touched. Run when a queue is loaded and whenever the playing song changes.
+ * Remove duplicates inside the whole queue (keep the first). A radio (autoplay) row goes when it is the same song as the playing song or as a row
+ * before it, or a version of the PLAYING song. Songs you added yourself, and playlist / album rows, are never touched.
+ * Run after every refill, when a queue is loaded, and whenever the playing song changes.
  */
 export function cleanRadioDuplicates(state) {
   if (!state.upcoming.some((e) => e.origin === 'radio')) return state;
   const seen = createIdentitySet(state.current ? [state.current] : []);
+  const playing = createIdentitySet(state.current ? [state.current] : []);
   const upcoming = [];
   for (const e of state.upcoming) {
-    if (e.origin === 'radio' && seen.hasVariant(e.song)) continue;
+    if (e.origin === 'radio' && (seen.has(e.song) || playing.hasVariant(e.song))) continue;
     seen.add(e.song);
     upcoming.push(e);
   }
@@ -508,34 +494,20 @@ export const setRepeat = (state, repeat) => (['off', 'all', 'one'].includes(repe
 export const nextRepeat = (repeat) => (repeat === 'off' ? 'all' : repeat === 'all' ? 'one' : 'off');
 export const setAutoplay = (state, on) => ({ ...state, autoplay: Boolean(on) });
 
-// ---------------------------------------------------------------- session memory and the "heard everything" choices
+// ---------------------------------------------------------------- Retry and refresh
 
-/** Session memory: the saved memory plus everything played, skipped, playing and queued, oldest first, one entry per song version. */
-export function collectHeard(state) {
-  const out = new Map();
-  const add = (song) => {
-    if (!song?.id) return;
-    const k = variantKey(song);
-    if (out.has(k)) out.delete(k); // moves to the newest end
-    out.set(k, { k, id: song.id });
-  };
-  for (const h of state.heard || []) if (h?.k) { out.delete(h.k); out.set(h.k, { k: h.k, ...(h.id ? { id: h.id } : {}) }); }
-  [...state.history, ...(state.skipped || []), state.current, ...state.upcoming.map((e) => e.song)].forEach(add);
-  return [...out.values()].slice(-MAX_HEARD);
-}
-
-const retryNow = (refill) => ({ ...refill, pending: false, failures: 0, retryAt: 0 });
-/** "Allow repeats": the radio may bring heard songs back (least recently played first). Songs you blocked never return. */
-export const allowRepeatsNow = (state) => ({ ...state, allowRepeats: true, exhausted: false, refill: retryNow(state.refill) });
-/** "Play something different": one wider search (more composers, eras, languages). */
-export const playSomethingDifferent = (state) => ({ ...state, wideNext: true, exhausted: false, refill: retryNow(state.refill) });
-/** The listener chose "Start a new radio from another song" (or closed the card). */
-export const dismissExhausted = (state) => ({ ...state, exhausted: false });
-/** "Refresh recommendations": drops autoplay rows that repeat an earlier row or the playing song and asks for fresh ones. Songs you added stay. */
+const retryNow = (refill) => ({ ...refill, pending: false, failures: 0, retryAt: 0, error: false });
+/** "Retry" on the banner ("Couldn't load more songs"): forget the back-off and ask again now. */
+export const retryRefill = (state) => ({ ...state, exhaustedFor: null, refill: retryNow(state.refill) });
+/** "Refresh recommendations": drops duplicate autoplay rows and asks for fresh ones. Songs you added stay. */
 export const refreshRecommendations = (state) => {
   const cleaned = cleanRadioDuplicates(state);
-  return { ...cleaned, exhausted: false, refill: retryNow(cleaned.refill) };
+  return { ...cleaned, exhaustedFor: null, refill: retryNow(cleaned.refill) };
 };
+/** Is the playing song's radio out of new songs (nothing left that is not already queued)? */
+export const isExhausted = (state) => Boolean(state.current) && state.exhaustedFor === state.current.id;
+/** Did the last request for more songs fail (and nothing is loading)? */
+export const refillFailedBanner = (state) => Boolean(state.refill?.error) && !state.refill.pending && state.mode === 'radio' && state.upcoming.length < REFILL_THRESHOLD;
 
 // ---------------------------------------------------------------- radio refill
 
@@ -546,7 +518,7 @@ export function needsRefill(state, { threshold = REFILL_THRESHOLD, now = Date.no
     state.autoplay &&
     Boolean(state.current) &&
     !state.refill.pending &&
-    !state.exhausted &&
+    !isExhausted(state) &&
     state.upcoming.length < threshold &&
     now >= state.refill.retryAt
   );
@@ -589,61 +561,52 @@ export function spreadByArtist(tail, fresh, maxRun = MAX_ARTIST_RUN) {
 }
 
 /**
- * Mark a refill as in flight and describe the request: seed = what is playing, exclude = everything already played.
- * `avoid`: more ids to keep out, such as songs just shown on the home page (they come after the recent plays when the list is capped).
+ * Mark a refill as in flight and describe the request: seed = the playing song, exclude = what is already queued (the playing song and what is next),
+ * limit = a big batch (50), recent = the last songs played, newest first (only a soft preference on the server: it skips the last 20 while enough songs remain).
  */
-export function startRefill(state, { limit = REFILL_BATCH, avoid = [] } = {}) {
-  // repeats agreed: only what plays or is queued stays excluded, so the server may bring heard songs back (least recently played first)
-  const exclude = unique([
-    state.current?.id,
-    ...state.upcoming.map((e) => e.song.id),
-    ...(state.allowRepeats ? [] : [...[...state.played].reverse(), ...avoid]), // newest first, so the cap keeps the most recent plays
-  ].filter(Boolean)).slice(0, MAX_EXCLUDE);
+export function startRefill(state, { limit = REFILL_BATCH } = {}) {
+  const exclude = unique([state.current?.id, ...state.upcoming.map((e) => e.song.id)].filter(Boolean)).slice(0, MAX_EXCLUDE);
+  const recent = unique([...state.history].reverse().map((s) => s?.id).filter(Boolean)).slice(0, RECENT_TO_SEND);
   return {
-    state: { ...state, heard: collectHeard(state), wideNext: false, refill: { ...state.refill, pending: true, avoid: avoid.slice(0, MAX_EXCLUDE) } },
-    request: {
-      seedId: state.current?.id ?? null, exclude, limit,
-      ...(state.allowRepeats ? { allowRepeats: true } : {}),
-      ...(state.wideNext ? { wide: true } : {}),
-      ...(state.context?.type === 'liked' ? { context: 'liked' } : {}),
-    },
+    state: { ...state, refill: { ...state.refill, pending: true } },
+    request: { seedId: state.current?.id ?? null, exclude, limit, ...(recent.length ? { recent } : {}) },
   };
 }
 
 /**
- * Add fetched songs to the radio queue, skipping anything already played, queued or playing.
- * A batch with nothing new counts as a failure so we back off instead of asking again immediately.
+ * Add fetched songs to the radio queue, then check the whole queue for duplicates (keep the first).
+ * A batch with nothing new counts as a failure so we back off instead of asking again immediately; only when the SERVER says nothing is left that is
+ * not already queued ("exhausted") does the panel say "Out of new songs".
  */
 export function applyRefill(state, items, { now = Date.now(), meta = null } = {}) {
   // Checked against the queue as it is NOW (this runs in the state updater), so songs added or played while the request was running are respected
   const fresh = arrangeBatch(state, filterNewSongs(state, items));
   if (!fresh.length) {
     const failed = refillFailed(state, { now });
-    // the server says everything close to this song was heard (even after widening): stop asking and let the listener choose
-    return meta?.exhausted && !state.allowRepeats ? { ...failed, exhausted: true } : failed;
+    return meta?.exhausted ? { ...failed, exhaustedFor: state.current?.id ?? null } : failed;
   }
-  return { ...state, upcoming: [...state.upcoming, ...fresh.map((song) => entry(song, 'radio'))], refill: { pending: false, failures: 0, retryAt: 0 }, ended: false, exhausted: false };
+  return cleanRadioDuplicates({ ...state, upcoming: [...state.upcoming, ...fresh.map((song) => entry(song, 'radio'))], refill: { pending: false, failures: 0, retryAt: 0, error: false }, ended: false, exhaustedFor: null });
 }
 
 export const REFILL_BACKOFF_MS = (failures) => Math.min(30000, 1000 * 2 ** Math.max(0, failures - 1));
 
-/** The fetch failed (or returned nothing new): stop asking for a while, longer after each failure (1s ... 30s). */
-export function refillFailed(state, { now = Date.now() } = {}) {
+/** The fetch failed (or returned nothing new): stop asking for a while, longer after each failure (1s ... 30s). `error` = the request itself failed. */
+export function refillFailed(state, { now = Date.now(), error = false } = {}) {
   const failures = state.refill.failures + 1;
-  return { ...state, refill: { pending: false, failures, retryAt: now + REFILL_BACKOFF_MS(failures) } };
+  return { ...state, refill: { pending: false, failures, retryAt: now + REFILL_BACKOFF_MS(failures), error } };
 }
 
 /**
  * Fetch more related songs if the radio is running low.
  * @param {{ get: () => QueueState, update: (fn: (s: QueueState) => QueueState) => void,
- *   fetchRelated: (req: { seedId: string, exclude: string[], limit: number }) => Promise<Song[]>, now?: () => number }} io
+ *   fetchRelated: (req: { seedId: string, exclude: string[], limit: number, recent?: string[] }) => Promise<Song[]>, now?: () => number }} io
  * @returns {Promise<boolean>} true when songs were added
  */
-export async function runRefill({ get, update, fetchRelated, now = Date.now, avoid = () => [], onAdded }) {
+export async function runRefill({ get, update, fetchRelated, now = Date.now, onAdded }) {
   if (!needsRefill(get(), { now: now() })) return false;
   let request;
   update((s) => {
-    const started = startRefill(s, { avoid: avoid() });
+    const started = startRefill(s);
     request = started.request;
     return started.state;
   });
@@ -658,7 +621,7 @@ export async function runRefill({ get, update, fetchRelated, now = Date.now, avo
     if (added > 0) onAdded?.(added);
     return added > 0;
   } catch {
-    update((s) => applyFallback(refillFailed(s, { now: now() })));
+    update((s) => applyFallback(refillFailed(s, { now: now(), error: true })));
     return false;
   }
 }
@@ -696,8 +659,6 @@ export function toSnapshot(state) {
     autoplay: state.autoplay,
     shuffle: state.shuffle,
     repeat: state.repeat,
-    heard: collectHeard(state),
-    allowRepeats: Boolean(state.allowRepeats),
   };
 }
 
@@ -720,8 +681,8 @@ export function normalizeEntries(upcoming, userCount = 0) {
 
 export const fromSnapshot = (snap) => {
   const { upcoming, userCount } = normalizeEntries(snap?.upcoming, snap?.userCount ?? 0);
-  const heard = (Array.isArray(snap?.heard) ? snap.heard : []).filter((h) => h && typeof h.k === 'string').slice(-MAX_HEARD);
-  return cleanRadioDuplicates(createQueueState({ ...snap, upcoming, userCount, history: [], heard, allowRepeats: Boolean(snap?.allowRepeats), exhausted: false, wideNext: false }));
+  const { heard: _heard, allowRepeats: _allow, exhausted: _ex, wideNext: _wide, ...clean } = snap || {}; // fields of the first no-repeat version: ignored
+  return cleanRadioDuplicates(createQueueState({ ...clean, upcoming, userCount, history: [], exhaustedFor: null }));
 };
 
 /** Index of a queue slot by uid (-1 when it is not in the upcoming list). */

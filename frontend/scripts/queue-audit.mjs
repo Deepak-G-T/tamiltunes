@@ -430,9 +430,9 @@ async function feel(browser) {
   check(`${tag} the panel opens with its rows in under 150 ms`, openMs < 150, `${openMs} ms`);
 
   // autoplay: says what it did, keeps variety, keeps what the home page shows out
-  check(`${tag} autoplay asked for 10 songs`, relatedCalls[0]?.limit === 10, JSON.stringify(relatedCalls[0]));
-  check(`${tag} songs shown on the home page are kept out of the suggestions`, relatedCalls[0]?.exclude.includes('q2') && relatedCalls[0]?.exclude.includes('q6'), relatedCalls[0]?.exclude.join(','));
-  check(`${tag} autoplay says "Added 10 similar songs"`, await page.getByText('Added 10 similar songs.').count() > 0);
+  check(`${tag} autoplay asks for a big batch (50 songs)`, relatedCalls[0]?.limit === 50, JSON.stringify(relatedCalls[0]));
+  check(`${tag} only the queue is excluded (the playing song): not what the home page shows, not the history`, relatedCalls[0]?.exclude.join(',') === 'q1', relatedCalls[0]?.exclude.join(','));
+  check(`${tag} autoplay says "Added 12 similar songs" (all that the server had)`, await page.getByText('Added 12 similar songs.').count() > 0);
   const artists = await page.$$eval('[data-testid=queue-row]', (els) => els.map((e) => (e.getAttribute('aria-label') || '').split(', ')[1]));
   let run = 1; let best = 1; artists.forEach((a, i) => { if (i) { run = a === artists[i - 1] ? run + 1 : 1; best = Math.max(best, run); } });
   const nowArtist = await page.locator('[data-testid=queue-now-playing] p.text-sm').first().innerText();

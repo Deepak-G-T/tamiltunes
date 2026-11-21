@@ -6,11 +6,11 @@ import api from '../services/api';
  * @param {{ seedId: string, exclude?: string[], limit?: number }} req
  * @returns {Promise<object[]>} songs (each with a `why` label such as "Same singer")
  */
-export async function fetchRelated({ seedId, exclude = [], limit = 20, allowRepeats = false, wide = false, context = null }) {
+export async function fetchRelated({ seedId, exclude = [], limit = 50, recent = [] }) {
   const { data } = await api.get(`/songs/${encodeURIComponent(seedId)}/related`, {
-    params: { limit, ...(exclude.length ? { exclude: exclude.join(',') } : {}), ...(allowRepeats ? { allowRepeats: 1 } : {}), ...(wide ? { wide: 1 } : {}), ...(context ? { context } : {}) },
+    params: { limit, ...(exclude.length ? { exclude: exclude.join(',') } : {}), ...(recent.length ? { recent: recent.join(',') } : {}) },
   });
   const items = data?.items ?? [];
-  items.meta = data?.meta ?? null; // fresh / widened / exhausted: the queue shows "You've heard everything close to this" when exhausted
+  items.meta = data?.meta ?? null; // `exhausted` = nothing is left that is not already queued: the panel says "Out of new songs"
   return items;
 }

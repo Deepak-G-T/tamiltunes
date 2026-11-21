@@ -3,7 +3,6 @@ import app from '../src/app.js';
 import { initDb, db } from '../src/prisma/client.js';
 import { config } from '../src/config/env.js';
 import { musicService } from '../src/services/music/providerManager.js';
-import { NO_REPEAT } from '../src/services/noRepeat/config.js';
 
 // Runs on the in-memory store and, with TEST_DATABASE_URL, on real PostgreSQL (queue_state.heard, user_song_blocks).
 await initDb();
@@ -27,20 +26,23 @@ try {
   assert.ok(ids.length >= 4, 'the mock provider has songs');
   for (const id of ids) await ensureSong(id);
 
-  // device A saves its queue with a session memory; device B reads the same account and sees it
+  // the queue is saved without any session memory; an older app that still sends `heard` / `allowRepeats` is accepted and they are ignored
   const heard = ids.slice(0, 3).map((id) => ({ k: `key-${id}`, id }));
-  const put = await call('PUT', '/me/queue', { token, body: { items: [{ id: ids[3], o: 'r' }], currentIndex: 0, positionSec: 0, shuffle: false, repeat: 'off', autoplay: true, mode: 'radio', deviceId: 'deviceA', heard, allowRepeats: false } });
+  const put = await call('PUT', '/me/queue', { token, body: { items: [{ id: ids[3], o: 'r' }], currentIndex: 0, positionSec: 0, shuffle: false, repeat: 'off', autoplay: true, mode: 'radio', deviceId: 'deviceA', heard, allowRepeats: true } });
   assert.equal(put.status, 200, JSON.stringify(put.json));
   const get = await call('GET', '/me/queue', { token });
-  assert.deepEqual(get.json.queue.heard, heard, 'a second device gets the same session memory');
-  assert.equal((await call('PUT', '/me/queue', { token, body: { items: [], currentIndex: -1, positionSec: 0, shuffle: false, repeat: 'off', autoplay: true, mode: 'radio', heard: Array.from({ length: NO_REPEAT.sessionMemoryMax + 1 }, (_, i) => ({ k: `k${i}` })) } })).status, 400, 'the memory is capped');
-  assert.equal((await call('PUT', '/me/queue', { token, body: { items: [], currentIndex: -1, positionSec: 0, shuffle: false, repeat: 'off', autoplay: true, mode: 'radio', heard: [{ k: 'x', title: 'injected' }] } })).status, 400, 'nothing but compact keys is accepted');
+  assert.equal(get.json.queue.items.length, 1);
+  assert.ok(!('heard' in get.json.queue) && !('allowRepeats' in get.json.queue), 'no session memory is stored or returned any more');
 
-  // the related endpoint on "device B" leaves the remembered songs out
-  const rel = await call('GET', `/songs/${ids[3]}/related?limit=20`, { token });
+  // the related endpoint: the same song is never offered twice, "recent" is only a preference, and it asks for big batches
+  const rel = await call('GET', `/songs/${ids[3]}/related?limit=60&exclude=${ids.slice(0, 3).join(',')}&recent=${ids[4]}`, { token });
   assert.equal(rel.status, 200);
-  assert.ok(rel.json.items.every((s) => !ids.slice(0, 3).includes(s.id)), 'songs remembered by another device are not suggested');
-  assert.ok('exhausted' in rel.json.meta && 'widened' in rel.json.meta && 'fresh' in rel.json.meta, 'the batch tells the app what it needs for the prompt');
+  assert.ok(rel.json.items.every((s) => !ids.slice(0, 3).includes(s.id) && s.id !== ids[3]), 'songs already in the queue are not suggested');
+  assert.ok('exhausted' in rel.json.meta && 'softApplied' in rel.json.meta && 'fresh' in rel.json.meta);
+  assert.equal((await call('GET', `/songs/${ids[3]}/related?limit=61`, { token })).status, 400, 'at most 60 at a time');
+  assert.equal((await call('GET', `/songs/${ids[3]}/related?limit=50&allowRepeats=1&heard=x&context=liked`, { token })).status, 200, 'the old options are ignored, not an error');
+  // history is not a rule: a song played to the end a minute ago is still offered
+  await call('POST', '/me/play-events', { token, body: { songId: ids[4], completed: true } });
 
   // "Don't recommend this" over HTTP
   assert.equal((await call('POST', '/me/blocks', { token: null, body: { songId: ids[4] } })).status, 401);
@@ -58,7 +60,7 @@ try {
   const other = await call('POST', '/auth/register', { body: { name: 'Other One', email: `other.${tag}@example.com`, password: 'password-12345' } });
   await call('POST', '/me/blocks', { token, body: { songId: ids[5] } });
   assert.equal((await call('GET', '/me/blocks', { token: other.json.token })).json.items.length, 0, 'blocks belong to one account');
-  console.log('✓ API: the session memory is saved with the queue and shared by devices (capped, compact keys only); "Don\'t recommend this" works, ignores client text, is per account');
+  console.log('✓ API: no session memory stored (old apps still accepted); related takes exclude/recent and at most 60; "Don\'t recommend this" works, ignores client text, is per account');
 } finally {
   server.close();
 }

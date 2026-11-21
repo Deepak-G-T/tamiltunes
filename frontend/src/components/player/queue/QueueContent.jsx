@@ -51,7 +51,7 @@ const TimeLeft = ({ current, upcoming }) => {
  */
 const QueueContent = ({ onClose, embedded = false }) => {
   const {
-    queueSections, autoplay, setAutoplay, currentSong, isPlaying, offerRadio, continueWithRadio, startRadio, exhausted, allowRepeatsNow, playSomethingDifferent, dismissExhausted, blockSong,
+    queueSections, autoplay, setAutoplay, currentSong, isPlaying, offerRadio, continueWithRadio, startRadio, exhausted, refillError, retryMore, blockSong,
     jumpToUid, removeUids, moveUidsToQueue, reorderByUid, clearQueue, refreshRecommendations, removeCurrentSong,
     playFromHistoryAt, saveQueueAsPlaylist, toggleStopAfter, sleepTimer, startSleepTimer, cancelSleepTimer, showToast,
   } = useQueue(); // steady: does not re-render on every tick of the song clock
@@ -279,15 +279,14 @@ const QueueContent = ({ onClose, embedded = false }) => {
             </div>
           )}
 
+          {/* A small banner, not a card. "Out of new songs" only when nothing is left that is not already queued; a failed request offers Retry. */}
           {exhausted && (
-            <div className="flex-shrink-0 mx-4 mb-2 rounded-xl bg-white/5 p-3" role="status" data-testid="queue-exhausted">
-              <p className="text-sm font-semibold text-white">You've heard everything close to this</p>
-              <p className="mt-1 text-xs text-zinc-400">Nothing new was found, even after searching wider.</p>
-              <div className="mt-3 flex flex-wrap gap-2">
-                <button type="button" onClick={() => { dismissExhausted(); onClose?.(); navigate('/search'); }} className="press min-h-11 px-3 rounded-full bg-brand-500 text-black text-xs font-bold">Start a new radio from another song</button>
-                <button type="button" onClick={playSomethingDifferent} className="press min-h-11 px-3 rounded-full bg-white/10 hover:bg-white/15 text-white text-xs font-semibold">Play something different</button>
-                <button type="button" onClick={allowRepeatsNow} className="press min-h-11 px-3 rounded-full bg-white/10 hover:bg-white/15 text-white text-xs font-semibold">Allow repeats</button>
-              </div>
+            <p role="status" data-testid="queue-banner-exhausted" className="flex-shrink-0 mx-4 mb-2 px-3 py-2 rounded-lg bg-white/5 text-xs text-zinc-300">Out of new songs</p>
+          )}
+          {!exhausted && refillError && (
+            <div role="alert" data-testid="queue-banner-error" className="flex-shrink-0 mx-4 mb-2 pl-3 pr-1 min-h-11 rounded-lg bg-white/5 flex items-center justify-between gap-2">
+              <span className="text-xs text-zinc-300">Couldn't load more songs</span>
+              <button type="button" onClick={retryMore} className="press min-h-11 px-3 text-xs font-bold text-brand-300 hover:text-brand-200">Retry</button>
             </div>
           )}
 

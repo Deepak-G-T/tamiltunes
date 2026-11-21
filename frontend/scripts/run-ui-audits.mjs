@@ -14,6 +14,7 @@ const suites = [
   ['Now Playing audit (safe areas, layout)', 'scripts/player-audit.mjs'],
   ['Wrapped audit (banner, story, share picture)', 'scripts/wrapped-audit.mjs'],
   ['Onboarding audit (taste picker)', 'scripts/onboarding-audit.mjs'],
+  ['Queue refill audit (no repeats, banners)', 'scripts/queue-refill-audit.mjs'],
   ['Android app audit (simulated native plugins)', 'scripts/native-audit.mjs']
 ];
 
