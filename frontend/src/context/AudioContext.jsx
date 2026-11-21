@@ -29,6 +29,7 @@ import { getCoverColor, rgbVar } from '../lib/coverColor';
 import { engineFor, canToggleVideo, getVideoId, planSwitch, planEmbedError, hasAudioStream } from '../lib/playbackLogic';
 import { getToken } from '../lib/tokenStore';
 import { resolveDuration, pauseKind, stallShouldFinish, errorAction, PAUSE_FINISH_MS, STALL_FINISH_MS, TRANSITION_WATCHDOG_MS, DEBOUNCE_PAUSE_MS } from '../lib/playbackEnd';
+import { getOnlineStatus, subscribeOnlineStatus } from '../lib/networkStatus';
 
 const AudioContext = createContext();
 const QUEUE_ACTIONS = ['jumpToUid', 'removeUids', 'moveUidsToQueue', 'reorderByUid', 'clearQueue', 'refreshRecommendations', 'removeCurrentSong', 'playFromHistoryAt', 'saveQueueAsPlaylist', 'toggleStopAfter', 'startSleepTimer', 'cancelSleepTimer', 'setAutoplay', 'continueWithRadio', 'startRadio', 'addToQueue', 'playNext', 'blockSong', 'retryMore'];
@@ -404,6 +405,16 @@ export const AudioProvider = ({ children }) => {
       } catch (retryErr) {
         if (requestId !== playRequestIdRef.current) return;
         console.warn('Playback play() retry failed:', retryErr.message);
+        if (!getOnlineStatus()) {
+          setIsBuffering(false);
+          setIsPlaying(false);
+          audio.pause();
+          clearEndTimers();
+          endTransition();
+          setPlaybackError("You're offline. Playback paused.");
+          showToast("You're offline. Playback paused.");
+          return;
+        }
         showToast(currentSongRef.current?.title ? `Couldn't play "${currentSongRef.current.title}", skipped.` : "Couldn't play that song, skipped.");
         setTimeout(() => nextTrack(), 500);
       }
@@ -412,6 +423,16 @@ export const AudioProvider = ({ children }) => {
 
   // Attempt to refresh expired stream URL by song ID (GET /api/music/song/:id?fresh=1)
   const handleExpiredStream = async (song) => {
+    if (!getOnlineStatus()) {
+      setIsBuffering(false);
+      setIsPlaying(false);
+      audioRef.current?.pause();
+      clearEndTimers();
+      endTransition();
+      setPlaybackError("You're offline. Playback paused.");
+      showToast("You're offline. Playback paused.");
+      return;
+    }
     if (!song || song._hasRetriedFreshFetch) {
       setPlaybackError('Stream unavailable or expired. Skipping to next track...');
       showToast(song?.title ? `Couldn't play "${song.title}", skipped.` : "Couldn't play that song, skipped.");
@@ -522,7 +543,22 @@ export const AudioProvider = ({ children }) => {
       const rid = playRequestIdRef.current;
       endTimersRef.current.stall = setTimeout(() => {
         if (rid !== playRequestIdRef.current || audio.ended || audio.readyState >= 3) return;
-        if (stallShouldFinish({ stalledForMs: Date.now() - stallStartRef.current, currentTime: audio.currentTime, duration: resolveDuration({ audioDuration: audio.duration, catalogDuration: currentSongRef.current?.duration }) })) finishSongRef.current('stalled-near-end');
+        if (!getOnlineStatus()) {
+          setIsBuffering(false);
+          setIsPlaying(false);
+          audio.pause();
+          clearEndTimers();
+          endTransition();
+          setPlaybackError("You're offline. Playback paused.");
+          showToast("You're offline. Playback paused.");
+          return;
+        }
+        if (stallShouldFinish({
+          stalledForMs: Date.now() - stallStartRef.current,
+          currentTime: audio.currentTime,
+          duration: resolveDuration({ audioDuration: audio.duration, catalogDuration: currentSongRef.current?.duration }),
+          online: getOnlineStatus(),
+        })) finishSongRef.current('stalled-near-end');
       }, STALL_FINISH_MS);
     };
 
@@ -582,7 +618,24 @@ export const AudioProvider = ({ children }) => {
       console.warn('Playback error encountered on source:', audio.src);
       const song = currentSongRef.current;
       const t = audio.currentTime;
-      const action = errorAction({ currentTime: t, duration: resolveDuration({ audioDuration: audio.duration, catalogDuration: song?.duration }), midSongErrors: midSongErrorsRef.current });
+      const online = getOnlineStatus();
+      const action = errorAction({
+        currentTime: t,
+        duration: resolveDuration({ audioDuration: audio.duration, catalogDuration: song?.duration }),
+        midSongErrors: midSongErrorsRef.current,
+        online,
+      });
+
+      if (action === 'pause-offline') {
+        setIsBuffering(false);
+        setIsPlaying(false);
+        audio.pause();
+        clearEndTimers();
+        endTransition();
+        setPlaybackError("You're offline. Playback paused.");
+        showToast("You're offline. Playback paused.");
+        return;
+      }
 
       if (action === 'finish') { // the stream broke within the last 20 seconds: the song is finished
         setIsBuffering(false);
@@ -604,6 +657,16 @@ export const AudioProvider = ({ children }) => {
         }
       }
       if (action === 'retry' || action === 'skip') { // broke in the middle again: give up on this song
+        if (!getOnlineStatus()) {
+          setIsBuffering(false);
+          setIsPlaying(false);
+          audio.pause();
+          clearEndTimers();
+          endTransition();
+          setPlaybackError("You're offline. Playback paused.");
+          showToast("You're offline. Playback paused.");
+          return;
+        }
         setIsBuffering(false);
         setIsPlaying(false);
         showToast(song?.title ? `Couldn't play "${song.title}", skipped.` : "Couldn't play that song, skipped.");
@@ -732,6 +795,17 @@ export const AudioProvider = ({ children }) => {
       } catch (err) {
         console.warn('Primary stream error, trying fallback:', err.message);
         if (requestId !== playRequestIdRef.current) return;
+
+        if (!getOnlineStatus()) {
+          setIsBuffering(false);
+          setIsPlaying(false);
+          audio.pause();
+          clearEndTimers();
+          endTransition();
+          setPlaybackError("You're offline. Playback paused.");
+          showToast("You're offline. Playback paused.");
+          return;
+        }
 
         if (candidates.length > 1) {
           candidateIndexRef.current = 1;
@@ -914,6 +988,16 @@ export const AudioProvider = ({ children }) => {
     }
 
     // YouTube-only song (or a non-embed error): original behaviour, skip to the next track
+    if (!getOnlineStatus()) {
+      setIsBuffering(false);
+      setIsPlaying(false);
+      ytPlayerRef.current?.pause();
+      clearEndTimers();
+      endTransition();
+      setPlaybackError("You're offline. Playback paused.");
+      showToast("You're offline. Playback paused.");
+      return;
+    }
     const errCode = event?.data;
     let msg = 'YouTube playback failed. Auto-skipping to next track...';
     if (errCode === 101 || errCode === 150) {
@@ -941,6 +1025,10 @@ export const AudioProvider = ({ children }) => {
 
   const togglePlay = async () => {
     if (!currentSong) return;
+    if (!isPlaying && !getOnlineStatus()) {
+      showToast("You're offline. Connect to the internet to play.");
+      return;
+    }
     if (!isPlaying && (await startRestored())) return;
     const isYT = isYouTubeSong(currentSong);
 
@@ -989,6 +1077,10 @@ export const AudioProvider = ({ children }) => {
   pauseRef.current = pause;
 
   const resume = async () => {
+    if (!getOnlineStatus()) {
+      showToast("You're offline. Connect to the internet to play.");
+      return;
+    }
     if (await startRestored()) return;
     if (isYouTubeSong(currentSong)) {
       ytPlayerRef.current?.play();
@@ -1051,9 +1143,40 @@ export const AudioProvider = ({ children }) => {
 
   // ---- queue controls (all state changes go through the engine) ----
 
+  // Pause playback when device transitions to offline (e.g. Airplane mode), preserving queue and position
+  useEffect(() => {
+    return subscribeOnlineStatus((online) => {
+      if (!online) {
+        const audio = audioRef.current;
+        const isAudioPlaying = audio && !audio.paused;
+        const isYtPlaying = isYouTubeSong(currentSongRef.current) && isPlayingRef.current;
+        if (isAudioPlaying || isYtPlaying || isPlayingRef.current) {
+          userPausedRef.current = true;
+          isTransitioningRef.current = false;
+          clearEndTimers();
+          if (isYouTubeSong(currentSongRef.current)) {
+            ytPlayerRef.current?.pause();
+          } else if (audio) {
+            audio.pause();
+          }
+          setIsPlaying(false);
+          setIsBuffering(false);
+          setPlaybackError("You're offline. Playback paused.");
+          showToast("You're offline. Playback paused.");
+        }
+      } else {
+        setPlaybackError((prev) => (prev === "You're offline. Playback paused." ? null : prev));
+      }
+    });
+  }, [showToast, isYouTubeSong]);
+
   /** Play a song. With a list of 2+ songs it follows that list (playlist / album / shelf); otherwise it starts a radio. */
   const playSong = async (song, newQueue = null, opts = {}) => {
     if (!song) return;
+    if (!getOnlineStatus()) {
+      showToast("You're offline. Connect to the internet to play.");
+      return;
+    }
     if (Array.isArray(newQueue) && newQueue.length > 1) {
       const index = Math.max(0, newQueue.findIndex((item) => item.id === song.id));
       updateQs((q) => playFromContext(q, { songs: newQueue, index, type: opts.type || 'list', id: opts.id ?? null, label: opts.label || '' }));
