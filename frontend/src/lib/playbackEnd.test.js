@@ -46,9 +46,18 @@ describe('a song whose stream stops early must still advance', () => {
     expect(stallShouldFinish({ stalledForMs: 4000, currentTime: 313, duration: 328 })).toBe(false);
     expect(stallShouldFinish({ stalledForMs: 9000, currentTime: 100, duration: 328 })).toBe(false);
   });
+  it('stuck buffering near the end while offline does not finish (offline should pause, not skip)', () => {
+    expect(stallShouldFinish({ stalledForMs: STALL_FINISH_MS, currentTime: 313, duration: 328, online: false })).toBe(false);
+  });
 });
 
 describe('errors', () => {
+  it('an error while offline always pauses instead of skipping or retrying', () => {
+    expect(errorAction({ currentTime: 313, duration: 328, midSongErrors: 0, online: false })).toBe('pause-offline');
+    expect(errorAction({ currentTime: 100, duration: 328, midSongErrors: 0, online: false })).toBe('pause-offline');
+    expect(errorAction({ currentTime: 100, duration: 328, midSongErrors: 1, online: false })).toBe('pause-offline');
+    expect(errorAction({ currentTime: 0, duration: NaN, online: false })).toBe('pause-offline');
+  });
   it('an error near the end advances', () => {
     expect(errorAction({ currentTime: 313, duration: 328, midSongErrors: 0 })).toBe('finish');
     expect(errorAction({ currentTime: 313, duration: 328, midSongErrors: 1 })).toBe('finish');

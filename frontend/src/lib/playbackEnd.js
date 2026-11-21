@@ -39,17 +39,19 @@ export function pauseKind({ ended, userPaused, seeking, currentTime, duration } 
   return isNearEnd({ currentTime, duration }) ? 'suspect' : 'normal';
 }
 
-/** Stuck buffering near the end for long enough: the rest of the song is not coming. */
-export const stallShouldFinish = ({ stalledForMs, currentTime, duration }) => stalledForMs >= STALL_FINISH_MS && isNearEnd({ currentTime, duration });
+/** Stuck buffering near the end for long enough: the rest of the song is not coming. Offline stalls should pause, not finish. */
+export const stallShouldFinish = ({ stalledForMs, currentTime, duration, online = true }) => online && stalledForMs >= STALL_FINISH_MS && isNearEnd({ currentTime, duration });
 
 /**
  * What to do on an audio 'error'.
- *  'candidates' the song never really started: try the other stream addresses (the old behaviour)
- *  'finish'     near the end: the song is finished, go to the next one
- *  'retry'      in the middle, first time: load the same stream again and continue from the same second
- *  'skip'       in the middle, again: give up on this song (toast), go to the next one
+ *  'pause-offline' device is offline: pause and do not skip through queue
+ *  'candidates'    the song never really started: try the other stream addresses (the old behaviour)
+ *  'finish'        near the end: the song is finished, go to the next one
+ *  'retry'         in the middle, first time: load the same stream again and continue from the same second
+ *  'skip'          in the middle, again: give up on this song (toast), go to the next one
  */
-export function errorAction({ currentTime, duration, midSongErrors = 0 } = {}) {
+export function errorAction({ currentTime, duration, midSongErrors = 0, online = true } = {}) {
+  if (!online) return 'pause-offline';
   if (!(currentTime > MIN_PLAYED_SECONDS)) return 'candidates';
   if (isNearEnd({ currentTime, duration })) return 'finish';
   return midSongErrors < 1 ? 'retry' : 'skip';

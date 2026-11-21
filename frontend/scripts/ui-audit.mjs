@@ -560,7 +560,7 @@ async function runGestures(browser, width, height) {
   await page.touchscreen.tap(width / 2, 20); // the dimmed page above the sheet
   await page.waitForTimeout(400);
   if ((await page.locator('[data-testid=queue-sheet]').count()) > 0) {
-    await page.locator('div[style*="z-index: 100000"] > div.absolute').click({ force: true }).catch(() => {});
+    await page.locator('div[style*="z-index: 100000"] > div.absolute').click({ position: { x: 20, y: 20 }, force: true }).catch(() => {});
     await page.waitForTimeout(400);
   }
   check(`[${tag}] tapping the dimmed page closes the queue`, (await page.locator('[data-testid=queue-sheet]').count()) === 0);
