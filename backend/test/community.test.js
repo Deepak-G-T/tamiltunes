@@ -3,7 +3,7 @@ import { sanitizeText, charLength, parseTimestamp, extractTimestamp } from '../s
 import { checkContent } from '../src/community/contentFilter.js';
 import { validateUsername, suggestUsername } from '../src/community/username.js';
 import { validateAvatarDataUrl, AVATAR_MAX_BYTES } from '../src/community/avatar.js';
-import { commentCreateSchema, profileUpdateSchema } from '../src/community/schemas.js';
+import { profileUpdateSchema } from '../src/community/schemas.js';
 
 // sanitize
 assert.equal(sanitizeText('<script>alert(1)</script>hi <b>there</b>'), 'alert(1)hi there');
@@ -60,12 +60,7 @@ assert.equal(validateAvatarDataUrl(url('image/png', Buffer.concat([tinyPng, Buff
 console.log('✓ avatar validation rejects SVG, remote URLs, spoofed and oversized files');
 
 // schemas
-assert.equal(commentCreateSchema.safeParse({ body: '  hi <i>x</i> ' }).data.body, 'hi x');
-assert.equal(commentCreateSchema.safeParse({ body: '   ' }).success, false);
-assert.equal(commentCreateSchema.safeParse({ body: 'a'.repeat(501) }).success, false);
-assert.equal(commentCreateSchema.safeParse({ body: 'a'.repeat(500) }).success, true);
-assert.equal(commentCreateSchema.safeParse({ body: 'ok', timestampSec: -1 }).success, false);
 assert.equal(profileUpdateSchema.safeParse({ bio: 'x'.repeat(151) }).success, false);
 assert.equal(profileUpdateSchema.safeParse({ role: 'admin' }).success, false, 'role cannot be self-assigned');
 assert.equal(profileUpdateSchema.safeParse({ email: 'a@b.c' }).success, false);
-console.log('✓ schemas: 500-char comments, 150-char bio, no privilege fields');
+console.log('✓ schemas: 150-char bio, no privilege fields');

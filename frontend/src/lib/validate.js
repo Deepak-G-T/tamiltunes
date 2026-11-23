@@ -4,7 +4,6 @@
  */
 import { charLength } from './format';
 
-export const COMMENT_MAX = 500;
 export const BIO_MAX = 150;
 export const USERNAME_RE = /^[a-z][a-z0-9_]{2,19}$/;
 export const AVATAR_MAX_BYTES = 80 * 1024;
@@ -13,14 +12,6 @@ export const AVATAR_UPLOAD_MAX_BYTES = 8 * 1024 * 1024; // raw file picked by th
 const RESERVED = new Set(['admin', 'administrator', 'root', 'support', 'help', 'api', 'me', 'profile', 'settings', 'login', 'logout', 'signup', 'register', 'tamiltunes', 'moderator', 'mod', 'system', 'null', 'undefined', 'u', 'search', 'explore']);
 
 export const normalizeUsername = (v) => String(v ?? '').trim().toLowerCase().replace(/^@/, '');
-
-/** @returns {string | null} an error message, or null when valid */
-export function commentError(text) {
-  const t = String(text ?? '').trim();
-  if (!t) return 'Write something first.';
-  if (charLength(t) > COMMENT_MAX) return `Comments can be at most ${COMMENT_MAX} characters.`;
-  return null;
-}
 
 /** @returns {string | null} */
 export function usernameError(input) {

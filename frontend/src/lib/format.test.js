@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { formatTimestamp, parseTimestamp, tokenizeComment, timeAgo, compactCount, charLength } from './format';
+import { formatTimestamp, parseTimestamp, timeAgo, compactCount, charLength } from './format';
 
 describe('timestamps', () => {
   it('formats and parses', () => {
@@ -11,18 +11,6 @@ describe('timestamps', () => {
     expect(parseTimestamp('1:02:03')).toBe(3723);
     expect(parseTimestamp('1:75')).toBeNull();
     expect(parseTimestamp('abc')).toBeNull();
-  });
-  it('tokenizes comments into text and seek parts without touching markup', () => {
-    expect(tokenizeComment('drop at 1:23 and 2:05!')).toEqual([
-      { type: 'text', value: 'drop at ' },
-      { type: 'time', value: '1:23', seconds: 83 },
-      { type: 'text', value: ' and ' },
-      { type: 'time', value: '2:05', seconds: 125 },
-      { type: 'text', value: '!' },
-    ]);
-    expect(tokenizeComment('version 10:5 and 1:75')).toEqual([{ type: 'text', value: 'version 10:5 and 1:75' }]);
-    expect(tokenizeComment('<img onerror=x> 0:30')[0]).toEqual({ type: 'text', value: '<img onerror=x> ' });
-    expect(tokenizeComment('')).toEqual([]);
   });
 });
 

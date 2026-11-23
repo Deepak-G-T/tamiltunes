@@ -14,7 +14,6 @@ import {
   Repeat1,
   ListMusic,
   Heart,
-  MessageCircle,
   MoreHorizontal,
   Maximize,
   Settings2,
@@ -31,7 +30,6 @@ import { enterVideoFullscreen } from '../../lib/videoFullscreen';
 import VideoSettings from './VideoSettings';
 import VideoModeToggle from './VideoModeToggle';
 import ScreenLockNotice from './ScreenLockNotice';
-import CommentsPanel from '../comments/CommentsPanel';
 import QueueContent from './queue/QueueContent';
 import MarqueeText from '../common/MarqueeText';
 import { useSongActions } from '../common/SongActionsSheet';
@@ -82,13 +80,11 @@ const FullScreenPlayer = ({ isOpen, onClose: onCloseProp, onToggleFavorite, isFa
   const { showToast, sleepTimer, startSleepTimer, cancelSleepTimer } = useQueue();
   const [sleepOpen, setSleepOpen] = useState(false);
   const [lyricsOpen, setLyricsOpen] = useState(false);
-  const [commentsOpen, setCommentsOpen] = useState(false);
   const [view, setView] = useState('player'); // 'player' | 'queue' (the Queue tab inside Now Playing)
   const songActions = useSongActions();
   const [showVideoSettings, setShowVideoSettings] = useState(false);
   useEffect(() => { if (!isOpen) setView('player'); }, [isOpen]);
-  // Every way of closing the player also closes the comments sheet
-  const onClose = () => { setCommentsOpen(false); setSleepOpen(false); setLyricsOpen(false); onCloseProp(); };
+  const onClose = () => { setSleepOpen(false); setLyricsOpen(false); onCloseProp(); };
   // Songs carry no artist or album ids, so a name opens the search for it (artist and album cards are the first results)
   const openSearch = (name) => { haptic(10); onClose(); navigate(`/search?q=${encodeURIComponent(name)}`); };
   const artistNames = String(currentSong?.artist || currentSong?.singers || '').split(/\s*(?:,|&| and )\s*/).map((n) => n.trim()).filter(Boolean);
@@ -402,18 +398,6 @@ const FullScreenPlayer = ({ isOpen, onClose: onCloseProp, onToggleFavorite, isFa
         {/* Quick actions */}
         {(
           <div className="flex items-center justify-center gap-5 sm:gap-8 mb-2 text-zinc-300">
-            <button
-              onClick={() => {
-                haptic(10);
-                setCommentsOpen(true);
-              }}
-              aria-label="Open comments"
-              data-testid="open-comments"
-              className="flex flex-col items-center justify-center gap-1 min-w-11 min-h-11 text-[11px] hover:text-white active:scale-90 transition-transform"
-            >
-              <MessageCircle className="w-6 h-6" />
-              <span className="[@media(max-height:900px)]:hidden">Comments</span>
-            </button>
             {onAddToPlaylist && (
               <button
                 onClick={() => {
@@ -505,7 +489,7 @@ const FullScreenPlayer = ({ isOpen, onClose: onCloseProp, onToggleFavorite, isFa
     </div>
   );
 
-  const withComments = (
+  const portalContent = (
     <>
       {content}
       <BottomSheet open={sleepOpen} onClose={() => setSleepOpen(false)} title="Sleep timer" testId="sleep-sheet">
@@ -527,16 +511,10 @@ const FullScreenPlayer = ({ isOpen, onClose: onCloseProp, onToggleFavorite, isFa
           <p dir="auto" className="whitespace-pre-line text-sm text-zinc-200 leading-relaxed py-2">{currentSong.lyrics}</p>
         </BottomSheet>
       )}
-      <CommentsPanel
-        open={commentsOpen}
-        onClose={() => setCommentsOpen(false)}
-        onNavigate={onClose}
-        song={currentSong}
-      />
     </>
   );
 
-  return typeof document !== 'undefined' ? createPortal(withComments, document.body) : withComments;
+  return typeof document !== 'undefined' ? createPortal(portalContent, document.body) : portalContent;
 };
 
 export default FullScreenPlayer;

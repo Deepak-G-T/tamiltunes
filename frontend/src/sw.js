@@ -4,7 +4,7 @@
  *  - precaches the app shell (JS, CSS, icons, the offline page);
  *  - public music API GETs and images use stale-while-revalidate;
  *  - NEVER cached, and not even intercepted: audio and video streams (any Range request, /stream, audio and video requests, the CDN and YouTube hosts),
- *    sign-in and every personal endpoint (auth, me, admin, home, history, favorites, playlists, comments, profile ...).
+ *    sign-in and every personal endpoint (auth, me, admin, home, history, favorites, playlists, profile ...).
  *    Only an allow-list of PUBLIC music endpoints is cached, so one person's data can never be shown to another on a shared phone.
  *  - a page load while offline shows /offline.html;
  *  - a new version waits until the person taps "Reload" (never a silent reload: it would stop the music).

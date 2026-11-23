@@ -45,9 +45,6 @@ model User {
   playlists        Playlist[]
   favorites        Favorite[]
   listeningHistory ListeningHistory[]
-  comments         Comment[]
-  commentLikes     CommentLike[]
-  reports          Report[]
   playEvents       PlayEvent[]
   speedDialOverrides SpeedDialOverride[]
   queueState       QueueState?
@@ -208,45 +205,6 @@ model ListeningHistory {
 
 // Comments reference songs by plain id (no FK): a song row only exists once
 // someone favourites / plays / saves it.
-model Comment {
-  id            String   @id @default(uuid())
-  songId        String
-  userId        String
-  parentId      String?
-  body          String
-  timestampSec  Int?
-  isPinned      Boolean  @default(false)
-  likeCount     Int      @default(0)
-  likedByArtist Boolean  @default(false)
-  editedAt      DateTime?
-  createdAt     DateTime @default(now())
-
-  user    User          @relation(fields: [userId], references: [id], onDelete: Cascade)
-  parent  Comment?      @relation("Replies", fields: [parentId], references: [id], onDelete: Cascade)
-  replies Comment[]     @relation("Replies")
-  likes   CommentLike[]
-  reports Report[]
-
-  @@index([songId, createdAt(sort: Desc)])
-  @@index([songId, likeCount(sort: Desc)])
-  @@index([parentId])
-  @@index([userId, createdAt(sort: Desc)])
-  @@map("comments")
-}
-
-model CommentLike {
-  commentId String
-  userId    String
-  createdAt DateTime @default(now())
-
-  comment Comment @relation(fields: [commentId], references: [id], onDelete: Cascade)
-  user    User    @relation(fields: [userId], references: [id], onDelete: Cascade)
-
-  @@id([commentId, userId])
-  @@index([userId])
-  @@map("comment_likes")
-}
-
 model Follow {
   followerId String
   followedId String
@@ -258,20 +216,6 @@ model Follow {
   @@id([followerId, followedId])
   @@index([followedId, createdAt(sort: Desc)])
   @@map("follows")
-}
-
-model Report {
-  id         String   @id @default(uuid())
-  commentId  String
-  reporterId String
-  reason     String
-  createdAt  DateTime @default(now())
-
-  comment  Comment @relation(fields: [commentId], references: [id], onDelete: Cascade)
-  reporter User    @relation(fields: [reporterId], references: [id], onDelete: Cascade)
-
-  @@unique([commentId, reporterId])
-  @@map("reports")
 }
 
 // What a user actually did with a song: lets the radio learn from completions and skips.

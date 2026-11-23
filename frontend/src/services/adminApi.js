@@ -34,9 +34,6 @@ export const adminApi = {
   updateHomeContent: (data) => api.put('/admin/home-content', data).then((r) => r.data),
 
   // Moderation
-  getReportedComments: () => api.get('/admin/moderation/comments').then((r) => r.data),
-  deleteComment: (id) => api.delete(`/admin/moderation/comments/${id}`).then((r) => r.data),
-
   // Playlists
   getPlaylists: () => api.get('/admin/playlists').then((r) => r.data),
   toggleFeaturePlaylist: (id) => api.post(`/admin/playlists/${id}/feature`).then((r) => r.data),

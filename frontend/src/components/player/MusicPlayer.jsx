@@ -17,7 +17,7 @@ import { useAudio, useQueue } from '../../context/AudioContext';
 import { useAuth } from '../../context/AuthContext';
 import ProgressBar from './ProgressBar';
 import VolumeSlider from './VolumeSlider';
-// The full-screen player and the queue panel (drag and drop, comments ...) are not needed for the first page: their code is loaded once a song
+// The full-screen player and the queue panel (drag and drop ...) are not needed for the first page: their code is loaded once a song
 // is on and kept in state. (Not React.lazy: React holds back a lazy component behind Suspense on its first showing, which made the first open
 // of the queue ~170 ms slower.)
 const loadPanels = () => Promise.all([import('./QueueDrawer'), import('./FullScreenPlayer')])

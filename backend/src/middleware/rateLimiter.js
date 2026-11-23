@@ -46,24 +46,11 @@ const perUser = ({ windowMs, max, message }) =>
     message: { success: false, message },
   });
 
-// 5 new comments or replies per minute per account
-export const commentLimiter = perUser({
-  windowMs: 60 * 1000,
-  max: 5,
-  message: 'You are commenting too fast. Please wait a minute and try again.',
-});
-
 // A failed video embed is reported once per song; 20 an hour per account is plenty and stops anyone flagging the catalogue
 export const videoReportLimiter = perUser({
   windowMs: 60 * 60 * 1000,
   max: 20,
   message: 'Too many video reports, please try again later.',
-});
-
-export const reportLimiter = perUser({
-  windowMs: 60 * 1000,
-  max: 10,
-  message: 'Too many reports, please slow down.',
 });
 
 export const usernameCheckLimiter = perUser({

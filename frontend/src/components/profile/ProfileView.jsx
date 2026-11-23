@@ -1,7 +1,7 @@
 import { shareLink } from '../../lib/share';
 import { Link } from 'react-router-dom';
 import React, { Suspense, lazy, useState, useCallback, useMemo, useRef } from 'react';
-import { Settings, Pencil, Share2, MapPin, CalendarDays, Lock, Heart, ListMusic, History, MessageCircle, Sparkles } from 'lucide-react';
+import { Settings, Pencil, Share2, MapPin, CalendarDays, Lock, Heart, ListMusic, History, Sparkles } from 'lucide-react';
 import Avatar from '../common/Avatar';
 import { RowSkeleton, SkeletonList } from '../common/Skeleton';
 import { EmptyState } from '../common/StateViews';
@@ -20,7 +20,6 @@ import { useAuth } from '../../context/AuthContext';
 const LikedTab = lazy(() => import('./tabs/LikedTab'));
 const PlaylistsTab = lazy(() => import('./tabs/PlaylistsTab'));
 const HistoryTab = lazy(() => import('./tabs/HistoryTab'));
-const CommentsTab = lazy(() => import('./tabs/CommentsTab'));
 
 const joinedLabel = (d) => (d ? new Date(d).toLocaleDateString(undefined, { month: 'long', year: 'numeric' }) : '');
 
@@ -58,7 +57,6 @@ const ProfileView = ({ profile, isSelf, onProfileChange }) => {
   const tabs = useMemo(() => {
     const t = [{ id: 'liked', label: 'Liked', Icon: Heart }, { id: 'playlists', label: 'Playlists', Icon: ListMusic }];
     if (isSelf || profile.showHistory) t.push({ id: 'history', label: 'Recent', Icon: History });
-    t.push({ id: 'comments', label: 'Comments', Icon: MessageCircle });
     return t;
   }, [isSelf, profile.showHistory]);
 
@@ -134,10 +132,9 @@ const ProfileView = ({ profile, isSelf, onProfileChange }) => {
           </Link>
         )}
 
-        <div className={`mt-4 grid ${isPrivate ? 'grid-cols-2' : 'grid-cols-5'} gap-1 rounded-xl bg-black/30 px-1`}>
+        <div className={`mt-4 grid ${isPrivate ? 'grid-cols-2' : 'grid-cols-4'} gap-1 rounded-xl bg-black/30 px-1`}>
           {!isPrivate && <Stat label="Liked" value={stats.favorites ?? 0} />}
           {!isPrivate && <Stat label="Playlists" value={stats.playlists ?? 0} />}
-          {!isPrivate && <Stat label="Comments" value={stats.comments ?? 0} />}
           <Stat label="Followers" value={stats.followers ?? 0} onClick={() => setPeople('followers')} />
           <Stat label="Following" value={stats.following ?? 0} onClick={() => setPeople('following')} />
         </div>
@@ -162,7 +159,6 @@ const ProfileView = ({ profile, isSelf, onProfileChange }) => {
               {tab === 'playlists' && <PlaylistsTab key={profile.username} username={profile.username} isSelf={isSelf}
                 onCountChange={(d) => onProfileChange({ ...profile, stats: { ...profile.stats, playlists: Math.max(0, (stats.playlists ?? 0) + d) } })} />}
               {tab === 'history' && <HistoryTab key={profile.username} username={profile.username} isSelf={isSelf} />}
-              {tab === 'comments' && <CommentsTab key={profile.username} username={profile.username} isSelf={isSelf} />}
             </Suspense>
           </div>
         </>

@@ -1,13 +1,7 @@
 import { describe, it, expect } from 'vitest';
-import { commentError, usernameError, bioError, nameError, avatarFileError, normalizeUsername } from './validate';
+import { usernameError, bioError, nameError, avatarFileError, normalizeUsername } from './validate';
 
 describe('validation mirrors the server', () => {
-  it('comments', () => {
-    expect(commentError('   ')).toBeTruthy();
-    expect(commentError('a'.repeat(500))).toBeNull();
-    expect(commentError('a'.repeat(501))).toBeTruthy();
-    expect(commentError('தமிழ் '.repeat(100))).toBeNull(); // 600 UTF-16 units but ~400 graphemes
-  });
   it('usernames', () => {
     expect(normalizeUsername(' @Tamil_Fan ')).toBe('tamil_fan');
     for (const ok of ['abc', 'tamil_fan1', 'a'.repeat(20)]) expect(usernameError(ok)).toBeNull();

@@ -1,41 +1,11 @@
 /** Shapes returned to clients. Whitelists only: never spread a DB row (it holds the password hash). */
 
-export const encodeCursor = (key) => (key ? Buffer.from(JSON.stringify(key)).toString('base64url') : null);
-
-export const decodeCursor = (raw) => {
-  if (!raw) return null;
-  try {
-    const key = JSON.parse(Buffer.from(raw, 'base64url').toString('utf8'));
-    const ok = Array.isArray(key) && key.length >= 2 && key.length <= 3 &&
-      key.every((v) => typeof v === 'number' || (typeof v === 'string' && v.length < 100));
-    return ok ? key : undefined; // undefined = malformed
-  } catch {
-    return undefined;
-  }
-};
-
 export const avatarUrl = (u) =>
   u?.avatarUpdatedAt && u.username ? `/users/${encodeURIComponent(u.username)}/avatar?v=${new Date(u.avatarUpdatedAt).getTime()}` : null;
 
 export const presentAuthor = (u) =>
   u ? { id: u.id, username: u.username, name: u.name, role: u.role || 'user', avatarUrl: avatarUrl(u) }
     : { id: null, username: null, name: 'Deleted user', role: 'user', avatarUrl: null };
-
-export const presentComment = (c, { liked = new Set(), replyCounts = new Map() } = {}) => ({
-  id: c.id,
-  songId: c.songId,
-  parentId: c.parentId ?? null,
-  body: c.body,
-  timestampSec: c.timestampSec ?? null,
-  isPinned: Boolean(c.isPinned),
-  likeCount: c.likeCount,
-  likedByMe: liked.has(c.id),
-  likedByArtist: Boolean(c.likedByArtist),
-  replyCount: replyCounts.get(c.id) ?? 0,
-  editedAt: c.editedAt ?? null,
-  createdAt: c.createdAt,
-  author: presentAuthor(c.user),
-});
 
 const baseProfile = (u) => ({
   id: u.id,

@@ -126,7 +126,7 @@ const SettingsSheet = ({ profile, open, onClose, onChange }) => {
         ) : (
           <form onSubmit={destroy} className="rounded-xl border border-rose-500/30 bg-rose-500/5 p-3 space-y-3">
             <p className="text-sm text-white font-semibold">Delete your account?</p>
-            <p className="text-xs text-zinc-300 leading-relaxed">This permanently removes your profile, playlists, liked songs, history, comments and follows. It cannot be undone.</p>
+            <p className="text-xs text-zinc-300 leading-relaxed">This permanently removes your profile, playlists, liked songs, history and follows. It cannot be undone.</p>
             <div>
               <label htmlFor={pid} className="block text-xs font-semibold text-zinc-300 mb-1">Type your email address to confirm</label>
               <input id={pid} type="email" autoComplete="off" autoCapitalize="off" autoCorrect="off" spellCheck={false} placeholder={user?.email || ''} value={password} onChange={(e) => setPassword(e.target.value)}

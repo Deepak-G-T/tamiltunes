@@ -62,7 +62,7 @@ async function run(browser) {
     if (p === '/home') return json({ success: true, seed: 's', hero: null, hidden: [], sections: [{ id: 'trending', title: 'Trending now', kind: 'songs', items: S }] });
     if (/^\/songs\/[^/]+\/related/.test(p)) return json({ success: true, items: R });
     if (p === '/me/speed-dial') return json({ success: true, items: [] });
-    if (p === '/profile/me') return json({ success: true, profile: { id: 'u1', name: 'Test User', username: 'testuser', bio: '', role: 'user', stats: { favorites: 0, playlists: 0, comments: 0, followers: 0, following: 0 }, isPublicProfile: true, showHistory: true, joinedAt: '2026-01-01T00:00:00.000Z' } });
+    if (p === '/profile/me') return json({ success: true, profile: { id: 'u1', name: 'Test User', username: 'testuser', bio: '', role: 'user', stats: { favorites: 0, playlists: 0, followers: 0, following: 0 }, isPublicProfile: true, showHistory: true, joinedAt: '2026-01-01T00:00:00.000Z' } });
     if (/^\/users\//.test(p)) return json({ success: false, message: 'User not found' }, 404); // a real server answers an unknown profile with 404
     return json({ success: true, items: [], songs: {} });
   });

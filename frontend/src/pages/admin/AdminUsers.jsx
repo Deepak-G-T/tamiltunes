@@ -205,7 +205,7 @@ const AdminUsers = () => {
         <div role="dialog" aria-modal="true" aria-label="Remove account" data-testid="remove-modal" className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/70">
           <form onSubmit={submitRemove} className="w-full max-w-sm rounded-2xl bg-[#18181B] border border-rose-500/40 p-5 space-y-3">
             <div className="flex items-start justify-between"><h3 className="text-base font-bold text-white inline-flex items-center gap-2"><AlertTriangle className="w-4 h-4 text-rose-400" />Remove this account?</h3><button type="button" onClick={() => setRemoveModal(null)} aria-label="Close"><X className="w-4 h-4 text-zinc-400" /></button></div>
-            <p className="text-xs text-zinc-300">This permanently deletes <b>{removeModal.email}</b> and their playlists, likes, history and comments. It cannot be undone.</p>
+            <p className="text-xs text-zinc-300">This permanently deletes <b>{removeModal.email}</b> and their playlists, likes and history. It cannot be undone.</p>
             <label className="block text-xs font-semibold text-zinc-300">Type their email address to confirm
               <input autoFocus value={typed} onChange={(e) => setTyped(e.target.value)} data-testid="remove-input" autoCapitalize="off" autoCorrect="off" spellCheck={false} className="mt-1.5 w-full px-3 py-2 rounded-xl bg-zinc-900 border border-zinc-700 text-white text-sm focus:outline-none focus:border-rose-400" />
             </label>

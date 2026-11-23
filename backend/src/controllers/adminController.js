@@ -235,7 +235,7 @@ export const blockUser = async (req, res, next) => {
   }
 };
 
-// REMOVE ACCOUNT: deletes the person and everything of theirs (playlists, likes, history, comments ...). Typed email confirmation; never yourself or an admin.
+// REMOVE ACCOUNT: deletes the person and everything of theirs (playlists, likes, history, follows ...). Typed email confirmation; never yourself or an admin.
 export const deleteUser = async (req, res, next) => {
   try {
     const { id } = req.params;
@@ -706,38 +706,6 @@ export const updateHomeContent = async (req, res, next) => {
   }
 };
 
-// 16. MODERATION: COMMENTS
-export const listReportedComments = async (req, res, next) => {
-  try {
-    const comments = await db.comment.findMany({
-      take: 50,
-      orderBy: { createdAt: 'desc' }
-    });
-    res.json({ comments });
-  } catch (err) {
-    next(err);
-  }
-};
-
-export const deleteComment = async (req, res, next) => {
-  try {
-    const { id } = req.params;
-    await db.comment.delete({ where: { id } }).catch(() => {});
-
-    await recordAuditLog({
-      actorId: req.user.id,
-      actorEmail: req.user.email,
-      action: 'COMMENT_DELETE',
-      targetType: 'Comment',
-      targetId: id,
-      ip: req.ip
-    });
-
-    res.json({ message: 'Comment deleted', ok: true });
-  } catch (err) {
-    next(err);
-  }
-};
 
 // 17. PLAYLISTS MANAGEMENT
 export const listAdminPlaylists = async (req, res, next) => {
