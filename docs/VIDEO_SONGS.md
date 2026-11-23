@@ -53,6 +53,18 @@ Admin panel > **Songs** > the **Video** button on a song (a camera icon in the t
 Your account needs the admin role AND its user id in the Render setting `ADMIN_VIDEO_USER_IDS` (otherwise the screen says so). Nothing is downloaded or stored: only the video id is saved.
 Browser audit: `npm run test:admin-video --prefix frontend` (27 checks).
 
+## Turning on automatic videos (YouTube Data API key)
+Without a key only the curated map (`curatedVideos.js`, nine songs) and your admin choices give videos. With a key, official channels' uploads are indexed daily and most songs from them get a video.
+The website and the Android app use the same code, so both get videos at the same time; the app needs no new build for this (the lookup is on the server).
+1. Google Cloud Console > APIs & Services > Library: enable **YouTube Data API v3**. Credentials: create an API key. Restrict it: **API restrictions = YouTube Data API v3**; **Application restrictions = None**
+   (Render has no fixed address). Never paste the key in chat or commit it.
+2. Check it on YOUR computer (about 2 quota units; prints each channel's real name so you can confirm it is the official one; never prints the key):
+   `YOUTUBE_API_KEY=... VIDEO_CHANNEL_ALLOWLIST=UC...,UC... npm run video:check --prefix backend`
+   (PowerShell: `$env:YOUTUBE_API_KEY="..."; $env:VIDEO_CHANNEL_ALLOWLIST="UC...,UC..."; npm run video:check --prefix backend`, then close the window.) It explains bad keys, a disabled API, quota and key restrictions in plain words.
+3. Render > Environment: `YOUTUBE_API_KEY`, `VIDEO_CHANNEL_ALLOWLIST` (required; empty = nothing is served), optionally `YOUTUBE_DAILY_BUDGET` (5000), `VIDEO_INDEX_MAX_PAGES` (10; up to 40 for older songs), `VIDEO_SEARCH_FALLBACK` (true). Redeploy (a change made through the Render API does not redeploy by itself).
+4. Give it a day: the first index run, then Home shows a "Video songs" shelf (4+ songs) and songs show the Audio | Video toggle in Now Playing. A wrong or missing video for one song: pick it by hand with the admin routes above.
+Quota: the index costs about channels x pages x 2 units a day (4 channels x 10 pages = 80); each per-song search about 101; Google's default is 10,000 a day.
+
 ## Migration: Neon dev branch first, then production
 Run these on YOUR computer. Never paste a connection string into a chat.
 1. Create a Neon dev branch from production and get its UNPOOLED url:
@@ -65,7 +77,7 @@ Run these on YOUR computer. Never paste a connection string into a chat.
 4. Delete the dev branch when done: `npx neonctl branches delete video-songs-test --project-id rapid-poetry-01926455`.
 
 ## Tests
-`npm test --prefix backend` (song-videos.test.js: memory and, with TEST_DATABASE_URL, Postgres), `npm test --prefix frontend`,
+`npm test --prefix backend` (song-videos.test.js: memory and, with TEST_DATABASE_URL, Postgres; video-setup-check.test.js: the owner check with a fake Google), `npm test --prefix frontend`,
 `npm run test:ui --prefix frontend` (admin-video-audit.mjs: the admin screen above; ui-audit: toggle, position both ways, close-to-audio, errors, reports, settings, lists; native-audit: Back order;
 pwa-audit: privacy page, nothing cached). `UI_AUDIT_ONLY=viewports|report|settings|lists` runs one part of the UI audit.
 

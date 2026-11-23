@@ -155,6 +155,7 @@ Songs may carry an optional `videoId`. It comes from the curated map `backend/sr
   settings, the migration steps and the phone checklist: `docs/VIDEO_SONGS.md`. No batch auto-match job yet (later phase).
 - Adding a video to one song by hand: Admin > Songs > Video (paste a link, Check, Save); needs the admin role AND the id in `ADMIN_VIDEO_USER_IDS`. `npm run test:admin-video --prefix frontend`. UNTESTED: a real admin account and real YouTube answers.
 - Migration `20261126000000_song_videos` (additive; songs.video_id / video_available / video_flagged_at + video_reports). Neon dev branch first, backup branch BEFORE merging.
+- Turning on automatic videos (API key, allow-list, `npm run video:check --prefix backend` which never prints the key): `docs/VIDEO_SONGS.md` "Turning on automatic videos". Website and app share the code; no app build is needed for it. UNTESTED: a real key against Google (needs the owner's key).
 - A video is hidden for everyone only after 2 signed-in people report it (served video only); one failed embed hides it for that person (7 days, browser only).
 - UNTESTED: everything on a real phone (rotation/full screen, screen lock, Back from full screen, Bluetooth/headset, Wi-Fi only on mobile data).
 
