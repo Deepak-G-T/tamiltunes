@@ -153,6 +153,7 @@ export const createVideoLookup = ({
           if (!CHANNEL_ID_RE.test(channelId)) continue; // channel ids look like UC + 22 chars
           const uploads = `UU${channelId.slice(2)}`; // a channel's uploads playlist
           let pageToken = '';
+          let rank = 0; // 0 = the channel's newest accepted upload (the uploads playlist is newest first)
           for (let page = 0; page < maxIndexPages; page++) {
             if (!spend(1)) break;
             const data = await apiCall('playlistItems', {
@@ -161,7 +162,7 @@ export const createVideoLookup = ({
             for (const it of data.items || []) {
               const id = it?.contentDetails?.videoId;
               const title = it?.snippet?.title;
-              if (VIDEO_ID_RE.test(id || '') && scoreVideoTitle(title) >= 0) found.push({ videoId: id, title });
+              if (VIDEO_ID_RE.test(id || '') && scoreVideoTitle(title) >= 0) found.push({ videoId: id, title, channelId, rank: rank++ });
             }
             pageToken = data.nextPageToken;
             if (!pageToken) break;
@@ -177,7 +178,7 @@ export const createVideoLookup = ({
           for (const b of batch) {
             const st = status.get(b.videoId);
             if (st?.embeddable === true && (!st.privacyStatus || st.privacyStatus === 'public')) {
-              verified.push({ videoId: b.videoId, title: b.title, norm: plain(b.title), score: scoreVideoTitle(b.title) });
+              verified.push({ videoId: b.videoId, title: b.title, channelId: b.channelId, rank: b.rank, norm: plain(b.title), score: scoreVideoTitle(b.title) });
             }
           }
         }
@@ -418,8 +419,18 @@ export const createVideoLookup = ({
     }
   };
   const indexState = () => ({ ok: index.ok, entries: index.entries.length });
+  /** The newest `perChannel` embeddable official uploads of each allow-listed channel (lyric/audio uploads already left out). For the batch matcher's --recent mode. */
+  const recentUploads = async (perChannel = 100) => {
+    if (!apiEnabled()) return [];
+    await loadIndex();
+    if (!index.ok) return [];
+    return index.entries
+      .filter((e) => e.rank < perChannel)
+      .sort((a, b) => a.rank - b.rank)
+      .map((e) => ({ videoId: e.videoId, title: e.title, channelId: e.channelId, rank: e.rank }));
+  };
 
-  return { peek, lookup, attach, attachOne, checkVideo, batchResolve, indexState, stats, _budget: budget, _cache: cache, apiEnabled };
+  return { peek, lookup, attach, attachOne, checkVideo, batchResolve, indexState, recentUploads, stats, _budget: budget, _cache: cache, apiEnabled };
 };
 
 // Admin-chosen and flagged videos (database) come first: see services/songVideos/service.js
