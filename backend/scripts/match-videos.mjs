@@ -3,6 +3,8 @@
 // (the channel index and the searches), so keep --max-units small until you trust the report.
 // Run on YOUR computer (never paste the key or the database url in a chat):
 //   PowerShell: $env:YOUTUBE_API_KEY="..."; $env:VIDEO_CHANNEL_ALLOWLIST="UC...,UC..."; $env:DATABASE_URL="<unpooled url>"; npm run video:batch --prefix backend -- --limit=300 --max-units=1500
+// Recent mode: --recent=N starts from each channel's newest N official uploads (max 300), finds the matching song in the music catalogue and
+//   remembers the pair (needs internet access to the music provider; it does NOT look at play counts). Combine with --apply to save.
 // Options: --limit=N songs to look at (default 300, max 5000), --max-units=N quota this run may use (default 1500, max 8000),
 //          --apply write the results, --no-search index only (no per-song search), --retry-none look again at songs recorded as "no video".
 // It never prints the key, never changes the songs table, never deletes anything. Admin choices and curated songs are left alone.
@@ -11,12 +13,14 @@ import { config } from '../src/config/env.js';
 import { createVideoLookup } from '../src/services/music/videoLookup.js';
 import { createPrismaStore } from '../src/services/videoMatches/store.js';
 import { runBatch } from '../src/services/videoBatch/run.js';
+import { runRecent } from '../src/services/videoBatch/recent.js';
 
 const arg = (name, dflt) => { const a = process.argv.find((x) => x.startsWith(`--${name}=`)); return a ? Number(a.split('=')[1]) : dflt; };
 const flag = (name) => process.argv.includes(`--${name}`);
 const limit = Math.min(5000, Math.max(1, Math.floor(arg('limit', 300)) || 300));
 const maxUnits = Math.min(8000, Math.max(10, Math.floor(arg('max-units', 1500)) || 1500));
 const apply = flag('apply');
+const recent = Math.min(300, Math.max(0, Math.floor(arg('recent', 0)) || 0));
 
 if (!config.youtubeApiKey || (config.videoChannelAllowlist || []).length === 0) {
   console.error('FAIL  set YOUTUBE_API_KEY and VIDEO_CHANNEL_ALLOWLIST in this shell first (see docs/VIDEO_SONGS.md). Run npm run video:check to test them.');
@@ -43,6 +47,28 @@ const overrides = new Map(songs.filter((s) => s.videoId || s.videoAvailable === 
 const store = createPrismaStore(prisma);
 const existing = new Map((await store.list()).map((r) => [r.songKey, r]));
 const lookup = createVideoLookup({ cfg: { ...config, youtubeDailyBudget: maxUnits }, getOverride: (s) => overrides.get(s.id) || null });
+
+if (recent > 0) {
+  // Recent mode: newest uploads of the allow-listed channels -> catalogue songs.
+  const { musicService } = await import('../src/services/music/providerManager.js');
+  const uploads = await lookup.recentUploads(recent);
+  const idx0 = lookup.indexState();
+  console.log(`Channel index: ${idx0.ok ? `${idx0.entries} embeddable official uploads` : 'NOT LOADED (check the key and quota)'}; looking at the newest ${recent} per channel = ${uploads.length} uploads. ${apply ? 'APPLY: results will be saved.' : 'Dry run: nothing is saved (add --apply).'}`);
+  const rr = await runRecent({
+    uploads, store, existing, apply, delayMs: 150,
+    search: async (q) => (await musicService.searchTracks(q, { type: 'songs' })).songs || [],
+    log: (l) => console.log('  ' + l)
+  });
+  const k = rr.counts;
+  console.log(`\nUploads looked at: ${k.uploads}`);
+  console.log(`  matched to a catalogue song: ${k.matched} (already saved earlier: ${k.alreadyKnown})`);
+  console.log(`  not found in the catalogue: ${k.notInCatalogue}, title not understood: ${k.unparsed}, catalogue search errors: ${k.searchErrors}`);
+  if (rr.missing.length) console.log(`\nSample of uploads whose song was not found in the catalogue (first ${rr.missing.length}):\n  ${rr.missing.join('\n  ')}`);
+  console.log(apply ? `Saved ${rr.written} rows to video_matches.` : 'Dry run: nothing saved. Run again with --apply to save these results.');
+  console.log(`Quota used by this run: about ${lookup._budget.used} units.`);
+  await prisma.$disconnect();
+  process.exit(0);
+}
 
 console.log(`Looking at ${songs.length} songs (most played first). Quota cap for this run: ${maxUnits} units. ${apply ? 'APPLY: results will be saved.' : 'Dry run: nothing is saved (add --apply).'}`);
 const res = await runBatch({ songs, lookup, store, existing, apply, retryNone: flag('retry-none'), allowSearch: !flag('no-search'), log: (l) => console.log('  ' + l) });
