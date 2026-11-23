@@ -28,6 +28,7 @@ const ROUTES = [
   ['GET', '/admin/videos/songs'],
   ['GET', '/admin/videos/flagged'],
   ['GET', '/admin/videos/check/AbCdEfGhIj1'],
+  ['GET', `/admin/videos/${songId}`],
   ['PUT', `/admin/videos/${songId}`, { videoId: 'AbCdEfGhIj1' }],
   ['DELETE', `/admin/videos/${songId}`],
   ['POST', `/admin/videos/${songId}/restore`],
@@ -65,6 +66,19 @@ try {
     const r = await call(method, path, { token: ADMIN_LISTED.token, body });
     assert.ok(!denied(r), `${method} ${path}: the listed admin gets through (got ${r.status})`);
   }
+  assert.equal((await call('PUT', `/admin/videos/${songId}`, { token: ADMIN_LISTED.token, body: { videoId: 'AbCdEfGhIj1' } })).status, 200);
+  // the admin screen reads one song's state: chosen by the admin, then removed again
+  const one = await call('GET', `/admin/videos/${songId}`, { token: ADMIN_LISTED.token });
+  assert.equal(one.status, 200);
+  assert.equal(one.json.item.chosenVideoId, 'AbCdEfGhIj1');
+  assert.equal(one.json.item.source, 'admin');
+  assert.equal(one.json.item.servedVideoId, 'AbCdEfGhIj1');
+  assert.equal((await call('GET', '/admin/videos/no%20such%20song!', { token: ADMIN_LISTED.token })).status, 400, 'a bad id is refused');
+  assert.equal((await call('GET', '/admin/videos/zzz_missing_song', { token: ADMIN_LISTED.token })).status, 404, 'an unknown song is 404');
+  assert.equal((await call('DELETE', `/admin/videos/${songId}`, { token: ADMIN_LISTED.token })).status, 200);
+  const cleared = await call('GET', `/admin/videos/${songId}`, { token: ADMIN_LISTED.token });
+  assert.equal(cleared.json.item.chosenVideoId, null);
+  assert.notEqual(cleared.json.item.source, 'admin');
   assert.equal((await call('PUT', `/admin/videos/${songId}`, { token: ADMIN_LISTED.token, body: { videoId: 'AbCdEfGhIj1' } })).status, 200);
   console.log('✓ admin videos: only an account with role admin in the database AND its id in ADMIN_VIDEO_USER_IDS gets through');
 

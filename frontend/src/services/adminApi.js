@@ -22,6 +22,13 @@ export const adminApi = {
   getDuplicates: () => api.get('/admin/songs/duplicates').then((r) => r.data),
   mergeSongs: ({ sourceSongId, targetSongId, confirm }) => api.post('/admin/songs/merge', { sourceSongId, targetSongId, confirm }).then((r) => r.data),
 
+  // Video for one song (admin only, and the account id must be in ADMIN_VIDEO_USER_IDS on the server)
+  videoGet: (songId) => api.get(`/admin/videos/${encodeURIComponent(songId)}`).then((r) => r.data),
+  videoCheck: (videoId) => api.get(`/admin/videos/check/${encodeURIComponent(videoId)}`).then((r) => r.data),
+  videoSet: (songId, videoId) => api.put(`/admin/videos/${encodeURIComponent(songId)}`, { videoId }).then((r) => r.data),
+  videoClear: (songId) => api.delete(`/admin/videos/${encodeURIComponent(songId)}`).then((r) => r.data),
+  videoRestore: (songId) => api.post(`/admin/videos/${encodeURIComponent(songId)}/restore`).then((r) => r.data),
+
   // Home Content
   getHomeContent: () => api.get('/admin/home-content').then((r) => r.data),
   updateHomeContent: (data) => api.put('/admin/home-content', data).then((r) => r.data),

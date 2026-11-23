@@ -11,6 +11,7 @@
     "preview": "vite preview",
     "test": "vitest run",
     "test:ui": "vite build && vite build --mode nativetest && node scripts/run-ui-audits.mjs",
+    "test:admin-video": "vite build && node scripts/admin-video-audit.mjs",
     "test:refill": "vite build && node scripts/queue-refill-audit.mjs",
     "test:onboarding": "vite build && node scripts/onboarding-audit.mjs",
     "test:wrapped": "vite build && node scripts/wrapped-audit.mjs",
