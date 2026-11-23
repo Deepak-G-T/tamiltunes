@@ -37,6 +37,13 @@ const vid = (n) => `vid${String(n).padStart(8, '0')}`;
   assert.equal(pickCatalogSong(songs.slice(0, 2), { title: 'Hukum', film: '' }), null, 'no film and two possible songs: not sure, so no match');
   assert.equal(pickCatalogSong([songs[1]], { title: 'Hukum', film: '' })?.id, 'b', 'no film but only one candidate');
   assert.equal(pickCatalogSong([], { title: 'Hukum', film: 'Jailer' }), null);
+  // an actor or singer in the film slot must not match a compilation album that merely contains the name
+  const best = [{ id: 'x', title: 'Veezha Veera (From "O.M: Operation Mole")', artist: 'Sai Abhyankkar', album: 'Best Of Dhanush' }];
+  assert.equal(pickCatalogSong(best, { title: 'Veezha Veera', film: 'Dhanush' }), null, 'one-word "film" (really an actor) needs an exact album match');
+  const darbar = [{ id: 'y', title: 'Varavaa Varavaa', artist: 'Anirudh', album: "Anirudh's Darbar" }];
+  assert.equal(pickCatalogSong(darbar, { title: 'Varavaa Varavaa', film: 'Anirudh' }), null);
+  const long = [{ id: 'z', title: 'Annul Maelae', artist: 'Harris', album: 'Vaaranam Aayiram Original Soundtrack' }];
+  assert.equal(pickCatalogSong(long, { title: 'Annul Maelae', film: 'Vaaranam Aayiram' })?.id, 'z', 'a longer film name may sit inside the album name');
   console.log('✓ recent: the catalogue song must match the title and, when the upload names one, the film');
 }
 
@@ -86,4 +93,16 @@ const vid = (n) => `vid${String(n).padStart(8, '0')}`;
   assert.equal(failing.counts.searchErrors, 1);
   assert.ok(!JSON.stringify([dry, applied]).includes('TESTKEY'), 'the key is never in the report');
   console.log('✓ recent: newest uploads only, dry run saves nothing, apply saves under the app key, known videos are kept, failures are counted');
+}
+
+// ---- 5. clips, visualizers and event videos are not video songs (this also protects the live channel index)
+{
+  const { scoreVideoTitle } = await import('../src/services/music/videoLookup.js');
+  for (const bad of ['Veezha Veera | Dhanush | Sai Abhyankkar | #Shorts', 'Scenuke Scene (Visualizer) | Scene | Suriya', 'Bhairavi - Highlights (23 Nov 2026)', 'Dhanush Speech (O.M Pre-Release Event)', 'Kurinji - Preview (24 Nov 2026)', 'Hukum Glimpse | Jailer']) {
+    assert.equal(scoreVideoTitle(bad), -1, bad);
+  }
+  for (const good of ['Hukum - Video Song | Jailer', 'Kaarkuzhal Kadavaiye - 8K Video Song | Vadachennai | Dhanush', 'Ayalaa Ayalaa | Ayalaan | A.R.Rahman']) {
+    assert.ok(scoreVideoTitle(good) >= 0, good);
+  }
+  console.log('✓ recent: shorts, visualizers, highlights, speeches and previews are rejected; real video songs still pass');
 }

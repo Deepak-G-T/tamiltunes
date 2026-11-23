@@ -41,7 +41,7 @@ const levenshtein = (a, b) => {
 };
 
 // YouTube upload titles that are NOT the music video (lyric/audio-only/promo/other recordings).
-const NOT_A_VIDEO_SONG_RE = /\b(lyric|lyrics|lyrical|audio|jukebox|teaser|trailer|promo|reaction|cover|remix|karaoke|status|8d|slowed|reverb|making|behind the scenes|live|full album|mashup)\b/i;
+const NOT_A_VIDEO_SONG_RE = /\b(lyric|lyrics|lyrical|audio|jukebox|teaser|trailer|promo|reaction|cover|remix|karaoke|status|8d|slowed|reverb|making|behind the scenes|live|full album|mashup|visualizer|visualiser|shorts|highlights|speech|preview|glimpse|press meet|interview|pre-?release)\b/i; // clips, visualizers and event videos are not the video song
 const OFFICIAL_VIDEO_RE = /\b(official (music )?video|video song|full video|music video)\b/i;
 
 /**

@@ -28,6 +28,10 @@ export const parseUploadTitle = (raw) => {
 };
 
 const same = (a, b) => a && b && a === b;
+const words = (t) => t.split(' ').filter(Boolean).length;
+// The film part of an upload title is often an actor or a singer ("... | Dhanush | ..."), so a one-word film must equal the album exactly:
+// "Dhanush" must not match the compilation "Best Of Dhanush". A longer name may sit inside the album ("Vaaranam Aayiram Original Soundtrack").
+const filmMatches = (album, film) => same(album, film) || (Math.min(words(album), words(film)) >= 2 && (album.includes(film) || film.includes(album)));
 
 /** The catalogue song that is this upload's song: same title (or main part) and, when the upload names a film, the same film. null if unsure. */
 export const pickCatalogSong = (songs, parsed) => {
@@ -40,7 +44,7 @@ export const pickCatalogSong = (songs, parsed) => {
     const mine = titleCandidates(s.title);
     if (!mine.some((c) => wanted.has(c))) continue;
     const album = normalizeTitle(s.album || s.movie);
-    const filmOk = film && album && (same(album, film) || album.includes(film) || film.includes(album));
+    const filmOk = film && album && filmMatches(album, film);
     hits.push({ s, filmOk });
   }
   if (film) {
