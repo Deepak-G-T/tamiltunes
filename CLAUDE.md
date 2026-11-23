@@ -153,6 +153,7 @@ Songs may carry an optional `videoId`. It comes from the curated map `backend/sr
 - Android media notification: `NativeMediaControls.jsx` re-posts the state after `create` because the plugin service cancels the first notification. Phone-confirmed on a real device.
 - YouTube embed only: never download, cache, re-host or hide the player; the API key and lookups stay in `backend/src/services/music/videoLookup.js`. Rules, API,
   settings, the migration steps and the phone checklist: `docs/VIDEO_SONGS.md`. No batch auto-match job yet (later phase).
+- Adding a video to one song by hand: Admin > Songs > Video (paste a link, Check, Save); needs the admin role AND the id in `ADMIN_VIDEO_USER_IDS`. `npm run test:admin-video --prefix frontend`. UNTESTED: a real admin account and real YouTube answers.
 - Migration `20261126000000_song_videos` (additive; songs.video_id / video_available / video_flagged_at + video_reports). Neon dev branch first, backup branch BEFORE merging.
 - A video is hidden for everyone only after 2 signed-in people report it (served video only); one failed embed hides it for that person (7 days, browser only).
 - UNTESTED: everything on a real phone (rotation/full screen, screen lock, Back from full screen, Bluetooth/headset, Wi-Fi only on mobile data).

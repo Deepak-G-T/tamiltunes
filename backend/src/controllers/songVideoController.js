@@ -66,6 +66,20 @@ export const checkVideo = async (req, res, next) => {
   } catch (err) { return next(err); }
 };
 
+/** GET /api/admin/videos/:songId: what this song has now (chosen / hidden / automatic / none), for the admin screen. */
+export const getVideo = async (req, res, next) => {
+  try {
+    if (!SONG_ID_RE.test(req.params.songId)) return res.status(400).json({ success: false, message: 'Invalid song id' });
+    const song = await knownSong(req.params.songId);
+    if (!song) return res.status(404).json({ success: false, message: 'Song not found' });
+    const row = await songVideos.store.getSong(song.id).catch(() => null);
+    const served = videoLookup.peek({ ...song }) || null;
+    const chosen = row?.videoId ?? null;
+    const hidden = row ? row.videoAvailable === false : false;
+    return res.json({ success: true, item: { songId: song.id, title: song.title, artist: song.artist, chosenVideoId: chosen, hidden, servedVideoId: served, source: chosen ? 'admin' : hidden ? 'hidden' : served ? 'automatic' : 'none' } });
+  } catch (err) { return next(err); }
+};
+
 /** PUT /api/admin/videos/:songId { videoId }: choose the video for a song (clears its flag and reports). */
 export const setVideo = async (req, res, next) => {
   try {

@@ -27,6 +27,7 @@
 | POST | `/api/songs/:id/video-report` | report a failed embed (signed in) |
 | GET | `/api/admin/videos/songs?missing=1&limit&offset` | saved songs, their served video and its source (admin / automatic / hidden / none) |
 | GET | `/api/admin/videos/flagged` | hidden videos with report counts and YouTube error codes |
+| GET | `/api/admin/videos/:songId` | one song's video now: chosen / hidden / automatic / none, and the id it plays |
 | GET | `/api/admin/videos/check/:videoId` | can it be embedded? (oEmbed; also the Data API, 1 unit, when configured) |
 | PUT | `/api/admin/videos/:songId` `{ videoId }` | choose the video (clears flag and reports) |
 | DELETE | `/api/admin/videos/:songId` | remove the choice (automatic lookup again) |
@@ -43,6 +44,15 @@ When PR #31 merges, put `/api/admin/videos` behind its admin check (2FA included
 - Lists: video icon on song cards and queue rows, Home "Video songs" shelf (4+ songs, canonical dedupe) and Videos chip, Search videos chip,
   Videos sections on artist and album pages; thumbnails `i.ytimg.com/vi/<id>/mqdefault.jpg` (lazy, cover as fallback); the embed loads on tap.
 
+## Adding a video to one song by hand (Admin > Songs)
+Admin panel > **Songs** > the **Video** button on a song (a camera icon in the table on a computer, a "Video" button on a phone):
+1. Paste a YouTube link (watch, youtu.be, shorts, embed, live, music.youtube.com) or the 11-character id. Playlist, channel and other-website links are refused (`lib/youtubeLink.js`).
+2. **Check**: shows the video's title and channel and whether it can be played inside the app (oEmbed; the Data API too when a key is set). A video that cannot be embedded cannot be saved.
+   A title that looks like a lyric, audio, live or jukebox upload gets a gentle warning (the app prefers the official video song); open it on YouTube to be sure.
+3. **Save video**. Your choice always wins over the automatic lookup. **Remove my choice** goes back to the automatic lookup; **Show the video again** undoes a hidden video (2 people could not play it).
+Your account needs the admin role AND its user id in the Render setting `ADMIN_VIDEO_USER_IDS` (otherwise the screen says so). Nothing is downloaded or stored: only the video id is saved.
+Browser audit: `npm run test:admin-video --prefix frontend` (27 checks).
+
 ## Migration: Neon dev branch first, then production
 Run these on YOUR computer. Never paste a connection string into a chat.
 1. Create a Neon dev branch from production and get its UNPOOLED url:
@@ -56,7 +66,7 @@ Run these on YOUR computer. Never paste a connection string into a chat.
 
 ## Tests
 `npm test --prefix backend` (song-videos.test.js: memory and, with TEST_DATABASE_URL, Postgres), `npm test --prefix frontend`,
-`npm run test:ui --prefix frontend` (ui-audit: toggle, position both ways, close-to-audio, errors, reports, settings, lists; native-audit: Back order;
+`npm run test:ui --prefix frontend` (admin-video-audit.mjs: the admin screen above; ui-audit: toggle, position both ways, close-to-audio, errors, reports, settings, lists; native-audit: Back order;
 pwa-audit: privacy page, nothing cached). `UI_AUDIT_ONLY=viewports|report|settings|lists` runs one part of the UI audit.
 
 ## Real-phone checklist (all UNTESTED until reported)

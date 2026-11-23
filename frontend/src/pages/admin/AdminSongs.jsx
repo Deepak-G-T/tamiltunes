@@ -11,9 +11,11 @@ import {
   X,
   Check,
   ChevronLeft,
-  ChevronRight
+  ChevronRight,
+  Video
 } from 'lucide-react';
 import { adminApi } from '../../services/adminApi';
+import SongVideoModal from '../../components/admin/SongVideoModal';
 
 const AdminSongs = () => {
   const [activeTab, setActiveTab] = useState('all'); // 'all' | 'duplicates'
@@ -26,6 +28,9 @@ const AdminSongs = () => {
   const [statusFilter, setStatusFilter] = useState('all');
   const [loading, setLoading] = useState(true);
   const [toastMessage, setToastMessage] = useState('');
+
+  // YouTube video modal (choose the video for one song)
+  const [videoSong, setVideoSong] = useState(null);
 
   // Edit metadata modal
   const [editSong, setEditSong] = useState(null);
@@ -288,6 +293,15 @@ const AdminSongs = () => {
                         <span>Edit</span>
                       </button>
                       <button
+                        onClick={() => setVideoSong(s)}
+                        aria-label={`YouTube video for ${s.title}`}
+                        data-testid="song-video-button"
+                        className="px-3 min-h-11 rounded-lg bg-zinc-800 hover:bg-zinc-700 text-zinc-200 text-xs font-semibold flex items-center gap-1"
+                      >
+                        <Video className="w-3 h-3" />
+                        <span>Video</span>
+                      </button>
+                      <button
                         onClick={() => handleToggleHide(s)}
                         className="px-3 py-1 rounded-lg bg-zinc-800 hover:bg-zinc-700 text-zinc-200 text-xs font-semibold flex items-center gap-1"
                       >
@@ -356,6 +370,15 @@ const AdminSongs = () => {
                               className="p-1.5 rounded-lg bg-zinc-800/80 hover:bg-zinc-700 text-zinc-300 hover:text-white"
                             >
                               <Edit className="w-3.5 h-3.5" />
+                            </button>
+                            <button
+                              onClick={() => setVideoSong(s)}
+                              title="YouTube video"
+                              aria-label={`YouTube video for ${s.title}`}
+                              data-testid="song-video-button"
+                              className="p-1.5 rounded-lg bg-zinc-800/80 hover:bg-zinc-700 text-zinc-300 hover:text-white"
+                            >
+                              <Video className="w-3.5 h-3.5" />
                             </button>
                             <button
                               onClick={() => handleToggleHide(s)}
@@ -466,6 +489,8 @@ const AdminSongs = () => {
           )}
         </div>
       )}
+
+      {videoSong && <SongVideoModal song={videoSong} onClose={() => setVideoSong(null)} onChanged={(msg) => showToast(msg)} />}
 
       {/* Edit Metadata Modal */}
       {editSong && (
