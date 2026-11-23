@@ -201,3 +201,9 @@ Songs may carry an optional `videoId`. It comes from the curated map `backend/sr
 - Names come from a FIXED list (`backend/src/services/taste/options.js`, English only); never accept free text. Migration `20261129000000_user_taste` (additive; Neon backup BEFORE merging). `npm run test:onboarding --prefix frontend`.
 - `aria-disabled` buttons count as disabled for Playwright's `click()`: use `{ force: true }` in an audit when a real finger can still tap them.
 - UNTESTED: a real new account, the Settings button, real phone, quality of the first Daily Mixes with the live catalogue.
+
+## Video batch matcher (feature/video-batch-matcher)
+- `npm run video:batch --prefix backend` (dry run by default, `--apply` saves): finds official videos for the most played songs and stores them in `video_matches` (keyed by `songKey`, so a searched song is never searched again). Notes, options and quota: `docs/VIDEO_SONGS.md` "Batch matcher".
+- Code: `services/videoBatch/run.js` (pure, tested with a fake YouTube), `services/videoMatches/{store,service}.js`, `videoLookup.batchResolve`. Admin choices, flagged videos and curated songs always win; errors are never stored; "none" expires after 14 days; stored matches need the key AND the allow-list (fail closed).
+- Migration `20261130000000_video_matches` (additive, one table; Neon backup BEFORE merging). UNTESTED: a real run against YouTube and the live catalogue; spot-check the matches before `--apply`.
+

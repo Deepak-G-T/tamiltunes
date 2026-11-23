@@ -1,4 +1,5 @@
 import { songVideos } from '../songVideos/service.js';
+import { videoMatches } from '../videoMatches/service.js';
 import { LruCacheService } from '../cacheService.js';
 import { config as defaultConfig } from '../../config/env.js';
 import { CURATED_VIDEOS } from './curatedVideos.js';
@@ -71,7 +72,7 @@ const aliasMatches = (candidate, alias) =>
 
 const artistText = (song) => `${song.artist || ''} ${song.singers || ''}`.toLowerCase();
 
-const songKey = (song) => `${normalizeTitle(song.title)}|${normalizeTitle((song.artist || song.singers || '').split(',')[0])}`;
+export const songKey = (song) => `${normalizeTitle(song.title)}|${normalizeTitle((song.artist || song.singers || '').split(',')[0])}`;
 
 /**
  * Factory so tests can inject fetch / config / cache / clock.
@@ -85,7 +86,9 @@ export const createVideoLookup = ({
   curated = CURATED_VIDEOS,
   maxQueue = 20,
   // Admin choices and flags from the database (services/songVideos): { videoId } wins, { hidden: true } means no video. Synchronous.
-  getOverride = () => null
+  getOverride = () => null,
+  // Results of the batch matcher (services/videoMatches): key -> { videoId } | { videoId: null } | undefined. Synchronous.
+  getMatch = () => undefined
 } = {}) => {
   const inflight = new Map();
   const queue = [];
@@ -223,8 +226,11 @@ export const createVideoLookup = ({
     if (c) return c.videoId;
     const hit = cache.get(`video_${songKey(song)}`);
     if (hit) return hit.videoId;
+    const stored = apiEnabled() ? getMatch(songKey(song)) : undefined; // fail closed: no key or no allow-list = no stored matches either
+    if (stored?.videoId) return stored.videoId;
     const viaIndex = matchIndex(song);
     if (viaIndex) return viaIndex;
+    if (stored && stored.videoId === null) return null; // the batch matcher looked recently and found none
     return undefined; // undefined = unknown, null = known none
   };
 
@@ -270,6 +276,9 @@ export const createVideoLookup = ({
 
     if (!apiEnabled()) return null; // no key or empty allow-list: fail closed, no network, no cache write
 
+    const stored = getMatch(songKey(song));
+    if (stored?.videoId) return stored.videoId;
+
     // Cheap path first: the channel uploads index (a few quota units for the whole catalogue)
     await loadIndex();
     const viaIndex = matchIndex(song);
@@ -278,6 +287,7 @@ export const createVideoLookup = ({
       return viaIndex;
     }
     if (!searchFallback) return null; // index only: do not spend search quota
+    if (stored && stored.videoId === null) return null; // the batch matcher already searched recently: do not pay again
 
     if (inflight.has(key)) return inflight.get(key);
     const p = (async () => {
@@ -379,8 +389,41 @@ export const createVideoLookup = ({
     return id ? { ...song, videoId: id } : song;
   };
 
-  return { peek, lookup, attach, attachOne, checkVideo, stats, _budget: budget, _cache: cache, apiEnabled };
+  /**
+   * One song for the batch matcher (scripts/match-videos.mjs). Never reads or writes the cache or the stored matches.
+   * Returns { via, videoId? }: admin | curated | hidden (already decided elsewhere, not stored), index | search (found), none (searched, nothing
+   * official), no-budget (a search was needed but the budget is spent), error (nothing learned, try again later), off (no key or allow-list).
+   */
+  const batchResolve = async (song, { allowSearch = true } = {}) => {
+    if (!song?.title) return { via: 'skip' };
+    const o = getOverride(song);
+    if (o?.hidden) return { via: 'hidden' };
+    if (o?.videoId) return { via: 'admin', videoId: o.videoId };
+    const c = curatedMatch(song);
+    if (c) return { via: 'curated', videoId: c.videoId };
+    if (!apiEnabled()) return { via: 'off' };
+    await loadIndex();
+    if (index.ok) {
+      const viaIndex = matchIndex(song);
+      if (viaIndex) return { via: 'index', videoId: viaIndex };
+    }
+    if (!allowSearch || !searchFallback) return { via: 'no-budget', reason: 'search-off' };
+    if (!spend(SEARCH_COST + VIDEOS_COST)) return { via: 'no-budget', reason: 'budget' };
+    stats.apiLookups++;
+    try {
+      const videoId = await apiSearch(song);
+      return videoId ? { via: 'search', videoId } : { via: 'none', videoId: null };
+    } catch (err) {
+      return { via: 'error', error: err.message };
+    }
+  };
+  const indexState = () => ({ ok: index.ok, entries: index.entries.length });
+
+  return { peek, lookup, attach, attachOne, checkVideo, batchResolve, indexState, stats, _budget: budget, _cache: cache, apiEnabled };
 };
 
 // Admin-chosen and flagged videos (database) come first: see services/songVideos/service.js
-export const videoLookup = createVideoLookup({ getOverride: (song) => songVideos.override(song) });
+export const videoLookup = createVideoLookup({
+  getOverride: (song) => songVideos.override(song),
+  getMatch: (key) => videoMatches.match(key)
+});

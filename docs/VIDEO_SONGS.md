@@ -65,6 +65,23 @@ The website and the Android app use the same code, so both get videos at the sam
 4. Give it a day: the first index run, then Home shows a "Video songs" shelf (4+ songs) and songs show the Audio | Video toggle in Now Playing. A wrong or missing video for one song: pick it by hand with the admin routes above.
 Quota: the index costs about channels x pages x 2 units a day (4 channels x 10 pages = 80); each per-song search about 101; Google's default is 10,000 a day.
 
+## Batch matcher (more songs get a video, without paying twice)
+`npm run video:batch --prefix backend` looks at the songs people play most, finds each one's official video (curated map, then the channel index, then a budgeted per-song search) and
+remembers the result in the table `video_matches`. The app reads that table (refreshed every 10 minutes), so a song that was searched once is never searched again, even after Render restarts.
+- **Dry run by default.** It saves nothing until you add `--apply`. A dry run still spends YouTube quota (the index and the searches), so start small.
+- Run it on YOUR computer with the same three values as the check, plus the UNPOOLED database url (never paste them in a chat):
+  `$env:YOUTUBE_API_KEY="..."; $env:VIDEO_CHANNEL_ALLOWLIST="UC...,UC..."; $env:DATABASE_URL="<unpooled url>"; npm run video:batch --prefix backend -- --limit=300 --max-units=1500`
+- Options: `--limit=N` songs (default 300, max 5000, most played first), `--max-units=N` quota for this run (default 1500, max 8000), `--apply`, `--no-search` (index only, costs a few units),
+  `--retry-none` (look again at songs recorded as "no video"; they are retried after 14 days anyway).
+- The report shows: index size, songs looked at, how many were already known, new matches from the index and from a search, songs with no official video (a sample, to see which channel to add), how many were not looked up
+  because the quota ran out, and the coverage. Run it again the next day to continue; known songs are skipped.
+- Safety: only `video_matches` rows are written (id, title, artist, source). An admin choice or a flagged video always beats a stored match; curated songs, admin choices and failed lookups are never stored; "no video found"
+  is trusted for 14 days. Stored matches are served only while `YOUTUBE_API_KEY` and `VIDEO_CHANNEL_ALLOWLIST` are set (remove either and videos switch off). Nothing is downloaded or stored but ids.
+- Quota: the script and the server count their own use, but Google's 10,000 units a day are shared. A search costs about 101 units, so 1500 units is about 14 searches after the index. More coverage per unit comes from a
+  deeper index (`VIDEO_INDEX_MAX_PAGES` up to 40) and from adding the official label channels (`npm run video:check` first).
+- Migration `20261130000000_video_matches` (additive, one new table; take the Neon backup BEFORE merging, as always). Tests: `node test/video-batch.test.js` (fake YouTube); the Prisma store and the played-songs query passed on a scratch Postgres 16.
+- UNTESTED: a run against real YouTube and the real catalogue (how many songs match, whether the matched videos are the right ones: read the report and spot-check some links before `--apply`).
+
 ## Migration: Neon dev branch first, then production
 Run these on YOUR computer. Never paste a connection string into a chat.
 1. Create a Neon dev branch from production and get its UNPOOLED url:
