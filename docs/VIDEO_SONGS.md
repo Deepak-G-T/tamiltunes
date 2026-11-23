@@ -79,7 +79,7 @@ remembers the result in the table `video_matches`. The app reads that table (ref
   is trusted for 14 days. Stored matches are served only while `YOUTUBE_API_KEY` and `VIDEO_CHANNEL_ALLOWLIST` are set (remove either and videos switch off). Nothing is downloaded or stored but ids.
 - Quota: the script and the server count their own use, but Google's 10,000 units a day are shared. A search costs about 101 units, so 1500 units is about 14 searches after the index. More coverage per unit comes from a
   deeper index (`VIDEO_INDEX_MAX_PAGES` up to 40) and from adding the official label channels (`npm run video:check` first).
-- Migration `20261130000000_video_matches` (additive, one new table; take the Neon backup BEFORE merging, as always). Tests: `node test/video-batch.test.js` (fake YouTube); the Prisma store and the played-songs query passed on a scratch Postgres 16.
+- Migration `20261130000100_video_matches` (additive, one new table; take the Neon backup BEFORE merging, as always). Tests: `node test/video-batch.test.js` (fake YouTube); the Prisma store and the played-songs query passed on a scratch Postgres 16.
 - UNTESTED: a run against real YouTube and the real catalogue (how many songs match, whether the matched videos are the right ones: read the report and spot-check some links before `--apply`).
 
 ## Migration: Neon dev branch first, then production

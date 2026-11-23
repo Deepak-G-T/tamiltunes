@@ -205,5 +205,5 @@ Songs may carry an optional `videoId`. It comes from the curated map `backend/sr
 ## Video batch matcher (feature/video-batch-matcher)
 - `npm run video:batch --prefix backend` (dry run by default, `--apply` saves): finds official videos for the most played songs and stores them in `video_matches` (keyed by `songKey`, so a searched song is never searched again). Notes, options and quota: `docs/VIDEO_SONGS.md` "Batch matcher".
 - Code: `services/videoBatch/run.js` (pure, tested with a fake YouTube), `services/videoMatches/{store,service}.js`, `videoLookup.batchResolve`. Admin choices, flagged videos and curated songs always win; errors are never stored; "none" expires after 14 days; stored matches need the key AND the allow-list (fail closed).
-- Migration `20261130000000_video_matches` (additive, one table; Neon backup BEFORE merging). UNTESTED: a real run against YouTube and the live catalogue; spot-check the matches before `--apply`.
+- Migration `20261130000100_video_matches` (additive, one table; Neon backup BEFORE merging). UNTESTED: a real run against YouTube and the live catalogue; spot-check the matches before `--apply`.
 
