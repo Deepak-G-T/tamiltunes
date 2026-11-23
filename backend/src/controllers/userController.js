@@ -1,6 +1,6 @@
 import { getStore } from '../community/store/index.js';
 import { normalizeUsername } from '../community/username.js';
-import { presentPublicProfile, presentAuthor, presentComment, parsePaging } from '../community/presenters.js';
+import { presentPublicProfile, presentAuthor, parsePaging } from '../community/presenters.js';
 import { db } from '../prisma/client.js';
 
 const fail = (res, status, message) => res.status(status).json({ success: false, message });
@@ -23,8 +23,8 @@ export const getPublicProfile = async (req, res, next) => {
     if (!user) return;
     const stats = await store.userStats(user.id);
     if (!isSelf(req, user) && user.isPublicProfile === false) {
-      // Playlist/like/comment counts are hidden on private profiles
-      stats.playlists = stats.favorites = stats.comments = 0;
+      // Playlist/like counts are hidden on private profiles
+      stats.playlists = stats.favorites = 0;
     } else {
       stats.playlists = await db.playlist.count({ where: { userId: user.id, ...(isSelf(req, user) ? {} : { isPublic: true }) } });
     }
@@ -102,12 +102,6 @@ export const getHistoryTab = async (req, res, next) => {
     res.json({ success: true, items, total, limit, offset, hasMore: offset + items.length < total });
   } catch (err) { next(err); }
 };
-
-export const getCommentsTab = tab(async ({ user, limit, offset, store, req }) => {
-  const { items, total } = await store.listUserComments(user.id, { limit, offset });
-  const liked = await store.likedSet(req.user?.id, items.map((c) => c.id));
-  return { items: items.map((c) => presentComment(c, { liked })), total };
-});
 
 const people = (direction) => tab(async ({ user, limit, offset, store, req }) => {
   const { items, total } = await store.listFollows(user.id, direction, { limit, offset });

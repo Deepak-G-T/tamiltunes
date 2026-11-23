@@ -32,10 +32,6 @@ router.delete('/songs/:id', adminCtrl.softDeleteSong);
 router.get('/home-content', adminCtrl.getHomeContent);
 router.put('/home-content', adminCtrl.updateHomeContent);
 
-// 5. Moderation
-router.get('/moderation/comments', adminCtrl.listReportedComments);
-router.delete('/moderation/comments/:id', adminCtrl.deleteComment);
-
 // 6. Playlists
 router.get('/playlists', adminCtrl.listAdminPlaylists);
 router.post('/playlists/:id/feature', adminCtrl.toggleFeaturePlaylist);

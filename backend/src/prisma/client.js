@@ -31,8 +31,6 @@ class InMemoryDb {
       ['home_featured_songs', { songIds: [] }],
       ['home_category_chips', { chips: ['All', 'Romance', 'Mass', 'Melody', '90s Hits', 'Anirudh', 'AR Rahman', 'Yuvan', 'Harris'] }]
     ]);
-    this._comments = new Map();
-    this._reports = new Map();
     this._playEvents = [];
   }
 
@@ -206,47 +204,6 @@ class InMemoryDb {
       this._appSettings.set(where.key, val);
       return { key: where.key, value: val, updatedAt: new Date() };
     }
-  };
-
-  comment = {
-    findMany: async ({ where, include, orderBy, take, skip } = {}) => {
-      let list = Array.from(this._comments.values());
-      const start = skip || 0;
-      const end = take !== undefined ? start + take : undefined;
-      return list.slice(start, end).map((c) => ({
-        ...c,
-        user: this.users.get(c.userId) || { name: 'User' }
-      }));
-    },
-    findUnique: async ({ where }) => {
-      const c = this._comments.get(where.id);
-      return c ? { ...c } : null;
-    },
-    count: async () => this._comments.size,
-    update: async ({ where, data }) => {
-      const c = this._comments.get(where.id);
-      if (!c) throw new Error('Comment not found');
-      const updated = { ...c, ...data };
-      this._comments.set(where.id, updated);
-      return { ...updated };
-    },
-    delete: async ({ where }) => {
-      const c = this._comments.get(where.id);
-      this._comments.delete(where.id);
-      return c;
-    }
-  };
-
-  report = {
-    findMany: async ({ where, include, take, skip } = {}) => {
-      const list = Array.from(this._reports.values());
-      return list.map((r) => ({
-        ...r,
-        comment: this._comments.get(r.commentId),
-        reporter: this.users.get(r.reporterId)
-      }));
-    },
-    count: async () => this._reports.size
   };
 
   playEvent = {

@@ -11,7 +11,7 @@ describe('what the service worker may cache', () => {
   });
   it('never auth, personal data, admin, the song/stream endpoints or writes', () => {
     for (const p of ['/api/auth/login', '/api/auth/me', '/api/me/queue', '/api/home', '/api/admin/users', '/api/favorites', '/api/history', '/api/playlists/1',
-      '/api/profile/me', '/api/songs/1/comments', '/api/music/song/abc', '/api/music/songs/abc', '/api/music/stream', '/api/songs/1/related']) expect(isCacheableApi('GET', url(p))).toBe(false);
+      '/api/profile/me', '/api/music/song/abc', '/api/music/songs/abc', '/api/music/stream', '/api/songs/1/related']) expect(isCacheableApi('GET', url(p))).toBe(false);
     expect(isCacheableApi('POST', url('/api/music/search'))).toBe(false);
     expect(PUBLIC_API.test('/api/music/search/extra')).toBe(false);
   });

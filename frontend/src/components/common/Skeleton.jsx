@@ -5,17 +5,6 @@ export const Skeleton = ({ className = '' }) => (
   <div aria-hidden="true" className={`shimmer rounded-md bg-surface-3 ${className}`} />
 );
 
-export const CommentSkeleton = () => (
-  <div className="flex gap-3 py-3" aria-hidden="true">
-    <Skeleton className="w-9 h-9 rounded-full flex-shrink-0" />
-    <div className="flex-1 space-y-2">
-      <Skeleton className="h-3 w-1/3" />
-      <Skeleton className="h-3 w-full" />
-      <Skeleton className="h-3 w-2/3" />
-    </div>
-  </div>
-);
-
 export const RowSkeleton = () => (
   <div className="flex items-center gap-3 p-2.5" aria-hidden="true">
     <Skeleton className="w-11 h-11 rounded-lg flex-shrink-0" />

@@ -13,7 +13,7 @@ const Privacy = () => (
     <H>What we keep when you have an account</H>
     <L items={[
       'Your name, email address, username and profile details you add (photo, bio). Your password is stored only as a secure hash.',
-      'Your playlists, liked songs, comments, the songs you play (to build Speed Dial, Daily Mix and "Continue listening") and your play queue (song ids only).',
+      'Your playlists, liked songs, the songs you play (to build Speed Dial, Daily Mix and "Continue listening") and your play queue (song ids only).',
       'Reports you send when a video cannot be played (which song and video, and YouTube’s error code).',
     ]} />
     <P>This data is stored on our server (Render) and database (Neon). Password-reset emails are sent through an email service (Brevo or Resend) with only your email address and the reset link.</P>

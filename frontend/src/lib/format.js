@@ -1,5 +1,5 @@
 /**
- * Small formatting helpers for the comments and profile UI.
+ * Small formatting helpers for timestamps, numbers, and profile UI.
  */
 
 /** 83 -> "1:23", 3723 -> "1:02:03". Invalid input -> "0:00". */
@@ -21,26 +21,6 @@ export function parseTimestamp(text) {
 }
 
 const TS_RE = /(?<![\d:])(\d{1,2}:[0-5]\d(?::[0-5]\d)?)(?![\d:])/g;
-
-/**
- * Split comment text into plain and timestamp parts so timestamps can render as seek buttons.
- * Text is never interpreted as HTML: callers render parts as React text nodes.
- * @param {string} body
- * @returns {{ type: 'text' | 'time', value: string, seconds?: number }[]}
- */
-export function tokenizeComment(body) {
-  const parts = [];
-  let last = 0;
-  for (const m of String(body).matchAll(TS_RE)) {
-    const seconds = parseTimestamp(m[1]);
-    if (seconds === null) continue;
-    if (m.index > last) parts.push({ type: 'text', value: body.slice(last, m.index) });
-    parts.push({ type: 'time', value: m[1], seconds });
-    last = m.index + m[1].length;
-  }
-  if (last < body.length) parts.push({ type: 'text', value: body.slice(last) });
-  return parts;
-}
 
 /** "Just now", "5m", "3h", "2d", then a short date. */
 export function timeAgo(date, now = Date.now()) {

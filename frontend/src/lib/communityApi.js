@@ -1,12 +1,9 @@
 /**
- * Thin typed wrappers over the REST API for comments, profiles and follows.
+ * Thin typed wrappers over the REST API for profiles and follows.
  * Every function resolves with the response body's data or rejects with an Error carrying `.message`
  * (server message when available) and `.status`.
  *
  * @typedef {{ id: string|null, username: string|null, name: string, role: string, avatarUrl: string|null }} Author
- * @typedef {{ id: string, songId: string, parentId: string|null, body: string, timestampSec: number|null,
- *   isPinned: boolean, likeCount: number, likedByMe: boolean, likedByArtist: boolean, replyCount: number,
- *   editedAt: string|null, createdAt: string, author: Author }} Comment
  */
 import api from '../services/api';
 import { API_BASE_URL as BASE } from '../config/app';
@@ -33,23 +30,6 @@ const run = async (promise, fallback) => {
 };
 
 const enc = encodeURIComponent;
-
-export const commentsApi = {
-  list: (songId, { sort = 'newest', cursor, limit = 20 } = {}) =>
-    run(api.get(`/songs/${enc(songId)}/comments`, { params: { sort, limit, ...(cursor ? { cursor } : {}) } }), 'Could not load comments.'),
-  poll: (songId, since) => run(api.get(`/songs/${enc(songId)}/comments/poll`, { params: { since } })),
-  replies: (id, { cursor, limit = 20 } = {}) =>
-    run(api.get(`/comments/${enc(id)}/replies`, { params: { limit, ...(cursor ? { cursor } : {}) } }), 'Could not load replies.'),
-  create: (songId, body, { parentId, timestampSec } = {}) =>
-    run(api.post(`/songs/${enc(songId)}/comments`, { body, ...(parentId ? { parentId } : {}), ...(timestampSec != null ? { timestampSec } : {}) }), 'Could not post your comment.'),
-  edit: (id, body) => run(api.patch(`/comments/${enc(id)}`, { body }), 'Could not save your edit.'),
-  remove: (id) => run(api.delete(`/comments/${enc(id)}`), 'Could not delete that comment.'),
-  like: (id) => run(api.post(`/comments/${enc(id)}/like`)),
-  unlike: (id) => run(api.delete(`/comments/${enc(id)}/like`)),
-  pin: (id) => run(api.post(`/comments/${enc(id)}/pin`), 'Could not pin that comment.'),
-  unpin: (id) => run(api.delete(`/comments/${enc(id)}/pin`)),
-  report: (id, reason) => run(api.post(`/comments/${enc(id)}/report`, { reason }), 'Could not send your report.'),
-};
 
 export const profileApi = {
   me: () => run(api.get('/profile/me'), 'Could not load your profile.'),
