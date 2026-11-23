@@ -208,3 +208,9 @@ Songs may carry an optional `videoId`. It comes from the curated map `backend/sr
 - Migration `20261130000000_video_matches` (additive, one table; Neon backup BEFORE merging). UNTESTED: a real run against YouTube and the live catalogue; spot-check the matches before `--apply`.
 - `--recent=N` (services/videoBatch/recent.js): starts from each channel's newest N uploads, parses "Song - Video Song | Film", finds the song in the catalogue (title AND film must match) and saves the pair. Never replaces a saved video. UNTESTED against live JioSaavn: dry run and spot-check before `--apply`.
 
+## Website updates itself (feature/auto-update)
+- The website (service worker, not the Android app) applies a new version by itself: `frontend/src/lib/autoUpdate.js` (`shouldAutoApply`) decides, `lib/pwa.js` (`tryAutoApply`) does it. Rules: never while a song plays; only right after the page opened (first 20 s) or when the tab is hidden; at most once per 2 minutes (no reload loop); otherwise the bar still offers "Reload". It also looks for a new version hourly and when the tab comes back (not more often than every 10 minutes).
+- The reload is explicit (`controllerchange` -> `location.reload()`): the library reloads only in some cases. `registerType` stays `prompt`. `PwaBar` tells `pwa.js` whether music is playing (`setPlayingProbe`).
+- `npm run test:pwa --prefix frontend` now also runs `scripts/pwa-update-audit.mjs` (a real changed worker file: applied after opening, only the bar on an old visible page, applied when hidden). Do not `await` closing a Playwright context there: it hung for minutes.
+- UNTESTED: a real phone browser / installed PWA, and a real Vercel deploy followed by an open tab.
+
