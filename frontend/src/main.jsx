@@ -6,8 +6,10 @@ import { registerServiceWorker, captureInstallPrompt } from './lib/pwa'
 import { initTokenStore } from './lib/tokenStore'
 import { initNative } from './lib/native'
 import { initMonitoring } from './lib/monitoring'
+import { startWarmUp } from './lib/warmUp'
 import ErrorBoundary from './components/common/ErrorBoundary'
 
+startWarmUp() // wake the sleeping server early (a silent ping to /health)
 initMonitoring() // error reports: on only when VITE_SENTRY_DSN was set at build time
 
 // The saved login is loaded first (inside the Android app it lives in private storage and loads asynchronously), then the app draws
