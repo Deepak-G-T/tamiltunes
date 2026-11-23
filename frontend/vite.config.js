@@ -22,7 +22,7 @@ export default defineConfig(({ mode }) => ({
       strategies: 'injectManifest', // our own worker in src/sw.js: it decides exactly what may be cached
       srcDir: 'src',
       filename: 'sw.js',
-      registerType: 'prompt', // a new version waits for "Reload": a silent reload would stop the music
+      registerType: 'prompt', // a new version waits; lib/autoUpdate.js applies it by itself only when safe (never while music plays), else the bar offers "Reload"
       injectRegister: false, // registered in src/lib/pwa.js (not inside the native app)
       includeAssets: ['favicon.svg', 'offline.html', 'icons/apple-touch-icon.png'],
       injectManifest: { globPatterns: ['**/*.{js,css,html,svg,png,woff2,webmanifest}'], globIgnores: ['**/splash-source.png', '**/screenshot-*.png'], maximumFileSizeToCacheInBytes: 3 * 1024 * 1024 },
