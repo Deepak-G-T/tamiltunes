@@ -414,3 +414,18 @@ model UserTaste {
 
   @@map("user_taste")
 }
+
+/// Result of the batch video matcher (scripts/match-videos.mjs): the official upload a song matched, or "no video found" (video_id null).
+/// Keyed by the lookup's song key (normalised title|first artist), not by song id: most songs come live from the music provider.
+/// An admin choice or a flagged video (songs table) always beats a row here. Nothing but ids and titles is stored.
+model VideoMatch {
+  songKey   String   @id @map("song_key")
+  videoId   String?  @map("video_id")
+  title     String
+  artist    String
+  source    String   // index | search | none
+  checkedAt DateTime @default(now()) @map("checked_at")
+
+  @@index([checkedAt])
+  @@map("video_matches")
+}
