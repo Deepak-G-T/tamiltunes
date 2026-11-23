@@ -25,6 +25,7 @@ Music providers: jiosaavn (unlicensed, personal/portfolio only), youtube (IFrame
 - audit/golden_labeled.csv needs hand labels from the owner.
 - Mobile full-screen player and YouTube autoplay must be tested on a real phone.
 - Stream proxy: keep ENABLE_EXTERNAL_STREAMS off in production.
+- Cold start (Render free sleeps after 15 min, ~30 s to wake): migrations run at BUILD time (`render.yaml`), the port opens before the database is ready (`backend/src/startup.js`: /health and preflights answer at once, other requests wait for the DB), the app pings `/api/health` early (`frontend/src/lib/warmUp.js`). Keep-awake pinger and the paid option: `docs/COLD_START.md`. Never point a pinger at a route that reads the database (it keeps Neon awake).
 - Required env: Render needs DATABASE_URL, JWT_SECRET, NODE_ENV=production, CORS_ORIGIN (explicit origins), VERCEL_TEAM_SLUG, MUSIC_PROVIDER. Vercel needs VITE_API_BASE_URL.
 - Database: production runs on Neon (Singapore, Postgres 18). `DATABASE_URL` is a Render dashboard value
   (`sync: false` in render.yaml), set to the Neon DIRECT string with `?sslmode=require&connect_timeout=15&connection_limit=5`.
