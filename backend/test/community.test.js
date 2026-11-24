@@ -4,6 +4,7 @@ import { checkContent } from '../src/community/contentFilter.js';
 import { validateUsername, suggestUsername } from '../src/community/username.js';
 import { validateAvatarDataUrl, AVATAR_MAX_BYTES } from '../src/community/avatar.js';
 import { profileUpdateSchema } from '../src/community/schemas.js';
+import { createPrismaStore } from '../src/community/store/prismaStore.js';
 
 // sanitize
 assert.equal(sanitizeText('<script>alert(1)</script>hi <b>there</b>'), 'alert(1)hi there');
@@ -64,3 +65,22 @@ assert.equal(profileUpdateSchema.safeParse({ bio: 'x'.repeat(151) }).success, fa
 assert.equal(profileUpdateSchema.safeParse({ role: 'admin' }).success, false, 'role cannot be self-assigned');
 assert.equal(profileUpdateSchema.safeParse({ email: 'a@b.c' }).success, false);
 console.log('✓ schemas: 150-char bio, no privilege fields');
+
+// prismaStore userStats
+const calls = [];
+const mockPrisma = {
+  favorite: { count: async (args) => { calls.push(['favorite', args]); return 2; } },
+  playlist: { count: async (args) => { calls.push(['playlist', args]); return 3; } },
+  follow: { count: async (args) => { calls.push(['follow', args]); return 4; } },
+};
+const store = createPrismaStore(mockPrisma);
+const stats = await store.userStats('u1');
+assert.deepEqual(stats, { favorites: 2, playlists: 3, followers: 4, following: 4 });
+assert.deepEqual(calls, [
+  ['favorite', { where: { userId: 'u1' } }],
+  ['playlist', { where: { userId: 'u1' } }],
+  ['follow', { where: { followedId: 'u1' } }],
+  ['follow', { where: { followerId: 'u1' } }],
+]);
+console.log('✓ prismaStore.userStats passes where clauses to count queries');
+

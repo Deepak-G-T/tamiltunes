@@ -25,8 +25,8 @@ export function createPrismaStore(prisma) {
       const [favorites, playlists, followers, following] = await Promise.all([
         prisma.favorite.count({ where: { userId: id } }),
         prisma.playlist.count({ where: { userId: id } }),
-        prisma.follow.count({ followedId: id }),
-        prisma.follow.count({ followerId: id }),
+        prisma.follow.count({ where: { followedId: id } }),
+        prisma.follow.count({ where: { followerId: id } }),
       ]);
       return { favorites, playlists, followers, following };
     },
